@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cstring>
+#include <vector>
 
 /*
  * Pixel Packing Implementation for Blackmagic DeckLink API
@@ -16,7 +17,7 @@
  * - 12-bit function: Expect 12-bit values (0-4095)
  * 
  * All functions include range checking and will clamp values to valid ranges.
- * All functions fill entire frames with the specified color.
+ * These functions are focused purely on packing existing image data.
  */
 
 /**
@@ -65,7 +66,7 @@ static uint8_t low_8_of_12(uint16_t channel) {
 
 /**
  * Helper function to pack 8 pixels into 36 bytes
- * bmdFormat12BitRGB : ‘R12B’
+ * bmdFormat12BitRGB : 'R12B'
  * Big-endian RGB 12-bit per component with full range (0-4095).
  * Packed as 12-bit per component.
  * This 12-bit pixel format is compatible with SMPTE 268M Digital
@@ -85,12 +86,6 @@ static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr,
      * - g_channels[8]: Array of 8 green channel values (12-bit each, 0-4095)
      * - b_channels[8]: Array of 8 blue channel values (12-bit each, 0-4095)
      */
-    
-    // Clear the 36-byte buffer first
-    std::memset(groupPtr, 0, 36);
-    
-    // TODO: Replace this placeholder pattern with the correct interleaving
-    // The pattern below is just an example and needs to be customized
     
     // word 0
     groupPtr[3] = low_8_of_12(r_channels[0]);
@@ -147,177 +142,150 @@ static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr,
     groupPtr[32] = high_8_of_12(b_channels[7]);
 }
 
-void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                        uint8_t r, uint8_t g, uint8_t b, bool isBGRA) {
+// Packing functions that separate packing from filling
+
+void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
+                        int32_t width, int32_t height, int32_t rowBytes, bool isBGRA) {
     /*
-     * 8-bit RGB Frame Filling (BGRA/ARGB format)
+     * Pack 8-bit RGB image data into BGRA/ARGB format
      * 
-     * Fills the entire frame with 8-bit RGB values packed into 32-bit words.
-     * Supports both BGRA and ARGB byte orderings.
-     * 
-     * Format: AARRGGBB (ARGB) or AABBGGRR (BGRA)
-     * Alpha is set to 0xFF (fully opaque)
-     * 
-     * Range checking: Input values are already uint8_t, so they're automatically
-     * clamped to 0-255 range.
+     * Packs existing 8-bit RGB image data into BGRA or ARGB format.
+     * This function separates the packing logic from frame filling.
      */
     
-    uint32_t* pixels = static_cast<uint32_t*>(frameData);
-    uint32_t color;
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
     
-    if (isBGRA) {
-        // BGRA format: AABBGGRR
-        color = (0xFF << 24) | (r << 16) | (g << 8) | b;
-    } else {
-        // ARGB format: AARRGGBB  
-        color = (0xFF << 24) | (b << 16) | (g << 8) | r;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint8_t r = srcR[srcIndex];
+            uint8_t g = srcG[srcIndex];
+            uint8_t b = srcB[srcIndex];
+            
+            uint32_t color;
+            if (isBGRA) {
+                // BGRA format: AABBGGRR
+                color = (0xFF << 24) | (r << 16) | (g << 8) | b;
+            } else {
+                // ARGB format: AARRGGBB  
+                color = (0xFF << 24) | (b << 16) | (g << 8) | r;
+            }
+            
+            pixels[destIndex] = color;
+        }
     }
     
-    // Fill the entire frame with the packed color
-    for (int i = 0; i < width * height; ++i) {
-        pixels[i] = color;
-    }
-    
-    std::cerr << "[PixelPacking] 8-bit RGB frame filled: " << width << "x" << height 
-              << " with color (" << (int)r << "," << (int)g << "," << (int)b << ")" << std::endl;
+    std::cerr << "[PixelPacking] 8-bit RGB image packed: " << width << "x" << height 
+              << " into " << (isBGRA ? "BGRA" : "ARGB") << " format" << std::endl;
 }
 
-void fill_10bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                         uint16_t r, uint16_t g, uint16_t b) {
+void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+                         int32_t width, int32_t height, int32_t rowBytes) {
     /*
-     * 10-bit RGB Frame Filling
+     * Pack 10-bit RGB image data into 10-bit RGB format
      * 
-     * Fills the entire frame with 10-bit RGB values packed into 32-bit words.
-     * No scaling is performed - values should already be in 10-bit range.
-     * 
-     * PACKING:
-     * - Bits 0-9: Blue channel (10 bits)
-     * - Bits 10-19: Green channel (10 bits)  
-     * - Bits 20-29: Red channel (10 bits)
-     * - Bits 30-31: Unused (padding)
-     * 
-     * RANGE CHECKING:
-     * - Clamps values to 0-1023 range (10-bit)
+     * Packs existing 10-bit RGB image data into 10-bit RGB format.
+     * This function separates the packing logic from frame filling.
      */
     
-    uint32_t* pixels = static_cast<uint32_t*>(frameData);
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
     
-    // Clamp values to 10-bit range (0-1023)
-    r = std::min(r, static_cast<uint16_t>(1023));
-    g = std::min(g, static_cast<uint16_t>(1023));
-    b = std::min(b, static_cast<uint16_t>(1023));
-    
-    // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
-    uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
-    
-    // Fill the entire frame with the packed color
-    for (int i = 0; i < width * height; ++i) {
-        pixels[i] = color;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint16_t r = std::min(srcR[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t g = std::min(srcG[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t b = std::min(srcB[srcIndex], static_cast<uint16_t>(1023));
+            
+            // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
+            uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
+            
+            pixels[destIndex] = color;
+        }
     }
     
-    std::cerr << "[PixelPacking] 10-bit RGB frame filled: " << width << "x" << height 
-              << " with color (" << r << "," << g << "," << b << ")" << std::endl;
+    std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
 }
 
-void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                         uint16_t y, uint16_t u, uint16_t v) {
+void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+                         int32_t width, int32_t height, int32_t rowBytes) {
     /*
-     * 10-bit YUV Frame Filling
+     * Pack 10-bit YUV image data into 10-bit YUV format
      * 
-     * Fills the entire frame with 10-bit YUV values packed into 32-bit words.
-     * No color space conversion is performed - values should already be in YUV space.
-     * 
-     * PACKING:
-     * - Bits 0-9: U channel (10 bits)
-     * - Bits 10-19: Y channel (10 bits)
-     * - Bits 20-29: V channel (10 bits)
-     * - Bits 30-31: Unused (padding)
-     * 
-     * RANGE CHECKING:
-     * - Clamps values to 0-1023 range (10-bit)
+     * Packs existing 10-bit YUV image data into 10-bit YUV format.
+     * This function separates the packing logic from frame filling.
      */
     
-    uint32_t* pixels = static_cast<uint32_t*>(frameData);
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
     
-    // Clamp values to 10-bit range (0-1023)
-    y = std::min(y, static_cast<uint16_t>(1023));
-    u = std::min(u, static_cast<uint16_t>(1023));
-    v = std::min(v, static_cast<uint16_t>(1023));
-    
-    // Pack into 32-bit word: U[9:0] | Y[9:0] << 10 | V[9:0] << 20
-    uint32_t color = (u & 0x3FF) | ((y & 0x3FF) << 10) | ((v & 0x3FF) << 20);
-    
-    // Fill the entire frame with the packed color
-    for (int i = 0; i < width * height; ++i) {
-        pixels[i] = color;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint16_t y_val = std::min(srcY[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t u = std::min(srcU[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t v = std::min(srcV[srcIndex], static_cast<uint16_t>(1023));
+            
+            // Pack into 32-bit word: U[9:0] | Y[9:0] << 10 | V[9:0] << 20
+            uint32_t color = (u & 0x3FF) | ((y_val & 0x3FF) << 10) | ((v & 0x3FF) << 20);
+            
+            pixels[destIndex] = color;
+        }
     }
     
-    std::cerr << "[PixelPacking] 10-bit YUV frame filled: " << width << "x" << height 
-              << " with color (" << y << "," << u << "," << v << ")" << std::endl;
+    std::cerr << "[PixelPacking] 10-bit YUV image packed: " << width << "x" << height << std::endl;
 }
 
-void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 
-                         uint16_t r, uint16_t g, uint16_t b) {
+void pack_12bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+                         int32_t width, int32_t height, int32_t rowBytes) {
     /*
-     * 12-bit RGB Interleaved Packing Implementation (Refactored)
+     * Pack 12-bit RGB image data into 12-bit RGB format
      * 
-     * This function implements the complex 12-bit RGB interleaved packing scheme
-     * used by Blackmagic DeckLink devices. The implementation has been refactored
-     * to process 8 separately defined pixels across 36 bytes for easier customization.
-     * 
-     * PACKING SCHEME:
-     * - Each pixel: 36 bits (4.5 bytes)
-     * - 8 pixels fit into 36 bytes (288 bits total)
-     * - Each 12-bit channel is split into low 8 bits and high 4 bits
-     * - The 36 bytes are organized to accommodate 8 pixels with interleaved packing
-     * 
-     * IMPLEMENTATION:
-     * Uses the pack_8_pixels_into_36_bytes helper function to provide a clear
-     * structure for defining the correct pixel interleaving pattern.
-     * 
-     * RANGE CHECKING:
-     * - Clamps values to 0-4095 range (12-bit)
+     * Packs existing 12-bit RGB image data into 12-bit RGB format using interleaved packing.
+     * This function separates the packing logic from frame filling.
      */
     
-    uint8_t* bytes = static_cast<uint8_t*>(frameData);
+    uint8_t* bytes = static_cast<uint8_t*>(destData);
     
-    std::cerr << "[PixelPacking] Filling 12-bit RGB frame with interleaved packing: " 
-              << width << "x" << height << ", rowBytes: " << rowBytes << std::endl;
-    
-    // Clamp values to 12-bit range (0-4095)
-    r = std::min(r, static_cast<uint16_t>(4095));
-    g = std::min(g, static_cast<uint16_t>(4095));
-    b = std::min(b, static_cast<uint16_t>(4095));
+    std::cerr << "[PixelPacking] Packing 12-bit RGB image: " << width << "x" << height 
+              << ", rowBytes: " << rowBytes << std::endl;
     
     for (int y = 0; y < height; y++) {
         uint8_t* row = bytes + (y * rowBytes);
         
         // Process pixels in groups of 8 (36 bytes per group)
         for (int x = 0; x < width; x += 8) {
-            // Calculate the number of pixels to process in this group
-            //int pixelsInThisGroup = std::min(8, width - x);
-            
             // Base address for this pixel group (36 bytes)
             uint8_t* groupPtr = row + ((x / 8) * 36);
             
             // Prepare arrays for the 8 pixels in this group
-            // For now, all pixels will have the same color (can be customized later)
             uint16_t r_channels[8], g_channels[8], b_channels[8];
             
-            // Fill the arrays with the current color values
+            // Fill the arrays with image data
             for (int i = 0; i < 8; i++) {
-                r_channels[i] = r;  // Use full 12-bit red value
-                g_channels[i] = g;  // Use full 12-bit green value
-                b_channels[i] = b;  // Use full 12-bit blue value
+                int pixelX = x + i;
+                if (pixelX < width) {
+                    int srcIndex = y * width + pixelX;
+                    r_channels[i] = std::min(srcR[srcIndex], static_cast<uint16_t>(4095));
+                    g_channels[i] = std::min(srcG[srcIndex], static_cast<uint16_t>(4095));
+                    b_channels[i] = std::min(srcB[srcIndex], static_cast<uint16_t>(4095));
+                } else {
+                    // Pad with zeros if we're at the end of a row
+                    r_channels[i] = 0;
+                    g_channels[i] = 0;
+                    b_channels[i] = 0;
+                }
             }
             
             // Use the helper function to pack 8 pixels into 36 bytes
-            pack_8_pixels_into_36_bytes(groupPtr, 
-                                       r_channels, g_channels, b_channels);
+            pack_8_pixels_into_36_bytes(groupPtr, r_channels, g_channels, b_channels);
         }
     }
     
-    std::cerr << "[PixelPacking] 12-bit RGB frame filled successfully with interleaved packing" << std::endl;
-    std::cerr << "[PixelPacking] NOTE: Current implementation uses placeholder interleaving pattern" << std::endl;
-    std::cerr << "[PixelPacking] TODO: Replace with correct 8-pixel interleaving across 36 bytes" << std::endl;
+    std::cerr << "[PixelPacking] 12-bit RGB image packed successfully with interleaved packing" << std::endl;
 } 

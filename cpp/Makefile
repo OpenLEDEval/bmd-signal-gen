@@ -7,7 +7,7 @@ CXXFLAGS = -std=c++17 -Wall -O2 -fPIC -I"Blackmagic DeckLink SDK 14.4/Mac/includ
 LDFLAGS = -dynamiclib -framework CoreFoundation -F/Library/Frameworks -framework DeckLinkAPI
 
 # Source files
-SRC = decklink_wrapper.cpp pixel_packing.cpp
+SRC = decklink_wrapper.cpp pixel_packing.cpp draw_image.cpp
 TARGET = ../lib/libdecklink.dylib
 
 # Default target

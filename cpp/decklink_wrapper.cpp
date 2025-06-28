@@ -1,5 +1,6 @@
 #include "decklink_wrapper.h"
 #include "pixel_packing.h"
+#include "draw_image.h"
 #include <iostream>
 #include <algorithm>
 #include <cstring>

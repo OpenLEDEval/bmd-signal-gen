@@ -6,9 +6,9 @@
 /*
  * Pixel Packing Schemes for Blackmagic DeckLink API
  * 
- * This header defines the interface for filling frame buffers with RGB color data
- * in various pixel formats supported by Blackmagic DeckLink devices. Each function
- * handles the specific bit depth and packing requirements for optimal hardware compatibility.
+ * This header defines the interface for packing image data into various pixel formats
+ * supported by Blackmagic DeckLink devices. Each function handles the specific bit depth
+ * and packing requirements for optimal hardware compatibility.
  * 
  * INPUT RANGES:
  * - 8-bit functions: Expect 8-bit values (0-255)
@@ -16,85 +16,72 @@
  * - 12-bit function: Expect 12-bit values (0-4095)
  * 
  * All functions include range checking and will clamp values to valid ranges.
- * All functions fill entire frames with the specified color.
+ * These functions are focused purely on packing existing image data.
  */
 
 /**
- * Fill a frame buffer with 8-bit RGB data in BGRA/ARGB format
+ * Pack 8-bit RGB image data into BGRA/ARGB format
  * 
- * Fills the entire frame with the specified RGB color packed into 8-bit BGRA or ARGB format.
+ * Packs existing 8-bit RGB image data into BGRA or ARGB format.
  * 
- * @param frameData Pointer to frame buffer
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (8-bit, 0-255)
+ * @param srcG Pointer to source green channel data (8-bit, 0-255)
+ * @param srcB Pointer to source blue channel data (8-bit, 0-255)
  * @param width Frame width in pixels
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
- * @param r Red channel (0-255, will be clamped if out of range)
- * @param g Green channel (0-255, will be clamped if out of range)
- * @param b Blue channel (0-255, will be clamped if out of range)
  * @param isBGRA true for BGRA format, false for ARGB format
  */
-void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                        uint8_t r, uint8_t g, uint8_t b, bool isBGRA = true);
+void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
+                        int32_t width, int32_t height, int32_t rowBytes, bool isBGRA = true);
 
 /**
- * Fill a frame buffer with 10-bit RGB data
+ * Pack 10-bit RGB image data into 10-bit RGB format
  * 
- * Fills the entire frame with the specified RGB color packed into 10-bit RGB format.
- * No scaling is performed - values should already be in 10-bit range.
+ * Packs existing 10-bit RGB image data into 10-bit RGB format.
  * 
- * @param frameData Pointer to frame buffer
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (10-bit, 0-1023)
+ * @param srcG Pointer to source green channel data (10-bit, 0-1023)
+ * @param srcB Pointer to source blue channel data (10-bit, 0-1023)
  * @param width Frame width in pixels
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
- * @param r Red channel (0-1023, will be clamped if out of range)
- * @param g Green channel (0-1023, will be clamped if out of range)
- * @param b Blue channel (0-1023, will be clamped if out of range)
  */
-void fill_10bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                         uint16_t r, uint16_t g, uint16_t b);
+void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+                         int32_t width, int32_t height, int32_t rowBytes);
 
 /**
- * Fill a frame buffer with 10-bit YUV data
+ * Pack 10-bit YUV image data into 10-bit YUV format
  * 
- * Fills the entire frame with the specified YUV color packed into 10-bit YUV format.
- * No color space conversion is performed - values should already be in YUV space.
+ * Packs existing 10-bit YUV image data into 10-bit YUV format.
  * 
- * @param frameData Pointer to frame buffer
+ * @param destData Pointer to destination frame buffer
+ * @param srcY Pointer to source Y channel data (10-bit, 0-1023)
+ * @param srcU Pointer to source U channel data (10-bit, 0-1023)
+ * @param srcV Pointer to source V channel data (10-bit, 0-1023)
  * @param width Frame width in pixels
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
- * @param y Y channel (0-1023, will be clamped if out of range)
- * @param u U channel (0-1023, will be clamped if out of range)
- * @param v V channel (0-1023, will be clamped if out of range)
  */
-void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
-                         uint16_t y, uint16_t u, uint16_t v);
+void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+                         int32_t width, int32_t height, int32_t rowBytes);
 
 /**
- * Fill a frame buffer with 12-bit RGB data using interleaved packing
+ * Pack 12-bit RGB image data into 12-bit RGB format
  * 
- * This function implements the complex 12-bit RGB interleaved packing scheme
- * used by Blackmagic DeckLink devices. Each 12-bit RGB pixel is split into
- * low 8 bits and high 4 bits for each channel, then interleaved across bytes.
+ * Packs existing 12-bit RGB image data into 12-bit RGB format using interleaved packing.
  * 
- * PACKING SCHEME:
- * - Each pixel: 36 bits (4.5 bytes)
- * - 8 pixels fit into 36 bytes
- * - Byte 0: R_low[7:0]
- * - Byte 1: G_low[7:0] 
- * - Byte 2: B_low[7:0]
- * - Byte 3: R_high[3:0] | G_high[3:0] << 4
- * - Byte 4: B_high[3:0] | (unused bits)
- * 
- * @param frameData Pointer to frame buffer
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (12-bit, 0-4095)
+ * @param srcG Pointer to source green channel data (12-bit, 0-4095)
+ * @param srcB Pointer to source blue channel data (12-bit, 0-4095)
  * @param width Frame width in pixels
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
- * @param r Red channel (0-4095, will be clamped if out of range)
- * @param g Green channel (0-4095, will be clamped if out of range)
- * @param b Blue channel (0-4095, will be clamped if out of range)
  */
-void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 
-                         uint16_t r, uint16_t g, uint16_t b);
+void pack_12bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+                         int32_t width, int32_t height, int32_t rowBytes);
 
 #endif // PIXEL_PACKING_H 
