@@ -184,6 +184,7 @@ private:
     int fillFrameWithColor();
     int applyEOTFMetadata();
     uint32_t convertRGBToPixelFormat(int r, int g, int b, BMDPixelFormat format);
+    void logFrameInfo(const char* context);
 };
 
 // Thin C wrapper for ctypes compatibility

@@ -153,12 +153,30 @@ int DeckLinkColorPatch::setColor(uint16_t r, uint16_t g, uint16_t b) {
     return 0;
 }
 
+void DeckLinkColorPatch::logFrameInfo(const char* context) {
+    if (m_frame) {
+        BMDFrameFlags flags = m_frame->GetFlags();
+        int32_t width = m_frame->GetWidth();
+        int32_t height = m_frame->GetHeight();
+        int32_t rowBytes = m_frame->GetRowBytes();
+        BMDPixelFormat format = m_frame->GetPixelFormat();
+        
+        std::cerr << "[DeckLink] Frame info " << context << ":" << std::endl;
+        std::cerr << "  Width: " << std::dec << width << ", Height: " << std::dec << height << std::endl;
+        std::cerr << "  RowBytes: " << std::dec << rowBytes << std::endl;
+        std::cerr << "  PixelFormat: " << std::hex << getPixelFormatName(format) << std::dec << std::endl;
+        std::cerr << "  Flags: 0x" << std::hex << flags << std::dec << std::endl;
+    } else {
+        std::cerr << "[DeckLink] No frame available for logging" << std::endl;
+    }
+}
+
 int DeckLinkColorPatch::startOutput() {
     if (!m_output || !m_frame) return -1;
     if (m_outputEnabled) return 0;
 
     // Log pixel format and display mode
-    std::cerr << "[DeckLink] Enabling video output: display mode bmdModeHD1080p30, pixel format: " << getPixelFormatName(m_pixelFormat) << " (" << std::hex << m_pixelFormat << ")" << std::endl;
+    std::cerr << "[DeckLink] Enabling video output: display mode bmdModeHD1080p30, pixel format: " << getPixelFormatName(m_pixelFormat) << " (" << std::hex << m_pixelFormat << ")" << std::dec << std::endl;
 
     HRESULT enableResult = m_output->EnableVideoOutput(bmdModeHD1080p30, bmdVideoOutputFlagDefault);
     if (enableResult != S_OK) {
@@ -168,19 +186,7 @@ int DeckLinkColorPatch::startOutput() {
     m_outputEnabled = true;
 
     // Log frame information before scheduling
-    if (m_frame) {
-        BMDFrameFlags flags = m_frame->GetFlags();
-        int32_t width = m_frame->GetWidth();
-        int32_t height = m_frame->GetHeight();
-        int32_t rowBytes = m_frame->GetRowBytes();
-        BMDPixelFormat format = m_frame->GetPixelFormat();
-        
-        std::cerr << "[DeckLink] Frame info before scheduling:" << std::endl;
-        std::cerr << "  Width: " << std::dec << width << ", Height: " << std::dec << height << std::endl;
-        std::cerr << "  RowBytes: " << std::dec << rowBytes << std::endl;
-        std::cerr << "  PixelFormat: " << std::hex << format << std::dec << std::endl;
-        std::cerr << "  Flags: 0x" << std::hex << flags << std::dec << std::endl;
-    }
+    logFrameInfo("before scheduling");
 
     HRESULT schedResult = m_output->ScheduleVideoFrame(m_frame, 0, 1, 30);
     if (schedResult != S_OK) {
