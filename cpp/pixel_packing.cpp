@@ -29,31 +29,14 @@
  * @param channelB Second 12-bit channel (0-4095)
  * @return Swizzled byte with low 4 bits of A and high 4 bits of B
  */
-static uint8_t pack_two_12bit_channels(uint16_t channelA, uint16_t channelB) {
-    /*
-     * Pack two 12-bit channels into a single byte
-     * 
-     * INPUT:
-     * - channelA: 12-bit value (0-4095) - low 4 bits will be used
-     * - channelB: 12-bit value (0-4095) - high 4 bits will be used
-     * 
-     * OUTPUT:
-     * - Single byte with format: [A_low_4bits][B_high_4bits]
-     * 
-     * BIT LAYOUT:
-     * - Bits 0-3: channelB[11:8] (high 4 bits of channel B, which become low 4 bits in output)
-     * - Bits 4-7: channelA[3:0] (low 4 bits of channel A, which become high 4 bits in output)
-     */
-    
+static uint8_t swizzle_two_12(uint16_t channelA, uint16_t channelB) {
     // Extract 4 bits from each channel
     uint8_t b_high_4bits = (channelB & 0xF0) >> 4;  // channelB[11:8]
     uint8_t a_low_4bits = channelA & 0x0F;  // channelA[3:0]
     
     // Swizzle into single byte: [A_low_4bits][B_high_4bits]
     // This puts A's low 4 bits in the high 4 bits of the output byte
-    uint8_t packed_byte = (a_low_4bits << 4) | b_high_4bits;
-    
-    return packed_byte;
+    return (a_low_4bits << 4) | b_high_4bits;
 }
 
 /**
@@ -64,25 +47,8 @@ static uint8_t pack_two_12bit_channels(uint16_t channelA, uint16_t channelB) {
  * @param channel 12-bit channel (0-4095)
  * @return High 8 bits of the channel (bits 11-4)
  */
-static uint8_t high_8bits(uint16_t channel) {
-    /*
-     * Extract high 8 bits from a 12-bit channel
-     * 
-     * INPUT:
-     * - channel: 12-bit value (0-4095)
-     * 
-     * OUTPUT:
-     * - 8-bit value containing bits 11-4 of the input channel
-     * 
-     * BIT LAYOUT:
-     * - Input:  [11][10][9][8][7][6][5][4][3][2][1][0]
-     * - Output: [7][6][5][4][3][2][1][0] (bits 11-4 of input)
-     */
-    
-    // Extract high 8 bits: shift right by 4 to get bits 11-4
-    uint8_t high_8bits = (channel >> 4) & 0xFF;
-    
-    return high_8bits;
+static uint8_t high_8_of_12(uint16_t channel) {
+    return (channel >> 4) & 0xFF;
 }
 
 /**
@@ -93,25 +59,8 @@ static uint8_t high_8bits(uint16_t channel) {
  * @param channel 12-bit channel (0-4095)
  * @return Low 8 bits of the channel (bits 7-0)
  */
-static uint8_t low_8bits(uint16_t channel) {
-    /*
-     * Extract low 8 bits from a 12-bit channel
-     * 
-     * INPUT:
-     * - channel: 12-bit value (0-4095)
-     * 
-     * OUTPUT:
-     * - 8-bit value containing bits 7-0 of the input channel
-     * 
-     * BIT LAYOUT:
-     * - Input:  [11][10][9][8][7][6][5][4][3][2][1][0]
-     * - Output: [7][6][5][4][3][2][1][0] (bits 7-0 of input)
-     */
-    
-    // Extract low 8 bits: mask with 0xFF to get bits 7-0
-    uint8_t low_8bits = channel & 0xFF;
-    
-    return low_8bits;
+static uint8_t low_8_of_12(uint16_t channel) {
+    return channel & 0xFF;
 }
 
 /**
@@ -144,58 +93,58 @@ static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr,
     // The pattern below is just an example and needs to be customized
     
     // word 0
-    groupPtr[3] = low_8bits(r_channels[0]);
-    groupPtr[2] = pack_two_12bit_channels(g_channels[0], r_channels[0]);
-    groupPtr[1] = high_8bits(g_channels[0]);
-    groupPtr[0] = low_8bits(b_channels[0]);
+    groupPtr[3] = low_8_of_12(r_channels[0]);
+    groupPtr[2] = swizzle_two_12(g_channels[0], r_channels[0]);
+    groupPtr[1] = high_8_of_12(g_channels[0]);
+    groupPtr[0] = low_8_of_12(b_channels[0]);
 
     // word 1
-    groupPtr[7] = pack_two_12bit_channels(r_channels[1], b_channels[0]);
-    groupPtr[6] = high_8bits(r_channels[1]);
-    groupPtr[5] = low_8bits(g_channels[1]);
-    groupPtr[4] = pack_two_12bit_channels(b_channels[1], g_channels[1]);
+    groupPtr[7] = swizzle_two_12(r_channels[1], b_channels[0]);
+    groupPtr[6] = high_8_of_12(r_channels[1]);
+    groupPtr[5] = low_8_of_12(g_channels[1]);
+    groupPtr[4] = swizzle_two_12(b_channels[1], g_channels[1]);
 
     // word 2
-    groupPtr[11] = high_8bits(b_channels[1]);
-    groupPtr[10] = low_8bits(r_channels[2]);
-    groupPtr[9] = pack_two_12bit_channels(g_channels[2], r_channels[2]);
-    groupPtr[8] = high_8bits(g_channels[2]);
+    groupPtr[11] = high_8_of_12(b_channels[1]);
+    groupPtr[10] = low_8_of_12(r_channels[2]);
+    groupPtr[9] = swizzle_two_12(g_channels[2], r_channels[2]);
+    groupPtr[8] = high_8_of_12(g_channels[2]);
 
     // word 3
-    groupPtr[15] = low_8bits(b_channels[2]);
-    groupPtr[14] = pack_two_12bit_channels(r_channels[3], b_channels[2]);
-    groupPtr[13] = high_8bits(r_channels[3]);
-    groupPtr[12] = low_8bits(g_channels[3]);
+    groupPtr[15] = low_8_of_12(b_channels[2]);
+    groupPtr[14] = swizzle_two_12(r_channels[3], b_channels[2]);
+    groupPtr[13] = high_8_of_12(r_channels[3]);
+    groupPtr[12] = low_8_of_12(g_channels[3]);
 
     // word 4
-    groupPtr[19] = pack_two_12bit_channels(b_channels[3], g_channels[3]);
-    groupPtr[18] = high_8bits(b_channels[3]);
-    groupPtr[17] = low_8bits(r_channels[4]);
-    groupPtr[16] = pack_two_12bit_channels(g_channels[4], r_channels[4]);
+    groupPtr[19] = swizzle_two_12(b_channels[3], g_channels[3]);
+    groupPtr[18] = high_8_of_12(b_channels[3]);
+    groupPtr[17] = low_8_of_12(r_channels[4]);
+    groupPtr[16] = swizzle_two_12(g_channels[4], r_channels[4]);
 
     // word 5
-    groupPtr[23] = high_8bits(g_channels[4]);
-    groupPtr[22] = low_8bits(b_channels[4]);
-    groupPtr[21] = pack_two_12bit_channels(r_channels[5], b_channels[4]);
-    groupPtr[20] = high_8bits(r_channels[5]);
+    groupPtr[23] = high_8_of_12(g_channels[4]);
+    groupPtr[22] = low_8_of_12(b_channels[4]);
+    groupPtr[21] = swizzle_two_12(r_channels[5], b_channels[4]);
+    groupPtr[20] = high_8_of_12(r_channels[5]);
     
     // word 6
-    groupPtr[27] = low_8bits(g_channels[5]);
-    groupPtr[26] = pack_two_12bit_channels(b_channels[5], g_channels[5]);
-    groupPtr[25] = high_8bits(b_channels[5]);
-    groupPtr[24] = low_8bits(r_channels[6]);
+    groupPtr[27] = low_8_of_12(g_channels[5]);
+    groupPtr[26] = swizzle_two_12(b_channels[5], g_channels[5]);
+    groupPtr[25] = high_8_of_12(b_channels[5]);
+    groupPtr[24] = low_8_of_12(r_channels[6]);
 
     // word 7
-    groupPtr[31] = pack_two_12bit_channels(g_channels[6], r_channels[6]);
-    groupPtr[30] = high_8bits(g_channels[6]);
-    groupPtr[29] = low_8bits(b_channels[6]);
-    groupPtr[28] = pack_two_12bit_channels(r_channels[7], b_channels[6]);
+    groupPtr[31] = swizzle_two_12(g_channels[6], r_channels[6]);
+    groupPtr[30] = high_8_of_12(g_channels[6]);
+    groupPtr[29] = low_8_of_12(b_channels[6]);
+    groupPtr[28] = swizzle_two_12(r_channels[7], b_channels[6]);
 
     // word 8
-    groupPtr[35] = high_8bits(r_channels[7]);
-    groupPtr[34] = low_8bits(g_channels[7]);
-    groupPtr[33] = pack_two_12bit_channels(b_channels[7], g_channels[7]);
-    groupPtr[32] = high_8bits(b_channels[7]);
+    groupPtr[35] = high_8_of_12(r_channels[7]);
+    groupPtr[34] = low_8_of_12(g_channels[7]);
+    groupPtr[33] = swizzle_two_12(b_channels[7], g_channels[7]);
+    groupPtr[32] = high_8_of_12(b_channels[7]);
 }
 
 void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
