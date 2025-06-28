@@ -1,6 +1,7 @@
 #include "pixel_packing.h"
 #include <algorithm>
 #include <iostream>
+#include <cstring>
 
 /*
  * Pixel Packing Implementation for Blackmagic DeckLink API
@@ -17,6 +18,185 @@
  * All functions include range checking and will clamp values to valid ranges.
  * All functions fill entire frames with the specified color.
  */
+
+/**
+ * Swizzle a portion of two 12-bit color channels into a single byte
+ * 
+ * Takes two 12-bit color channels and swizzles a portion of them into a single byte with
+ * the following format: low 4 bits of channel B, high 4 bits of channel A
+ * 
+ * @param channelA First 12-bit channel (0-4095)
+ * @param channelB Second 12-bit channel (0-4095)
+ * @return Swizzled byte with low 4 bits of A and high 4 bits of B
+ */
+static uint8_t pack_two_12bit_channels(uint16_t channelA, uint16_t channelB) {
+    /*
+     * Pack two 12-bit channels into a single byte
+     * 
+     * INPUT:
+     * - channelA: 12-bit value (0-4095) - low 4 bits will be used
+     * - channelB: 12-bit value (0-4095) - high 4 bits will be used
+     * 
+     * OUTPUT:
+     * - Single byte with format: [A_low_4bits][B_high_4bits]
+     * 
+     * BIT LAYOUT:
+     * - Bits 0-3: channelB[11:8] (high 4 bits of channel B, which become low 4 bits in output)
+     * - Bits 4-7: channelA[3:0] (low 4 bits of channel A, which become high 4 bits in output)
+     */
+    
+    // Extract 4 bits from each channel
+    uint8_t b_high_4bits = (channelB & 0xF0) >> 4;  // channelB[11:8]
+    uint8_t a_low_4bits = channelA & 0x0F;  // channelA[3:0]
+    
+    // Swizzle into single byte: [A_low_4bits][B_high_4bits]
+    // This puts A's low 4 bits in the high 4 bits of the output byte
+    uint8_t packed_byte = (a_low_4bits << 4) | b_high_4bits;
+    
+    return packed_byte;
+}
+
+/**
+ * Extract the high 8 bits from a 12-bit color channel
+ * 
+ * Takes a 12-bit color channel and extracts the high 8 bits (bits 11-4)
+ * 
+ * @param channel 12-bit channel (0-4095)
+ * @return High 8 bits of the channel (bits 11-4)
+ */
+static uint8_t high_8bits(uint16_t channel) {
+    /*
+     * Extract high 8 bits from a 12-bit channel
+     * 
+     * INPUT:
+     * - channel: 12-bit value (0-4095)
+     * 
+     * OUTPUT:
+     * - 8-bit value containing bits 11-4 of the input channel
+     * 
+     * BIT LAYOUT:
+     * - Input:  [11][10][9][8][7][6][5][4][3][2][1][0]
+     * - Output: [7][6][5][4][3][2][1][0] (bits 11-4 of input)
+     */
+    
+    // Extract high 8 bits: shift right by 4 to get bits 11-4
+    uint8_t high_8bits = (channel >> 4) & 0xFF;
+    
+    return high_8bits;
+}
+
+/**
+ * Extract the low 8 bits from a 12-bit color channel
+ * 
+ * Takes a 12-bit color channel and extracts the low 8 bits (bits 7-0)
+ * 
+ * @param channel 12-bit channel (0-4095)
+ * @return Low 8 bits of the channel (bits 7-0)
+ */
+static uint8_t low_8bits(uint16_t channel) {
+    /*
+     * Extract low 8 bits from a 12-bit channel
+     * 
+     * INPUT:
+     * - channel: 12-bit value (0-4095)
+     * 
+     * OUTPUT:
+     * - 8-bit value containing bits 7-0 of the input channel
+     * 
+     * BIT LAYOUT:
+     * - Input:  [11][10][9][8][7][6][5][4][3][2][1][0]
+     * - Output: [7][6][5][4][3][2][1][0] (bits 7-0 of input)
+     */
+    
+    // Extract low 8 bits: mask with 0xFF to get bits 7-0
+    uint8_t low_8bits = channel & 0xFF;
+    
+    return low_8bits;
+}
+
+/**
+ * Helper function to pack 8 pixels into 36 bytes
+ * bmdFormat12BitRGB : ‘R12B’
+ * Big-endian RGB 12-bit per component with full range (0-4095).
+ * Packed as 12-bit per component.
+ * This 12-bit pixel format is compatible with SMPTE 268M Digital
+ * Moving-Picture Exchange version 1, Annex C, Method C4 packing.
+ * int framesize = ((Width * 36) / 8) * Height
+ *               = rowbytes * Height
+ * In this format, 8 pixels fit into 36 bytes.
+ */
+static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr, 
+                                       const uint16_t r_channels[8], 
+                                       const uint16_t g_channels[8], 
+                                       const uint16_t b_channels[8]) {
+    /**
+     * INPUT:
+     * - groupPtr: Pointer to 36-byte destination buffer
+     * - r_channels[8]: Array of 8 red channel values (12-bit each, 0-4095)
+     * - g_channels[8]: Array of 8 green channel values (12-bit each, 0-4095)
+     * - b_channels[8]: Array of 8 blue channel values (12-bit each, 0-4095)
+     */
+    
+    // Clear the 36-byte buffer first
+    std::memset(groupPtr, 0, 36);
+    
+    // TODO: Replace this placeholder pattern with the correct interleaving
+    // The pattern below is just an example and needs to be customized
+    
+    // word 0
+    groupPtr[3] = low_8bits(r_channels[0]);
+    groupPtr[2] = pack_two_12bit_channels(g_channels[0], r_channels[0]);
+    groupPtr[1] = high_8bits(g_channels[0]);
+    groupPtr[0] = low_8bits(b_channels[0]);
+
+    // word 1
+    groupPtr[7] = pack_two_12bit_channels(r_channels[1], b_channels[0]);
+    groupPtr[6] = high_8bits(r_channels[1]);
+    groupPtr[5] = low_8bits(g_channels[1]);
+    groupPtr[4] = pack_two_12bit_channels(b_channels[1], g_channels[1]);
+
+    // word 2
+    groupPtr[11] = high_8bits(b_channels[1]);
+    groupPtr[10] = low_8bits(r_channels[2]);
+    groupPtr[9] = pack_two_12bit_channels(g_channels[2], r_channels[2]);
+    groupPtr[8] = high_8bits(g_channels[2]);
+
+    // word 3
+    groupPtr[15] = low_8bits(b_channels[2]);
+    groupPtr[14] = pack_two_12bit_channels(r_channels[3], b_channels[2]);
+    groupPtr[13] = high_8bits(r_channels[3]);
+    groupPtr[12] = low_8bits(g_channels[3]);
+
+    // word 4
+    groupPtr[19] = pack_two_12bit_channels(b_channels[3], g_channels[3]);
+    groupPtr[18] = high_8bits(b_channels[3]);
+    groupPtr[17] = low_8bits(r_channels[4]);
+    groupPtr[16] = pack_two_12bit_channels(g_channels[4], r_channels[4]);
+
+    // word 5
+    groupPtr[23] = high_8bits(g_channels[4]);
+    groupPtr[22] = low_8bits(b_channels[4]);
+    groupPtr[21] = pack_two_12bit_channels(r_channels[5], b_channels[4]);
+    groupPtr[20] = high_8bits(r_channels[5]);
+    
+    // word 6
+    groupPtr[27] = low_8bits(g_channels[5]);
+    groupPtr[26] = pack_two_12bit_channels(b_channels[5], g_channels[5]);
+    groupPtr[25] = high_8bits(b_channels[5]);
+    groupPtr[24] = low_8bits(r_channels[6]);
+
+    // word 7
+    groupPtr[31] = pack_two_12bit_channels(g_channels[6], r_channels[6]);
+    groupPtr[30] = high_8bits(g_channels[6]);
+    groupPtr[29] = low_8bits(b_channels[6]);
+    groupPtr[28] = pack_two_12bit_channels(r_channels[7], b_channels[6]);
+
+    // word 8
+    groupPtr[35] = high_8bits(r_channels[7]);
+    groupPtr[34] = low_8bits(g_channels[7]);
+    groupPtr[33] = pack_two_12bit_channels(b_channels[7], g_channels[7]);
+    groupPtr[32] = high_8bits(b_channels[7]);
+}
 
 void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
                         uint8_t r, uint8_t g, uint8_t b, bool isBGRA) {
@@ -130,25 +310,21 @@ void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_
 void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 
                          uint16_t r, uint16_t g, uint16_t b) {
     /*
-     * 12-bit RGB Interleaved Packing Implementation
+     * 12-bit RGB Interleaved Packing Implementation (Refactored)
      * 
      * This function implements the complex 12-bit RGB interleaved packing scheme
-     * used by Blackmagic DeckLink devices. Each 12-bit RGB pixel is split into
-     * low 8 bits and high 4 bits for each channel, then interleaved across bytes.
+     * used by Blackmagic DeckLink devices. The implementation has been refactored
+     * to process 8 separately defined pixels across 36 bytes for easier customization.
      * 
      * PACKING SCHEME:
      * - Each pixel: 36 bits (4.5 bytes)
      * - 8 pixels fit into 36 bytes (288 bits total)
-     * - Byte 0: R_low[7:0]     (Red low 8 bits)
-     * - Byte 1: G_low[7:0]     (Green low 8 bits)
-     * - Byte 2: B_low[7:0]     (Blue low 8 bits)
-     * - Byte 3: R_high[3:0] | G_high[3:0] << 4  (Red high 4 bits + Green high 4 bits)
-     * - Byte 4: B_high[3:0] | (unused bits)     (Blue high 4 bits + padding)
+     * - Each 12-bit channel is split into low 8 bits and high 4 bits
+     * - The 36 bytes are organized to accommodate 8 pixels with interleaved packing
      * 
-     * MEMORY LAYOUT:
-     * - 8 pixels per group, each group is 36 bytes
-     * - Row alignment follows DeckLink API requirements
-     * - Each row is padded to the required rowBytes alignment
+     * IMPLEMENTATION:
+     * Uses the pack_8_pixels_into_36_bytes helper function to provide a clear
+     * structure for defining the correct pixel interleaving pattern.
      * 
      * RANGE CHECKING:
      * - Clamps values to 0-4095 range (12-bit)
@@ -164,60 +340,35 @@ void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_
     g = std::min(g, static_cast<uint16_t>(4095));
     b = std::min(b, static_cast<uint16_t>(4095));
     
-    // Split each 12-bit channel into low 8 bits and high 4 bits
-    uint8_t r_low = r & 0xFF;        // R[7:0]
-    uint8_t r_high = (r >> 8) & 0x0F; // R[11:8]
-    uint8_t g_low = g & 0xFF;        // G[7:0]
-    uint8_t g_high = (g >> 8) & 0x0F; // G[11:8]
-    uint8_t b_low = b & 0xFF;        // B[7:0]
-    uint8_t b_high = (b >> 8) & 0x0F; // B[11:8]
-    
     for (int y = 0; y < height; y++) {
         uint8_t* row = bytes + (y * rowBytes);
         
-        // Process pixels one at a time to handle the complex interleaving
-        for (int x = 0; x < width; x++) {
-            // Calculate pixel position in the row
-            int pixelGroup = x / 8;  // Which group of 8 pixels this belongs to
-            int pixelInGroup = x % 8; // Position within the group (0-7)
+        // Process pixels in groups of 8 (36 bytes per group)
+        for (int x = 0; x < width; x += 8) {
+            // Calculate the number of pixels to process in this group
+            //int pixelsInThisGroup = std::min(8, width - x);
             
-            // Calculate byte offset for this pixel within its group
-            // Each pixel takes 4.5 bytes, so pixel 0 starts at byte 0, pixel 1 at byte 4.5, etc.
-            int pixelByteOffset = pixelInGroup * 4; // Integer part of 4.5
+            // Base address for this pixel group (36 bytes)
+            uint8_t* groupPtr = row + ((x / 8) * 36);
             
-            // Base address for this pixel group
-            uint8_t* groupPtr = row + (pixelGroup * 36);
+            // Prepare arrays for the 8 pixels in this group
+            // For now, all pixels will have the same color (can be customized later)
+            uint16_t r_channels[8], g_channels[8], b_channels[8];
             
-            // Write the interleaved bytes for this pixel
-            int baseByte = pixelByteOffset;
-            
-            // Byte 0: R_low[7:0]
-            if (baseByte < 36) {
-                groupPtr[baseByte] = r_low;
+            // Fill the arrays with the current color values
+            for (int i = 0; i < 8; i++) {
+                r_channels[i] = r;  // Use full 12-bit red value
+                g_channels[i] = g;  // Use full 12-bit green value
+                b_channels[i] = b;  // Use full 12-bit blue value
             }
             
-            // Byte 1: G_low[7:0]
-            if (baseByte + 1 < 36) {
-                groupPtr[baseByte + 1] = g_low;
-            }
-            
-            // Byte 2: B_low[7:0]
-            if (baseByte + 2 < 36) {
-                groupPtr[baseByte + 2] = b_low;
-            }
-            
-            // Byte 3: R_high[3:0] | G_high[3:0] << 4
-            if (baseByte + 3 < 36) {
-                uint8_t combined = r_high | (g_high << 4);
-                groupPtr[baseByte + 3] = combined;
-            }
-            
-            // Byte 4: B_high[3:0] | (unused bits)
-            if (baseByte + 4 < 36) {
-                groupPtr[baseByte + 4] = b_high;
-            }
+            // Use the helper function to pack 8 pixels into 36 bytes
+            pack_8_pixels_into_36_bytes(groupPtr, 
+                                       r_channels, g_channels, b_channels);
         }
     }
     
     std::cerr << "[PixelPacking] 12-bit RGB frame filled successfully with interleaved packing" << std::endl;
+    std::cerr << "[PixelPacking] NOTE: Current implementation uses placeholder interleaving pattern" << std::endl;
+    std::cerr << "[PixelPacking] TODO: Replace with correct 8-pixel interleaving across 36 bytes" << std::endl;
 } 

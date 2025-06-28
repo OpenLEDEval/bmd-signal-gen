@@ -16,3 +16,6 @@ wheels/
 
 # libraries
 Blackmagic\ DeckLink\ SDK\ 14.4/
+
+# macOS bullshit
+.DS_Store

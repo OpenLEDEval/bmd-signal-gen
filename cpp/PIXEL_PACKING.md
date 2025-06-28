@@ -82,11 +82,11 @@ U = -0.1146*R - 0.3854*G + 0.5000*B
 V = 0.5000*R - 0.4542*G - 0.0458*B
 ```
 
-### 4. 12-bit RGB Format (`bmdFormat12BitRGB`)
+### 4. 12-bit RGB Format (`bmdFormat12BitRGB`) - REFACTORED
 
-#### Complex Interleaved Packing Scheme
+#### Complex Interleaved Packing Scheme (Refactored)
 
-This is the most complex format, requiring special handling due to the interleaved packing scheme used by Blackmagic DeckLink devices.
+This is the most complex format, requiring special handling due to the interleaved packing scheme used by Blackmagic DeckLink devices. The implementation has been **refactored** to provide a clear structure for defining the correct pixel interleaving pattern.
 
 ##### Direct 12-bit Input (No Scaling)
 - **Input**: 12-bit RGB values (0-4095) - NO SCALING PERFORMED
@@ -98,19 +98,57 @@ Each 12-bit RGB channel is split into two parts:
 - **Low 8 bits**: Channel[7:0] (stored in separate bytes)
 - **High 4 bits**: Channel[11:8] (packed into combined bytes)
 
-##### Memory Layout
+##### Memory Layout (Refactored)
 - **Per Pixel**: 36 bits (4.5 bytes)
 - **Per Group**: 8 pixels fit into 36 bytes (288 bits total)
 - **Row Alignment**: Follows DeckLink API requirements
+- **Processing**: Uses `pack_8_pixels_into_36_bytes()` helper function
 
-##### Byte Structure (per pixel)
+##### Refactored Implementation Structure
+
+The 12-bit RGB packing has been refactored to provide a clear structure for customization:
+
+```cpp
+// Helper function for 8-pixel interleaving
+static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr, 
+                                       const uint8_t r_low[8], const uint8_t r_high[8],
+                                       const uint8_t g_low[8], const uint8_t g_high[8], 
+                                       const uint8_t b_low[8], const uint8_t b_high[8]);
 ```
-Byte 0: R_low[7:0]                    (Red low 8 bits)
-Byte 1: G_low[7:0]                    (Green low 8 bits)
-Byte 2: B_low[7:0]                    (Blue low 8 bits)
-Byte 3: R_high[3:0] | G_high[3:0]<<4  (Red high 4 bits + Green high 4 bits)
-Byte 4: B_high[3:0] | (unused bits)   (Blue high 4 bits + padding)
+
+##### Customization Points
+
+The refactored implementation provides several customization points:
+
+1. **Main Function**: `fill_12bit_rgb_frame()` - Handles frame-level processing
+2. **Helper Function**: `pack_8_pixels_into_36_bytes()` - Handles 8-pixel interleaving
+3. **Input Arrays**: Separate arrays for each channel's low and high bits
+4. **Pattern Definition**: Clear structure for defining interleaving patterns
+
+##### Current Placeholder Pattern
+
+The current implementation uses a placeholder pattern that needs to be customized:
+
+```cpp
+// CURRENT PLACEHOLDER: Simple sequential packing
+for (int pixel = 0; pixel < 8; pixel++) {
+    int baseByte = pixel * 4; // Integer part of 4.5
+    
+    groupPtr[baseByte] = r_low[pixel];      // Byte 0: R_low[7:0]
+    groupPtr[baseByte + 1] = g_low[pixel];  // Byte 1: G_low[7:0]
+    groupPtr[baseByte + 2] = b_low[pixel];  // Byte 2: B_low[7:0]
+    groupPtr[baseByte + 3] = r_high[pixel] | (g_high[pixel] << 4); // Byte 3: Combined
+    groupPtr[baseByte + 4] = b_high[pixel]; // Byte 4: B_high[3:0]
+}
 ```
+
+##### Alternative Pattern Examples
+
+The implementation includes commented examples of alternative patterns:
+
+1. **Interleaved Pattern**: Alternates between 8-bit low and 4-bit high components
+2. **Planar Pattern**: Groups all low bits together, then all high bits
+3. **Custom Pattern**: Based on specific hardware requirements
 
 ##### Function
 - **Function**: `fill_12bit_rgb_frame(frameData, width, height, rowBytes, r, g, b)`
@@ -132,7 +170,7 @@ void fill_10bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_
 void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
                          uint16_t y, uint16_t u, uint16_t v);
 
-// 12-bit RGB frame filling (expects 12-bit values)
+// 12-bit RGB frame filling (expects 12-bit values) - REFACTORED
 void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 
                          uint16_t r, uint16_t g, uint16_t b);
 ```
@@ -143,6 +181,66 @@ All functions include automatic range checking and will clamp values to the vali
 - 10-bit functions: Clamp to 0-1023
 - 12-bit function: Clamp to 0-4095
 
+## 12-bit RGB Customization Guide
+
+### Understanding the 36-Byte Structure
+
+The 12-bit RGB format packs 8 pixels into 36 bytes. Each pixel contributes 4.5 bytes (36 bits):
+
+```
+Pixel 0: 36 bits (4.5 bytes)
+Pixel 1: 36 bits (4.5 bytes)
+...
+Pixel 7: 36 bits (4.5 bytes)
+Total:  288 bits (36 bytes)
+```
+
+### Channel Bit Distribution
+
+Each 12-bit channel is split as follows:
+- **Low 8 bits**: Channel[7:0] - Stored in separate bytes
+- **High 4 bits**: Channel[11:8] - Packed into combined bytes
+
+### Customization Steps
+
+1. **Identify the Correct Pattern**: Determine the exact interleaving pattern required by your DeckLink hardware
+2. **Modify the Helper Function**: Update `pack_8_pixels_into_36_bytes()` with the correct pattern
+3. **Test the Implementation**: Verify the pattern works correctly with your hardware
+4. **Optimize if Needed**: Fine-tune the implementation for performance
+
+### Pattern Examples
+
+#### Example 1: Interleaved Low/High Pattern
+```cpp
+// Interleaves low and high bits across the 36 bytes
+for (int i = 0; i < 8; i++) {
+    groupPtr[i*3] = r_low[i];     // Every 3rd byte: R_low
+    groupPtr[i*3 + 1] = g_low[i]; // Every 3rd byte + 1: G_low  
+    groupPtr[i*3 + 2] = b_low[i]; // Every 3rd byte + 2: B_low
+}
+// High bits packed into remaining bytes...
+```
+
+#### Example 2: Planar Pattern
+```cpp
+// Groups all low bits together, then all high bits
+for (int i = 0; i < 8; i++) {
+    groupPtr[i] = r_low[i];       // First 8 bytes: R_low
+    groupPtr[i + 8] = g_low[i];   // Next 8 bytes: G_low
+    groupPtr[i + 16] = b_low[i];  // Next 8 bytes: B_low
+}
+// High bits packed into remaining 12 bytes...
+```
+
+### Testing and Validation
+
+When customizing the 12-bit RGB pattern:
+
+1. **Use Known Test Patterns**: Test with simple patterns (e.g., all red, all green, all blue)
+2. **Verify Hardware Compatibility**: Test with actual DeckLink hardware
+3. **Check Memory Alignment**: Ensure proper byte alignment
+4. **Validate Color Accuracy**: Verify correct color reproduction
+5. **Performance Testing**: Measure frame filling performance
 
 ## Blackmagic DeckLink API Compatibility
 
