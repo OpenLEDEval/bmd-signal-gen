@@ -15,13 +15,15 @@
  * - 12-bit function: Expect 12-bit values (0-4095)
  * 
  * All functions include range checking and will clamp values to valid ranges.
+ * All functions fill entire frames with the specified color.
  */
 
-uint32_t pack_8bit_rgb(uint8_t r, uint8_t g, uint8_t b, bool isBGRA) {
+void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+                        uint8_t r, uint8_t g, uint8_t b, bool isBGRA) {
     /*
-     * 8-bit RGB Packing (BGRA/ARGB format)
+     * 8-bit RGB Frame Filling (BGRA/ARGB format)
      * 
-     * Packs 8-bit RGB values into a 32-bit word with alpha channel.
+     * Fills the entire frame with 8-bit RGB values packed into 32-bit words.
      * Supports both BGRA and ARGB byte orderings.
      * 
      * Format: AARRGGBB (ARGB) or AABBGGRR (BGRA)
@@ -31,20 +33,32 @@ uint32_t pack_8bit_rgb(uint8_t r, uint8_t g, uint8_t b, bool isBGRA) {
      * clamped to 0-255 range.
      */
     
+    uint32_t* pixels = static_cast<uint32_t*>(frameData);
+    uint32_t color;
+    
     if (isBGRA) {
         // BGRA format: AABBGGRR
-        return (0xFF << 24) | (r << 16) | (g << 8) | b;
+        color = (0xFF << 24) | (r << 16) | (g << 8) | b;
     } else {
         // ARGB format: AARRGGBB  
-        return (0xFF << 24) | (b << 16) | (g << 8) | r;
+        color = (0xFF << 24) | (b << 16) | (g << 8) | r;
     }
+    
+    // Fill the entire frame with the packed color
+    for (int i = 0; i < width * height; ++i) {
+        pixels[i] = color;
+    }
+    
+    std::cerr << "[PixelPacking] 8-bit RGB frame filled: " << width << "x" << height 
+              << " with color (" << (int)r << "," << (int)g << "," << (int)b << ")" << std::endl;
 }
 
-uint32_t pack_10bit_rgb(uint16_t r, uint16_t g, uint16_t b) {
+void fill_10bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+                         uint16_t r, uint16_t g, uint16_t b) {
     /*
-     * 10-bit RGB Packing
+     * 10-bit RGB Frame Filling
      * 
-     * Accepts 10-bit RGB values and packs them into a 32-bit word.
+     * Fills the entire frame with 10-bit RGB values packed into 32-bit words.
      * No scaling is performed - values should already be in 10-bit range.
      * 
      * PACKING:
@@ -57,20 +71,31 @@ uint32_t pack_10bit_rgb(uint16_t r, uint16_t g, uint16_t b) {
      * - Clamps values to 0-1023 range (10-bit)
      */
     
+    uint32_t* pixels = static_cast<uint32_t*>(frameData);
+    
     // Clamp values to 10-bit range (0-1023)
     r = std::min(r, static_cast<uint16_t>(1023));
     g = std::min(g, static_cast<uint16_t>(1023));
     b = std::min(b, static_cast<uint16_t>(1023));
     
     // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
-    return (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
+    uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
+    
+    // Fill the entire frame with the packed color
+    for (int i = 0; i < width * height; ++i) {
+        pixels[i] = color;
+    }
+    
+    std::cerr << "[PixelPacking] 10-bit RGB frame filled: " << width << "x" << height 
+              << " with color (" << r << "," << g << "," << b << ")" << std::endl;
 }
 
-uint32_t pack_10bit_yuv(uint16_t y, uint16_t u, uint16_t v) {
+void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+                         uint16_t y, uint16_t u, uint16_t v) {
     /*
-     * 10-bit YUV Packing
+     * 10-bit YUV Frame Filling
      * 
-     * Accepts 10-bit YUV values and packs them into a 32-bit word.
+     * Fills the entire frame with 10-bit YUV values packed into 32-bit words.
      * No color space conversion is performed - values should already be in YUV space.
      * 
      * PACKING:
@@ -83,13 +108,23 @@ uint32_t pack_10bit_yuv(uint16_t y, uint16_t u, uint16_t v) {
      * - Clamps values to 0-1023 range (10-bit)
      */
     
+    uint32_t* pixels = static_cast<uint32_t*>(frameData);
+    
     // Clamp values to 10-bit range (0-1023)
     y = std::min(y, static_cast<uint16_t>(1023));
     u = std::min(u, static_cast<uint16_t>(1023));
     v = std::min(v, static_cast<uint16_t>(1023));
     
     // Pack into 32-bit word: U[9:0] | Y[9:0] << 10 | V[9:0] << 20
-    return (u & 0x3FF) | ((y & 0x3FF) << 10) | ((v & 0x3FF) << 20);
+    uint32_t color = (u & 0x3FF) | ((y & 0x3FF) << 10) | ((v & 0x3FF) << 20);
+    
+    // Fill the entire frame with the packed color
+    for (int i = 0; i < width * height; ++i) {
+        pixels[i] = color;
+    }
+    
+    std::cerr << "[PixelPacking] 10-bit YUV frame filled: " << width << "x" << height 
+              << " with color (" << y << "," << u << "," << v << ")" << std::endl;
 }
 
 void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 

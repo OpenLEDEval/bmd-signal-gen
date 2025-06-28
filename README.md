@@ -16,7 +16,7 @@ This project allows you to:
 - macOS (tested on macOS 15.5) or presumably Windows
 - Blackmagic Design Desktop Video drivers (tested with 14.5)
 - Blackmagic Design DeckLink SDK (tested with 14.4)
-- Python 3.7+ (for Python interface)
+- Python 3.11+ (for Python interface)
 - clang++ compiler
 
 ## Project Structure
@@ -25,10 +25,20 @@ This project allows you to:
 bmd-signal-gen/
 ├── cpp/                          # C++ wrapper library
 │   ├── decklink_wrapper.h        # C API header
-│   └── decklink_wrapper.cpp      # C API implementation
-├── lib/                         # Python interface
+│   ├── decklink_wrapper.cpp      # C API implementation
+│   ├── pixel_packing.h           # Pixel format conversion utilities
+│   ├── pixel_packing.cpp         # Pixel format conversion implementation
+│   ├── PIXEL_PACKING_DOCUMENTATION.md  # Documentation for pixel packing
+│   ├── Makefile                  # Build configuration for C++ library
+│   └── Blackmagic DeckLink SDK 14.4/  # Blackmagic Design SDK
+├── lib/                          # Python interface and built library
 │   ├── bmd_decklink.py          # Python ctypes wrapper
+│   └── libdecklink.dylib        # Built dynamic library (macOS)
 ├── bmd_signal_gen.py            # Command-line application
+├── pyproject.toml               # Python project configuration
+├── uv.lock                      # UV dependency lock file
+├── .python-version              # Python version specification
+├── .venv/                       # Python virtual environment
 ├── Makefile                     # Build configuration
 └── README.md                    # This file
 ```
@@ -39,7 +49,8 @@ bmd-signal-gen/
 
 1. Install the Blackmagic Design Desktop Video driver
 2. Install the Blackmagic Design DeckLink SDK
-2. Ensure the SDK is located at `cpp/Blackmagic DeckLink SDK 14.4/` relative to the project root
+3. Ensure the SDK is located at `cpp/Blackmagic DeckLink SDK 14.4/` relative to the project root
+4. Install Python 3.11+ and UV package manager
 
 ### Build the C++ Library
 
@@ -50,6 +61,18 @@ make
 ```
 
 This creates `lib/libdecklink.dylib` - a dynamic library that provides the C API for DeckLink device control.
+
+### Python Environment Setup
+
+The project uses UV for Python dependency management:
+
+```bash
+# Install UV if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies and create virtual environment
+uv sync
+```
 
 ## Usage
 
@@ -143,6 +166,18 @@ decklink_close(handle);
 - `BMDDeckLink(device_index=0)` - Main device interface
 - `get_decklink_devices()` - List available devices
 - `get_supported_pixel_formats(handle)` - Get pixel formats for device
+
+## Pixel Format Support
+
+The project includes comprehensive pixel format conversion utilities in `cpp/pixel_packing.h` and `cpp/pixel_packing.cpp`. These utilities handle conversion between RGB color values and various DeckLink pixel formats including:
+
+- 8-bit YUV (4:2:2)
+- 10-bit YUV (4:2:2)
+- 8-bit RGB
+- 10-bit RGB
+- 12-bit RGB
+
+See `cpp/PIXEL_PACKING_DOCUMENTATION.md` for detailed information about supported formats and conversion algorithms.
 
 ## Troubleshooting
 

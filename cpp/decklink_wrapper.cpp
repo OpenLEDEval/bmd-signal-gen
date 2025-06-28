@@ -176,8 +176,8 @@ int DeckLinkColorPatch::startOutput() {
         BMDPixelFormat format = m_frame->GetPixelFormat();
         
         std::cerr << "[DeckLink] Frame info before scheduling:" << std::endl;
-        std::cerr << "  Width: " << width << ", Height: " << height << std::endl;
-        std::cerr << "  RowBytes: " << rowBytes << std::endl;
+        std::cerr << "  Width: " << std::dec << width << ", Height: " << std::dec << height << std::endl;
+        std::cerr << "  RowBytes: " << std::dec << rowBytes << std::endl;
         std::cerr << "  PixelFormat: " << std::hex << format << std::dec << std::endl;
         std::cerr << "  Flags: 0x" << std::hex << flags << std::dec << std::endl;
     }
@@ -356,52 +356,54 @@ int DeckLinkColorPatch::fillFrameWithColor() {
         return -4; 
     }
     
-    // Fill based on pixel format using the new pixel packing functions
-    if (m_pixelFormat == bmdFormat12BitRGB) {
-        // Use the dedicated 12-bit RGB interleaved packing function
-        int32_t rowBytes = 0;
-        m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
-        fill_12bit_rgb_frame(frameData, m_width, m_height, rowBytes, m_r, m_g, m_b);
-    } else {
-        // Handle other formats with the appropriate packing functions
-        uint32_t* pixels = static_cast<uint32_t*>(frameData);
-        uint32_t color = 0;
-        
-        switch (m_pixelFormat) {
-            case bmdFormat8BitBGRA:
-                // Convert uint16_t to uint8_t for 8-bit formats
-                color = pack_8bit_rgb(static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), true);
-                break;
-            case bmdFormat8BitARGB:
-                // Convert uint16_t to uint8_t for 8-bit formats
-                color = pack_8bit_rgb(static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), false);
-                break;
-            case bmdFormat10BitRGB:
-                // Pass uint16_t values directly for 10-bit format
-                color = pack_10bit_rgb(m_r, m_g, m_b);
-                break;
-            case bmdFormat10BitYUV: {
-                // For YUV, we need to convert RGB to YUV first
-                // This is a simplified conversion - the Python wrapper should handle proper color space conversion
-                uint16_t y = (66 * m_r + 129 * m_g + 25 * m_b + 128) >> 8;
-                uint16_t u = (-38 * m_r - 74 * m_g + 112 * m_b + 128) >> 8;
-                uint16_t v = (112 * m_r - 94 * m_g - 18 * m_b + 128) >> 8;
-                y = std::max(0, std::min(1023, (int)y));
-                u = std::max(0, std::min(1023, (int)(u + 512)));
-                v = std::max(0, std::min(1023, (int)(v + 512)));
-                color = pack_10bit_yuv(y, u, v);
-                break;
-            }
-            default:
-                // Fallback to 8-bit BGRA for unsupported formats
-                color = pack_8bit_rgb(static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), true);
-                break;
+    // Get row bytes for the current pixel format
+    int32_t rowBytes = 0;
+    m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
+    
+    // Use the new consistent frame-filling API
+    switch (m_pixelFormat) {
+        case bmdFormat8BitBGRA:
+            // Scale 8-bit to 8-bit (no scaling needed, just cast)
+            fill_8bit_rgb_frame(frameData, m_width, m_height, rowBytes, 
+                               static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), true);
+            break;
+        case bmdFormat8BitARGB:
+            // Scale 8-bit to 8-bit (no scaling needed, just cast)
+            fill_8bit_rgb_frame(frameData, m_width, m_height, rowBytes, 
+                               static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), false);
+            break;
+        case bmdFormat10BitRGB: {
+            // Scale 8-bit to 10-bit before calling
+            uint16_t r_10bit = (m_r * 1023) / 255;
+            uint16_t g_10bit = (m_g * 1023) / 255;
+            uint16_t b_10bit = (m_b * 1023) / 255;
+            fill_10bit_rgb_frame(frameData, m_width, m_height, rowBytes, r_10bit, g_10bit, b_10bit);
+            break;
         }
-        
-        // Fill the entire frame with the packed color
-        for (int i = 0; i < m_width * m_height; ++i) {
-            pixels[i] = color;
+        case bmdFormat10BitYUV: {
+            // Convert RGB to YUV and scale to 10-bit before calling
+            uint16_t y = (66 * m_r + 129 * m_g + 25 * m_b + 128) >> 8;
+            uint16_t u = (-38 * m_r - 74 * m_g + 112 * m_b + 128) >> 8;
+            uint16_t v = (112 * m_r - 94 * m_g - 18 * m_b + 128) >> 8;
+            y = std::max(0, std::min(1023, (int)y));
+            u = std::max(0, std::min(1023, (int)(u + 512)));
+            v = std::max(0, std::min(1023, (int)(v + 512)));
+            fill_10bit_yuv_frame(frameData, m_width, m_height, rowBytes, y, u, v);
+            break;
         }
+        case bmdFormat12BitRGB: {
+            // Scale 8-bit to 12-bit before calling
+            uint16_t r_12bit = (m_r * 4095) / 255;
+            uint16_t g_12bit = (m_g * 4095) / 255;
+            uint16_t b_12bit = (m_b * 4095) / 255;
+            fill_12bit_rgb_frame(frameData, m_width, m_height, rowBytes, r_12bit, g_12bit, b_12bit);
+            break;
+        }
+        default:
+            // Fallback to 8-bit BGRA for unsupported formats
+            fill_8bit_rgb_frame(frameData, m_width, m_height, rowBytes, 
+                               static_cast<uint8_t>(m_r), static_cast<uint8_t>(m_g), static_cast<uint8_t>(m_b), true);
+            break;
     }
     
     videoBuffer->EndAccess(bmdBufferAccessWrite);
