@@ -1,14 +1,35 @@
 #!/usr/bin/env python3
 """
-Application to output a solid RGB color to a DeckLink device using the DeckLinkColorPatch wrapper.
+Application to output a solid RGB color to a DeckLink device using the DeckLinkSignalGen wrapper.
 Supports HDR metadata configuration including EOTF settings and pixel format selection.
 """
 import sys
 import time
 import argparse
-from lib.bmd_decklink import BMDDeckLink, get_decklink_devices
+import numpy as np
+from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version
+
+def generate_solid_color(width, height, r, g, b, bit_depth=12):
+    """Generate solid color image as numpy array.
+    
+    Args:
+        width, height: image dimensions
+        r, g, b: color values (0-255 for 8-bit, 0-1023 for 10-bit, 0-4095 for 12-bit)
+        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+    
+    Returns:
+        numpy array with shape (height, width, 3) in uint16 format
+    """
+    # Always use uint16 for consistency
+    image = np.zeros((height, width, 3), dtype=np.uint16)
+    image[:, :, 0] = r
+    image[:, :, 1] = g
+    image[:, :, 2] = b
+    return image
 
 def main():
+    print(f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}")
+    print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
     devices = get_decklink_devices()
     print("Available DeckLink devices:")
     for idx, name in enumerate(devices):
@@ -21,9 +42,9 @@ def main():
     description = (
         'Output solid RGB color to DeckLink device with HDR metadata support'
         '\n\nColor value ranges by pixel format:'
-        '\n  8-bit:   0-255'
+        '\n  12-bit:  0-4095 (default, recommended)'
         '\n  10-bit:  0-1023'
-        '\n  12-bit:  0-4095'
+        '\n  8-bit:   0-255 (fallback mode)'
     )
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('r', type=int, help='Red component (see --help for range)')
@@ -40,6 +61,10 @@ def main():
                        help='Maximum Frame Average Light Level in cd/m² (default: 400)')
     parser.add_argument('--no-hdr', action='store_true', 
                        help='Disable HDR metadata (use SDR mode)')
+    parser.add_argument('--pattern', type=str, choices=['solid'], 
+                       default='solid', help='Pattern type to generate (only "solid" is supported)')
+    parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
+    parser.add_argument('--height', type=int, default=1080, help='Image height (default: 1080)')
     args = parser.parse_args()
 
     # Validate device index
@@ -67,8 +92,8 @@ def main():
     
     # Auto-select pixel format if not specified
     if args.pixel_format is None or args.pixel_format == -1:
-        # Try to find preferred formats in order: 12BitRGB, 10BitRGB, 10BitYUV
-        preferred_formats = ['12BitRGB', '10BitRGB', '10BitYUV']
+        # Try to find preferred formats in order: 12-bit formats first, then 10-bit, then 8-bit
+        preferred_formats = ['12BitRGB', '10BitRGB', '10BitYUV', '8BitBGRA', '8BitARGB']
         selected_format = None
         
         for preferred in preferred_formats:
@@ -85,7 +110,6 @@ def main():
         print(f"\nAuto-selected pixel format: {filtered_formats[selected_format]} (index {selected_format})")
         # Map filtered index to original C++ index
         original_index = format_mapping[selected_format]
-        decklink.set_pixel_format(original_index)
     else:
         # Use specified pixel format
         if args.pixel_format >= len(filtered_formats):
@@ -94,24 +118,18 @@ def main():
         print(f"\nUsing pixel format: {filtered_formats[args.pixel_format]} (index {args.pixel_format})")
         # Map filtered index to original C++ index
         original_index = format_mapping[args.pixel_format]
-        decklink.set_pixel_format(original_index)
     
     # After pixel format selection, determine bit depth and validate color arguments
-    bit_depth = 8  # Default
+    bit_depth = 12  # Default to 12-bit for high quality
+    min_val, max_val = 0, 4095  # default to 12-bit min and max
     selected_format_name = filtered_formats[selected_format] if args.pixel_format is None or args.pixel_format == -1 else filtered_formats[args.pixel_format]
-    if '12' in selected_format_name:
-        bit_depth = 12
+    if '8' in selected_format_name:
+        bit_depth = 8
+        min_val, max_val = 0, 255
     elif '10' in selected_format_name:
         bit_depth = 10
-
-    if bit_depth == 8:
-        min_val, max_val = 0, 255
-    elif bit_depth == 10:
         min_val, max_val = 0, 1023
-    elif bit_depth == 12:
-        min_val, max_val = 0, 4095
-    else:
-        min_val, max_val = 0, 255
+    # 12-bit is already the default
 
     for color_name, color_val in zip(['Red', 'Green', 'Blue'], [args.r, args.g, args.b]):
         if not (min_val <= color_val <= max_val):
@@ -119,7 +137,12 @@ def main():
             return 1
 
     print(f"\nSetting color to RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
-    decklink.set_color(args.r, args.g, args.b)
+    
+    # Only support solid color for now
+    image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth)
+    
+    # Set the frame data using the new method with pixel format
+    decklink.set_frame_data(image, original_index)
     
     # Configure HDR metadata (set once, before any color/output)
     if args.no_hdr:

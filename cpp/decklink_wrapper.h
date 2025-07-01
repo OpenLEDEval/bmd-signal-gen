@@ -6,14 +6,19 @@
 #include <vector>
 #include <set>
 
+// Handle type for C API
+typedef void* DeckLinkHandle;
+
 // Wrapper definitions for versioned symbols
 extern "C" {
     IDeckLinkIterator* CreateDeckLinkIteratorInstance_0004(void);
     IDeckLinkDiscovery* CreateDeckLinkDiscoveryInstance_0003(void);
+    IDeckLinkAPIInformation* CreateDeckLinkAPIInformationInstance_0001(void);
 }
 
 #define CreateDeckLinkIteratorInstance CreateDeckLinkIteratorInstance_0004
 #define CreateDeckLinkDiscoveryInstance CreateDeckLinkDiscoveryInstance_0003
+#define CreateDeckLinkAPIInformationInstance CreateDeckLinkAPIInformationInstance_0001
 
 // C-style API for Python
 extern "C" {
@@ -72,6 +77,15 @@ extern "C" {
     // Status
     int decklink_is_playing(DeckLinkOutput* output);
     long long decklink_get_current_time(DeckLinkOutput* output);
+    
+    // Frame data management
+    int decklink_set_frame_data(DeckLinkHandle handle, const uint8_t* data, int width, int height, BMDPixelFormat pixel_format);
+    uint8_t* decklink_get_frame_buffer(DeckLinkHandle handle, int* width, int* height, int* row_bytes);
+    int decklink_commit_frame(DeckLinkHandle handle);
+    
+    // Version info
+    const char* decklink_get_driver_version();
+    const char* decklink_get_sdk_version();
 }
 
 // C++ wrapper classes (internal implementation)
@@ -130,17 +144,16 @@ private:
 };
 
 // C++ Implementation Classes
-class DeckLinkColorPatch {
+class DeckLinkSignalGen {
 public:
-    DeckLinkColorPatch();
-    ~DeckLinkColorPatch();
+    DeckLinkSignalGen();
+    ~DeckLinkSignalGen();
     
     // Device management
     bool openDevice(int deviceIndex);
     void closeDevice();
     
-    // Color and frame management
-    int setColor(uint16_t r, uint16_t g, uint16_t b);
+    // Output control
     int startOutput();
     int stopOutput();
     
@@ -152,6 +165,11 @@ public:
     
     // EOTF metadata management
     int setEOTFMetadata(int eotf, uint16_t maxCLL, uint16_t maxFALL);
+    
+    // Frame data management
+    int setFrameData(const uint8_t* data, int width, int height, BMDPixelFormat pixel_format);
+    uint8_t* getFrameBuffer(int* width, int* height, int* row_bytes);
+    int commitFrame();
     
     // Device enumeration (static)
     static int getDeviceCount();
@@ -166,7 +184,6 @@ private:
     // Configuration
     int m_width;
     int m_height;
-    uint16_t m_r, m_g, m_b;
     bool m_outputEnabled;
     BMDPixelFormat m_pixelFormat;
     
@@ -179,11 +196,12 @@ private:
     std::vector<BMDPixelFormat> m_supportedFormats;
     bool m_formatsCached;
     
+    // Pending frame data
+    std::vector<uint8_t> m_pendingFrameData;
+    
     // Private helper methods
     void cacheSupportedFormats();
-    int fillFrameWithColor();
     int applyEOTFMetadata();
-    uint32_t convertRGBToPixelFormat(int r, int g, int b, BMDPixelFormat format);
     void logFrameInfo(const char* context);
 };
 
@@ -191,8 +209,6 @@ private:
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef void* DeckLinkHandle;
 
 // Device enumeration
 int decklink_get_device_count();
@@ -202,8 +218,7 @@ int decklink_get_device_name_by_index(int index, char* name, int name_size);
 DeckLinkHandle decklink_open_output_by_index(int index);
 void decklink_close(DeckLinkHandle handle);
 
-// Color and output control
-int decklink_set_color(DeckLinkHandle handle, uint16_t r, uint16_t g, uint16_t b);
+// Output control
 int decklink_start_output(DeckLinkHandle handle);
 int decklink_stop_output(DeckLinkHandle handle);
 
@@ -215,6 +230,11 @@ int decklink_get_pixel_format(DeckLinkHandle handle);
 
 // EOTF metadata control
 int decklink_set_eotf_metadata(DeckLinkHandle handle, int eotf, uint16_t maxCLL, uint16_t maxFALL);
+
+// Frame data management
+int decklink_set_frame_data(DeckLinkHandle handle, const uint8_t* data, int width, int height, BMDPixelFormat pixel_format);
+uint8_t* decklink_get_frame_buffer(DeckLinkHandle handle, int* width, int* height, int* row_bytes);
+int decklink_commit_frame(DeckLinkHandle handle);
 
 #ifdef __cplusplus
 }
