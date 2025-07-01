@@ -1,54 +1,10 @@
 #include "decklink_wrapper.h"
 #include "pixel_packing.h"
-#include "draw_image.h"
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 #include "DeckLinkAPIVersion.h"
 #include <CoreFoundation/CoreFoundation.h>
-
-/*
- * Blackmagic DeckLink 12-bit RGB Interleaved Packing Implementation
- * 
- * This implementation handles the complex 12-bit RGB pixel format used by
- * Blackmagic DeckLink devices. The packing scheme is based on the DeckLink API
- * documentation and SMPTE standards for high-bit-depth video formats.
- * 
- * KEY CONCEPTS:
- * 
- * 1. PIXEL STRUCTURE:
- *    Each 12-bit RGB pixel contains:
- *    - Red channel: 12 bits (0-4095)
- *    - Green channel: 12 bits (0-4095) 
- *    - Blue channel: 12 bits (0-4095)
- *    Total: 36 bits per pixel
- * 
- * 2. CHANNEL SPLITTING:
- *    Each 12-bit channel is split into two parts:
- *    - Low 8 bits: Channel[7:0] (stored in separate bytes)
- *    - High 4 bits: Channel[11:8] (packed into combined bytes)
- * 
- * 3. INTERLEAVED PACKING:
- *    The 36 bits are distributed across 4.5 bytes per pixel:
- *    Byte 0: R_low[7:0]     (Red low 8 bits)
- *    Byte 1: G_low[7:0]     (Green low 8 bits)
- *    Byte 2: B_low[7:0]     (Blue low 8 bits)
- *    Byte 3: R_high[3:0] | G_high[3:0] << 4  (Red high 4 bits + Green high 4 bits)
- *    Byte 4: B_high[3:0] | (unused bits)     (Blue high 4 bits + padding)
- * 
- * 4. MEMORY LAYOUT:
- *    - 8 pixels fit into 36 bytes (288 bits total)
- *    - Row alignment follows DeckLink API requirements
- *    - Each row is padded to the required rowBytes alignment
- * 
- * 5. COLOR RANGE:
- *    - Input: 8-bit RGB (0-255 per channel)
- *    - Output: 12-bit RGB (0-4095 per channel)
- *    - Scaling: value_12bit = (value_8bit * 4095) / 255
- * 
- * This implementation ensures compatibility with Blackmagic hardware and
- * follows the exact packing scheme expected by the DeckLink API.
- */
 
 // DeckLinkSignalGen Implementation
 DeckLinkSignalGen::DeckLinkSignalGen() 
@@ -57,45 +13,15 @@ DeckLinkSignalGen::DeckLinkSignalGen()
     , m_frame(nullptr)
     , m_width(1920)
     , m_height(1080)
-
     , m_outputEnabled(false)
-    , m_pixelFormat(bmdFormat8BitBGRA)
+    , m_pixelFormat(bmdFormat12BitRGB)
     , m_eotfType(-1)
-    , m_maxCLL(0)
-    , m_maxFALL(0)
+    , m_maxCLL(2000)
+    , m_maxFALL(400)
     , m_formatsCached(false) {
 }
 
 DeckLinkSignalGen::~DeckLinkSignalGen() {
-    closeDevice();
-}
-
-bool DeckLinkSignalGen::openDevice(int deviceIndex) {
-    IDeckLinkIterator* iterator = CreateDeckLinkIteratorInstance();
-    if (!iterator) return false;
-    
-    IDeckLink* device = nullptr;
-    int current = 0;
-    while (iterator->Next(&device) == S_OK) {
-        if (current == deviceIndex) {
-    IDeckLinkOutput* output = nullptr;
-            if (device->QueryInterface(IID_IDeckLinkOutput, (void**)&output) == S_OK) {
-                m_device = device;
-                m_output = output;
-                iterator->Release();
-        return true;
-            }
-            device->Release();
-            break;
-        }
-        device->Release();
-        current++;
-    }
-    iterator->Release();
-    return false;
-}
-
-void DeckLinkSignalGen::closeDevice() {
     if (m_outputEnabled) {
         stopOutput();
     }
@@ -115,8 +41,6 @@ void DeckLinkSignalGen::closeDevice() {
     m_supportedFormats.clear();
 }
 
-
-
 void DeckLinkSignalGen::logFrameInfo(const char* context) {
     if (m_frame) {
         BMDFrameFlags flags = m_frame->GetFlags();
@@ -128,172 +52,36 @@ void DeckLinkSignalGen::logFrameInfo(const char* context) {
         std::cerr << "[DeckLink] Frame info " << context << ":" << std::endl;
         std::cerr << "  Width: " << std::dec << width << ", Height: " << std::dec << height << std::endl;
         std::cerr << "  RowBytes: " << std::dec << rowBytes << std::endl;
-        std::cerr << "  PixelFormat: " << std::hex << getPixelFormatName(format) << std::dec << std::endl;
+        std::cerr << "  PixelFormat: 0x" << std::hex << format << std::dec << std::endl;
         std::cerr << "  Flags: 0x" << std::hex << flags << std::dec << std::endl;
     } else {
         std::cerr << "[DeckLink] No frame available for logging" << std::endl;
     }
 }
 
+/**
+ * @brief Enables video output on the DeckLink device
+ * 
+ * This method enables video output on the DeckLink device in HD1080p30 mode
+ * with default video output flags. This is the first step in starting output.
+ * 
+ * @return int Returns 0 on success, negative values on failure:
+ *         - -1: Output interface not available or already enabled
+ * 
+ * @see stopOutput(), createFrame(), scheduleFrame(), startPlayback()
+ */
 int DeckLinkSignalGen::startOutput() {
     if (!m_output) return -1;
     if (m_outputEnabled) return 0;
-
-    // Log pixel format and display mode
-    std::cerr << "[DeckLink] Enabling video output: display mode bmdModeHD1080p30, pixel format: " << getPixelFormatName(m_pixelFormat) << " (" << std::hex << m_pixelFormat << ")" << std::dec << std::endl;
-
+    
+    // Enable video output
     HRESULT enableResult = m_output->EnableVideoOutput(bmdModeHD1080p30, bmdVideoOutputFlagDefault);
     if (enableResult != S_OK) {
         std::cerr << "[DeckLink] EnableVideoOutput failed. HRESULT: 0x" << std::hex << enableResult << std::dec << std::endl;
-        return -2;
+        return -1;
     }
     m_outputEnabled = true;
-
-    // Create frame from pending data if available
-    if (!m_frame && !m_pendingFrameData.empty()) {
-        int32_t rowBytes = 0;
-        HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
-        if (result != S_OK) {
-            std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
-            return -3;
-        }
-        
-        result = m_output->CreateVideoFrame(m_width, m_height, rowBytes, m_pixelFormat, bmdFrameFlagDefault, &m_frame);
-        if (!m_frame) {
-            std::cerr << "[DeckLink] CreateVideoFrame failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
-            return -4;
-        }
-        
-        // Copy pending data to frame
-        IDeckLinkVideoBuffer* videoBuffer = nullptr;
-        if (m_frame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer) != S_OK) return -5;
-        if (videoBuffer->StartAccess(bmdBufferAccessWrite) != S_OK) { videoBuffer->Release(); return -6; }
-        
-        void* frameData = nullptr;
-        if (videoBuffer->GetBytes(&frameData) != S_OK) { 
-            videoBuffer->EndAccess(bmdBufferAccessWrite); 
-            videoBuffer->Release(); 
-            return -7; 
-        }
-        
-        // Use pixel packing system to convert raw RGB data to the target format
-        const uint8_t* srcData = m_pendingFrameData.data();
-        
-        // Extract RGB channels from the raw data (3 bytes per pixel: R, G, B)
-        std::vector<uint8_t> r_channel(m_width * m_height);
-        std::vector<uint8_t> g_channel(m_width * m_height);
-        std::vector<uint8_t> b_channel(m_width * m_height);
-        
-        for (int i = 0; i < m_width * m_height; i++) {
-            r_channel[i] = srcData[i * 3 + 0];
-            g_channel[i] = srcData[i * 3 + 1];
-            b_channel[i] = srcData[i * 3 + 2];
-        }
-        
-        // Pack the data according to the pixel format
-        switch (m_pixelFormat) {
-            case bmdFormat8BitBGRA:
-                pack_8bit_rgb_image(frameData, r_channel.data(), g_channel.data(), b_channel.data(),
-                                  m_width, m_height, rowBytes, true);
-                break;
-            case bmdFormat8BitARGB:
-                pack_8bit_rgb_image(frameData, r_channel.data(), g_channel.data(), b_channel.data(),
-                                  m_width, m_height, rowBytes, false);
-                break;
-            case bmdFormat10BitRGB: {
-                // Convert 8-bit to 10-bit
-                std::vector<uint16_t> r_10bit(m_width * m_height);
-                std::vector<uint16_t> g_10bit(m_width * m_height);
-                std::vector<uint16_t> b_10bit(m_width * m_height);
-                
-                for (int i = 0; i < m_width * m_height; i++) {
-                    r_10bit[i] = (r_channel[i] * 1023) / 255;
-                    g_10bit[i] = (g_channel[i] * 1023) / 255;
-                    b_10bit[i] = (b_channel[i] * 1023) / 255;
-                }
-                
-                pack_10bit_rgb_image(frameData, r_10bit.data(), g_10bit.data(), b_10bit.data(),
-                                   m_width, m_height, rowBytes);
-                break;
-            }
-            case bmdFormat10BitYUV: {
-                // Convert RGB to YUV and scale to 10-bit
-                std::vector<uint16_t> y_channel(m_width * m_height);
-                std::vector<uint16_t> u_channel(m_width * m_height);
-                std::vector<uint16_t> v_channel(m_width * m_height);
-                
-                for (int i = 0; i < m_width * m_height; i++) {
-                    uint16_t r = r_channel[i];
-                    uint16_t g = g_channel[i];
-                    uint16_t b = b_channel[i];
-                    
-                    // RGB to YUV conversion
-                    y_channel[i] = (66 * r + 129 * g + 25 * b + 128) >> 8;
-                    u_channel[i] = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 512;
-                    v_channel[i] = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 512;
-                    
-                    // Clamp to 10-bit range
-                    y_channel[i] = std::max(0, std::min(1023, (int)y_channel[i]));
-                    u_channel[i] = std::max(0, std::min(1023, (int)u_channel[i]));
-                    v_channel[i] = std::max(0, std::min(1023, (int)v_channel[i]));
-                }
-                
-                pack_10bit_yuv_image(frameData, y_channel.data(), u_channel.data(), v_channel.data(),
-                                   m_width, m_height, rowBytes);
-                break;
-            }
-            case bmdFormat12BitRGB: {
-                // Convert 8-bit to 12-bit
-                std::vector<uint16_t> r_12bit(m_width * m_height);
-                std::vector<uint16_t> g_12bit(m_width * m_height);
-                std::vector<uint16_t> b_12bit(m_width * m_height);
-                
-                for (int i = 0; i < m_width * m_height; i++) {
-                    r_12bit[i] = (r_channel[i] * 4095) / 255;
-                    g_12bit[i] = (g_channel[i] * 4095) / 255;
-                    b_12bit[i] = (b_channel[i] * 4095) / 255;
-                }
-                
-                pack_12bit_rgb_image(frameData, r_12bit.data(), g_12bit.data(), b_12bit.data(),
-                                   m_width, m_height, rowBytes);
-                break;
-            }
-            default:
-                std::cerr << "[DeckLink] Unsupported pixel format for packing: " << getPixelFormatName(m_pixelFormat) << std::endl;
-                // Fallback to simple copy (may not work correctly)
-                memcpy(frameData, m_pendingFrameData.data(), rowBytes * m_height);
-                break;
-        }
-        
-        videoBuffer->EndAccess(bmdBufferAccessWrite);
-        videoBuffer->Release();
-        
-        // Apply EOTF metadata if set
-        if (m_eotfType >= 0) {
-            int metadataResult = applyEOTFMetadata();
-            if (metadataResult != 0) return metadataResult;
-        }
-    }
-
-    if (!m_frame) {
-        std::cerr << "[DeckLink] No frame available for output" << std::endl;
-        return -8;
-    }
-
-    // Log frame information before scheduling
-    logFrameInfo("before scheduling");
-
-    HRESULT schedResult = m_output->ScheduleVideoFrame(m_frame, 0, 1, 30);
-    if (schedResult != S_OK) {
-        std::cerr << "[DeckLink] ScheduleVideoFrame failed. HRESULT: 0x" << std::hex << schedResult << std::dec << std::endl;
-        return -9;
-    }
-    HRESULT playResult = m_output->StartScheduledPlayback(0, 30, 1.0);
-    if (playResult != S_OK) {
-        std::cerr << "[DeckLink] StartScheduledPlayback failed. HRESULT: 0x" << std::hex << playResult << std::dec << std::endl;
-        return -10;
-    }
-
+    
     return 0;
 }
 
@@ -307,159 +95,267 @@ int DeckLinkSignalGen::stopOutput() {
     return 0;
 }
 
-std::vector<BMDPixelFormat> DeckLinkSignalGen::getSupportedPixelFormats() {
-    if (!m_formatsCached) {
-        cacheSupportedFormats();
+int DeckLinkSignalGen::createFrame() {
+    if (!m_output || !m_outputEnabled) return -1;
+    if (m_pendingFrameData.empty()) {
+        std::cerr << "[DeckLink] No pending frame data available" << std::endl;
+        return -2;
     }
-    return m_supportedFormats;
+    
+    int32_t rowBytes = 0;
+    // Debug output for pixel format and dimensions
+    std::cerr << "[DeckLink][DEBUG] Calling RowBytesForPixelFormat with:"
+              << " pixelFormat=0x" << std::hex << m_pixelFormat << std::dec
+              << ", width=" << m_width
+              << ", height=" << m_height << std::endl;
+    HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
+    if (result != S_OK) {
+        std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
+        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat=0x" << std::hex << m_pixelFormat << std::dec
+                  << ", width=" << m_width
+                  << ", height=" << m_height << std::endl;
+        return -3;
+    }
+    // Output rowBytes in decimal notation
+    std::cerr << "[DeckLink][DEBUG] RowBytesForPixelFormat returned rowBytes=" << rowBytes << std::endl;
+    
+    result = m_output->CreateVideoFrame(m_width, m_height, rowBytes, m_pixelFormat, bmdFrameFlagDefault, &m_frame);
+    if (!m_frame) {
+        std::cerr << "[DeckLink] CreateVideoFrame failed" << std::endl;
+        return -4;
+    }
+    
+    // Get frame buffer for writing
+    IDeckLinkVideoBuffer* videoBuffer = nullptr;
+    if (m_frame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer) != S_OK) {
+        std::cerr << "[DeckLink] QueryInterface for IDeckLinkVideoBuffer failed" << std::endl;
+        return -5;
+    }
+    
+    if (videoBuffer->StartAccess(bmdBufferAccessWrite) != S_OK) {
+        std::cerr << "[DeckLink] StartAccess failed" << std::endl;
+        videoBuffer->Release();
+        return -6;
+    }
+    
+    void* frameData = nullptr;
+    if (videoBuffer->GetBytes(&frameData) != S_OK) {
+        std::cerr << "[DeckLink] GetBytes failed" << std::endl;
+        videoBuffer->EndAccess(bmdBufferAccessWrite);
+        videoBuffer->Release();
+        return -7;
+    }
+    
+    // Use pixel packing system to convert raw RGB data to the target format
+    const uint16_t* srcData = m_pendingFrameData.data();
+    
+    // Extract RGB channels from the raw data (3 uint16_t per pixel: R, G, B)
+    std::vector<uint16_t> r_channel(m_width * m_height);
+    std::vector<uint16_t> g_channel(m_width * m_height);
+    std::vector<uint16_t> b_channel(m_width * m_height);
+    
+    for (int i = 0; i < m_width * m_height; i++) {
+        r_channel[i] = srcData[i * 3 + 0];
+        g_channel[i] = srcData[i * 3 + 1];
+        b_channel[i] = srcData[i * 3 + 2];
+    }
+    
+    // Pack the data according to the pixel format
+    switch (m_pixelFormat) {
+        case bmdFormat8BitBGRA: {
+            // Convert 16-bit to 8-bit
+            std::vector<uint8_t> r_8bit(m_width * m_height);
+            std::vector<uint8_t> g_8bit(m_width * m_height);
+            std::vector<uint8_t> b_8bit(m_width * m_height);
+            
+            for (int i = 0; i < m_width * m_height; i++) {
+                r_8bit[i] = (r_channel[i] * 255) / 65535;
+                g_8bit[i] = (g_channel[i] * 255) / 65535;
+                b_8bit[i] = (b_channel[i] * 255) / 65535;
+            }
+            
+            pack_8bit_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
+                              m_width, m_height, rowBytes, true);
+            break;
+        }
+        case bmdFormat8BitARGB: {
+            // Convert 16-bit to 8-bit
+            std::vector<uint8_t> r_8bit(m_width * m_height);
+            std::vector<uint8_t> g_8bit(m_width * m_height);
+            std::vector<uint8_t> b_8bit(m_width * m_height);
+            
+            for (int i = 0; i < m_width * m_height; i++) {
+                r_8bit[i] = (r_channel[i] * 255) / 65535;
+                g_8bit[i] = (g_channel[i] * 255) / 65535;
+                b_8bit[i] = (b_channel[i] * 255) / 65535;
+            }
+            
+            pack_8bit_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
+                              m_width, m_height, rowBytes, false);
+            break;
+        }
+        case bmdFormat10BitRGB: {
+            // Convert 16-bit to 10-bit
+            std::vector<uint16_t> r_10bit(m_width * m_height);
+            std::vector<uint16_t> g_10bit(m_width * m_height);
+            std::vector<uint16_t> b_10bit(m_width * m_height);
+            
+            for (int i = 0; i < m_width * m_height; i++) {
+                r_10bit[i] = (r_channel[i] * 1023) / 65535;
+                g_10bit[i] = (g_channel[i] * 1023) / 65535;
+                b_10bit[i] = (b_channel[i] * 1023) / 65535;
+            }
+            
+            pack_10bit_rgb_image(frameData, r_10bit.data(), g_10bit.data(), b_10bit.data(),
+                               m_width, m_height, rowBytes);
+            break;
+        }
+        case bmdFormat8BitYUV: {
+            // Convert RGB to YUV
+            std::vector<uint16_t> y_channel(m_width * m_height);
+            std::vector<uint16_t> u_channel(m_width * m_height);
+            std::vector<uint16_t> v_channel(m_width * m_height);
+            
+            for (int i = 0; i < m_width * m_height; i++) {
+                // Convert RGB to YUV (simplified conversion)
+                uint16_t r = r_channel[i];
+                uint16_t g = g_channel[i];
+                uint16_t b = b_channel[i];
+                
+                y_channel[i] = (66 * r + 129 * g + 25 * b + 128) >> 8;
+                u_channel[i] = (-38 * r - 74 * g + 112 * b + 128) >> 8;
+                v_channel[i] = (112 * r - 94 * g - 18 * b + 128) >> 8;
+                
+                // Clamp values
+                y_channel[i] = std::min(std::max(y_channel[i], (uint16_t)0), (uint16_t)255);
+                u_channel[i] = std::min(std::max(u_channel[i], (uint16_t)0), (uint16_t)255);
+                v_channel[i] = std::min(std::max(v_channel[i], (uint16_t)0), (uint16_t)255);
+            }
+            
+            pack_10bit_yuv_image(frameData, y_channel.data(), u_channel.data(), v_channel.data(),
+                               m_width, m_height, rowBytes);
+            break;
+        }
+        case bmdFormat12BitRGB: {
+            // Convert 16-bit to 12-bit
+            std::vector<uint16_t> r_12bit(m_width * m_height);
+            std::vector<uint16_t> g_12bit(m_width * m_height);
+            std::vector<uint16_t> b_12bit(m_width * m_height);
+            
+            for (int i = 0; i < m_width * m_height; i++) {
+                r_12bit[i] = (r_channel[i] * 4095) / 65535;
+                g_12bit[i] = (g_channel[i] * 4095) / 65535;
+                b_12bit[i] = (b_channel[i] * 4095) / 65535;
+            }
+            
+            pack_12bit_rgb_image(frameData, r_12bit.data(), g_12bit.data(), b_12bit.data(),
+                               m_width, m_height, rowBytes);
+            break;
+        }
+        default:
+            std::cerr << "[DeckLink] Unsupported pixel format: 0x" << std::hex << m_pixelFormat << std::dec << std::endl;
+            videoBuffer->EndAccess(bmdBufferAccessWrite);
+            videoBuffer->Release();
+            return -8;
+    }
+    
+    videoBuffer->EndAccess(bmdBufferAccessWrite);
+    videoBuffer->Release();
+    
+    // Apply EOTF metadata if set
+    if (m_eotfType >= 0) {
+        applyEOTFMetadata();
+    }
+    
+    logFrameInfo("created");
+    return 0;
+}
+
+int DeckLinkSignalGen::scheduleFrame() {
+    if (!m_output || !m_frame) return -1;
+    
+    // Schedule the frame for output
+    HRESULT result = m_output->ScheduleVideoFrame(m_frame, 0, 1000, 30000);
+    if (result != S_OK) {
+        std::cerr << "[DeckLink] ScheduleVideoFrame failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
+        return -1;
+    }
+    
+    logFrameInfo("scheduled");
+    return 0;
+}
+
+int DeckLinkSignalGen::startPlayback() {
+    if (!m_output) return -1;
+    
+    // Start scheduled playback
+    HRESULT result = m_output->StartScheduledPlayback(0, 30000, 1.0);
+    if (result != S_OK) {
+        std::cerr << "[DeckLink] StartScheduledPlayback failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
+        return -1;
+    }
+    
+    std::cerr << "[DeckLink] Playback started successfully" << std::endl;
+    return 0;
 }
 
 int DeckLinkSignalGen::setPixelFormat(int pixelFormatIndex) {
+    if (!m_output) return -1;
+    
+    // Cache supported formats if not already done
     if (!m_formatsCached) {
         cacheSupportedFormats();
     }
     
     if (pixelFormatIndex < 0 || pixelFormatIndex >= static_cast<int>(m_supportedFormats.size())) {
-        std::cerr << "[DeckLink] Invalid pixel format index: " << pixelFormatIndex << " (valid range: 0-" << m_supportedFormats.size()-1 << ")" << std::endl;
+        std::cerr << "[DeckLink] Invalid pixel format index: " << pixelFormatIndex << std::endl;
         return -1;
     }
     
     m_pixelFormat = m_supportedFormats[pixelFormatIndex];
+    std::cerr << "[DeckLink] Set pixel format to index " << pixelFormatIndex 
+              << " (0x" << std::hex << m_pixelFormat << std::dec << ")" << std::endl;
+    
     return 0;
 }
 
 int DeckLinkSignalGen::getPixelFormat() const {
-    if (!m_formatsCached) {
-        const_cast<DeckLinkSignalGen*>(this)->cacheSupportedFormats();
-    }
+    if (!m_formatsCached) return -1;
     
+    // Find the index of the current pixel format
     for (int i = 0; i < static_cast<int>(m_supportedFormats.size()); i++) {
         if (m_supportedFormats[i] == m_pixelFormat) {
             return i;
         }
     }
+    
     return -1;
-}
-
-std::string DeckLinkSignalGen::getPixelFormatName(BMDPixelFormat format) const {
-    switch (format) {
-        case bmdFormat8BitYUV: return "8-bit YUV";
-        case bmdFormat10BitYUV: return "10-bit YUV";
-        case bmdFormat8BitARGB: return "8-bit ARGB";
-        case bmdFormat8BitBGRA: return "8-bit BGRA";
-        case bmdFormat10BitRGB: return "10-bit RGB";
-        case bmdFormat12BitRGB: return "12-bit RGB";
-        case bmdFormat12BitRGBLE: return "12-bit RGB LE";
-        case bmdFormat10BitRGBXLE: return "10-bit RGBX LE";
-        case bmdFormat10BitRGBX: return "10-bit RGBX";
-        default: return "Unknown";
-    }
 }
 
 int DeckLinkSignalGen::setEOTFMetadata(int eotf, uint16_t maxCLL, uint16_t maxFALL) {
     m_eotfType = eotf;
     m_maxCLL = maxCLL;
     m_maxFALL = maxFALL;
+    
+    std::cerr << "[DeckLink] Set EOTF metadata - EOTF: " << eotf 
+              << ", MaxCLL: " << maxCLL << ", MaxFALL: " << maxFALL << std::endl;
+    
     return 0;
 }
 
-int DeckLinkSignalGen::setFrameData(const uint8_t* data, int width, int height, BMDPixelFormat pixel_format) {
-    if (!m_output || !data) return -1;
-    
-    // Handle pixel format parameter - it can be either an index or a BMDPixelFormat value
-    BMDPixelFormat targetFormat = m_pixelFormat; // Default to current format
-    
-    if (pixel_format >= 0) {
-        // Check if this looks like an index (small positive number)
-        if (pixel_format < 100) {
-            // Treat as index into supported formats
-            if (!m_formatsCached) {
-                cacheSupportedFormats();
-            }
-            
-            if (pixel_format >= 0 && pixel_format < static_cast<int>(m_supportedFormats.size())) {
-                targetFormat = m_supportedFormats[pixel_format];
-            } else {
-                std::cerr << "[DeckLink] setFrameData: Invalid pixel format index " << pixel_format 
-                          << " (valid range: 0-" << m_supportedFormats.size()-1 << "), using current format" << std::endl;
-            }
-        } else {
-            // Treat as direct BMDPixelFormat value
-            targetFormat = pixel_format;
-        }
-    }
-    
-    // Update dimensions and pixel format if needed
-    if (width != m_width || height != m_height || targetFormat != m_pixelFormat) {
+int DeckLinkSignalGen::setFrameData(const uint16_t* data, int width, int height) {
+    if (!data || width <= 0 || height <= 0) return -1;
+    // Update dimensions if they changed
+    if (width != m_width || height != m_height) {
         m_width = width;
         m_height = height;
-        m_pixelFormat = targetFormat;
-        
-        // Create new frame with new parameters
-        if (m_frame) {
-            m_frame->Release();
-            m_frame = nullptr;
-        }
+        std::cerr << "[DeckLink] Updated frame dimensions to " << width << "x" << height << std::endl;
     }
-    
-    // Store the raw RGB data (3 bytes per pixel: R, G, B)
-    m_pendingFrameData = std::vector<uint8_t>(data, data + (width * height * 3));
-    
-    return 0;
-}
-
-uint8_t* DeckLinkSignalGen::getFrameBuffer(int* width, int* height, int* row_bytes) {
-    if (!m_output || !width || !height || !row_bytes) return nullptr;
-    
-    // Create frame if it doesn't exist
-    if (!m_frame) {
-        // Enable video output if not already enabled
-        if (!m_outputEnabled) {
-            HRESULT enableResult = m_output->EnableVideoOutput(bmdModeHD1080p30, bmdVideoOutputFlagDefault);
-            if (enableResult != S_OK) return nullptr;
-            m_outputEnabled = true;
-        }
-        
-        int32_t rowBytes = 0;
-        HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
-        if (result != S_OK) return nullptr;
-        
-        result = m_output->CreateVideoFrame(m_width, m_height, rowBytes, m_pixelFormat, bmdFrameFlagDefault, &m_frame);
-        if (!m_frame) return nullptr;
-    }
-    
-    // Get frame buffer
-    IDeckLinkVideoBuffer* videoBuffer = nullptr;
-    if (m_frame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer) != S_OK) return nullptr;
-    if (videoBuffer->StartAccess(bmdBufferAccessWrite) != S_OK) { videoBuffer->Release(); return nullptr; }
-    
-    void* frameData = nullptr;
-    if (videoBuffer->GetBytes(&frameData) != S_OK) { 
-        videoBuffer->EndAccess(bmdBufferAccessWrite); 
-        videoBuffer->Release(); 
-        return nullptr; 
-    }
-    
-    // Return frame info
-    *width = m_width;
-    *height = m_height;
-    int32_t rowBytes = 0;
-    m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
-    *row_bytes = rowBytes;
-    
-    // Note: The caller should call commitFrame() after writing to the buffer
-    return static_cast<uint8_t*>(frameData);
-}
-
-int DeckLinkSignalGen::commitFrame() {
-    if (!m_frame) return -1;
-    
-    // Apply EOTF metadata if set
-    if (m_eotfType >= 0) {
-        int metadataResult = applyEOTFMetadata();
-        if (metadataResult != 0) return metadataResult;
-    }
-    
+    // Store the frame data
+    size_t dataSize = width * height * 3; // 3 channels (R, G, B) per pixel
+    m_pendingFrameData.assign(data, data + dataSize);
+    std::cerr << "[DeckLink] Set frame data: " << width << "x" << height
+              << " pixels, " << m_pendingFrameData.size() << " samples" << std::endl;
     return 0;
 }
 
@@ -474,6 +370,7 @@ int DeckLinkSignalGen::getDeviceCount() {
         device->Release();
     }
     iterator->Release();
+    
     return count;
 }
 
@@ -483,45 +380,48 @@ std::string DeckLinkSignalGen::getDeviceName(int deviceIndex) {
     
     IDeckLink* device = nullptr;
     int current = 0;
+    std::string deviceName;
+    
     while (iterator->Next(&device) == S_OK) {
         if (current == deviceIndex) {
-            CFStringRef cfName = nullptr;
-            std::string name = "";
-            if (device->GetDisplayName(&cfName) == S_OK && cfName) {
-                char nameBuf[256];
-                if (CFStringGetCString(cfName, nameBuf, sizeof(nameBuf), kCFStringEncodingUTF8)) {
-                    name = nameBuf;
-                }
-                CFRelease(cfName);
+            CFStringRef nameRef = nullptr;
+            if (device->GetDisplayName(&nameRef) == S_OK && nameRef) {
+                char nameBuffer[256];
+                CFStringGetCString(nameRef, nameBuffer, sizeof(nameBuffer), kCFStringEncodingUTF8);
+                deviceName = nameBuffer;
+                CFRelease(nameRef);
             }
             device->Release();
-            iterator->Release();
-            return name;
+            break;
         }
         device->Release();
         current++;
     }
     iterator->Release();
-    return "";
+    
+    return deviceName;
 }
 
-// Private helper methods
 void DeckLinkSignalGen::cacheSupportedFormats() {
-    if (!m_output) return;
+    if (!m_output || m_formatsCached) return;
     
     std::set<BMDPixelFormat> uniqueFormats;
     
-    // Test common pixel formats against a standard display mode (1080p30)
-    // Order by preference: 12-bit first, then 10-bit, then 8-bit
+    // Test common pixel formats
     BMDPixelFormat supportedFormats[] = {
-        bmdFormat12BitRGB,
-        bmdFormat10BitRGB,
-        bmdFormat10BitYUV,
-        bmdFormat10BitRGBX,
-        bmdFormat10BitRGBXLE,
-        bmdFormat8BitBGRA,
-        bmdFormat8BitARGB,
-        bmdFormat8BitYUV
+        bmdFormat8BitYUV,       // '2vuy' 4:2:2 Representation
+        bmdFormat10BitYUV,      // 'v210' 4:2:2 Representation
+        bmdFormat10BitYUVA,     // 'Ay10' 4:2:2 raw
+        
+        bmdFormat8BitARGB,      // 32     4:4:4:4 raw
+        bmdFormat8BitBGRA,      // 'BGRA' 4:4:4:x raw
+
+        bmdFormat10BitRGB,      // 'r210' 4:4:4 raw
+        bmdFormat12BitRGB,      // 'R12B' Big-endian RGB 12-bit per component with full range (0-4095). Packed as 12-bit per component
+        bmdFormat12BitRGBLE,    // 'R12L' Little-endian RGB 12-bit per component with full range (0-4095). Packed as 12-bit per component.
+        
+        bmdFormat10BitRGBXLE,   // 'R10l' 4:4:4 raw Three 10-bit unsigned components are packed into one 32-bit little-endian word.
+        bmdFormat10BitRGBX,     // 'R10b' 4:4:4 raw Three 10-bit unsigned components are packed into one 32-bit big-endian word.
     };
     
     for (int i = 0; i < sizeof(supportedFormats)/sizeof(supportedFormats[0]); i++) {
@@ -543,8 +443,6 @@ void DeckLinkSignalGen::cacheSupportedFormats() {
     m_supportedFormats.assign(uniqueFormats.begin(), uniqueFormats.end());
     m_formatsCached = true;
 }
-
-
 
 int DeckLinkSignalGen::applyEOTFMetadata() {
     if (!m_frame || m_eotfType < 0) return 0;
@@ -575,32 +473,20 @@ int DeckLinkSignalGen::applyEOTFMetadata() {
     return 0;
 }
 
+// Thin C wrapper implementation
+extern "C" {
+
 int decklink_set_eotf_metadata(DeckLinkHandle handle, int eotf, uint16_t maxCLL, uint16_t maxFALL) {
     if (!handle) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
     return signalGen->setEOTFMetadata(eotf, maxCLL, maxFALL);
 }
 
-int decklink_set_frame_data(DeckLinkHandle handle, const uint8_t* data, int width, int height, BMDPixelFormat pixel_format) {
+int decklink_set_frame_data(DeckLinkHandle handle, const uint16_t* data, int width, int height) {
     if (!handle || !data) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->setFrameData(data, width, height, pixel_format);
+    return signalGen->setFrameData(data, width, height);
 }
-
-uint8_t* decklink_get_frame_buffer(DeckLinkHandle handle, int* width, int* height, int* row_bytes) {
-    if (!handle || !width || !height || !row_bytes) return nullptr;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->getFrameBuffer(width, height, row_bytes);
-}
-
-int decklink_commit_frame(DeckLinkHandle handle) {
-    if (!handle) return -1;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->commitFrame();
-}
-
-// Thin C wrapper implementation
-extern "C" {
 
 int decklink_get_device_count() {
     return DeckLinkSignalGen::getDeviceCount();
@@ -619,21 +505,42 @@ int decklink_get_device_name_by_index(int index, char* name, int name_size) {
 
 DeckLinkHandle decklink_open_output_by_index(int index) {
     DeckLinkSignalGen* signalGen = new DeckLinkSignalGen();
-    if (signalGen->openDevice(index)) {
-        return signalGen;
+    
+    // Open the device
+    IDeckLinkIterator* iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) {
+        delete signalGen;
+        return nullptr;
     }
+    
+    IDeckLink* device = nullptr;
+    int current = 0;
+    while (iterator->Next(&device) == S_OK) {
+        if (current == index) {
+            IDeckLinkOutput* output = nullptr;
+            if (device->QueryInterface(IID_IDeckLinkOutput, (void**)&output) == S_OK) {
+                signalGen->m_device = device;
+                signalGen->m_output = output;
+                iterator->Release();
+                return signalGen;
+            }
+            device->Release();
+            break;
+        }
+        device->Release();
+        current++;
+    }
+    iterator->Release();
     delete signalGen;
     return nullptr;
 }
 
 void decklink_close(DeckLinkHandle handle) {
     if (handle) {
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    delete signalGen;
+        auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+        delete signalGen;
     }
 }
-
-
 
 int decklink_start_output(DeckLinkHandle handle) {
     if (!handle) return -1;
@@ -647,29 +554,22 @@ int decklink_stop_output(DeckLinkHandle handle) {
     return signalGen->stopOutput();
 }
 
-int decklink_get_supported_pixel_format_count(DeckLinkHandle handle) {
-    if (!handle) return 0;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return static_cast<int>(signalGen->getSupportedPixelFormats().size());
-}
-
-int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, char* name, int name_size) {
-    if (!handle || !name || name_size <= 0) return -1;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    
-    std::vector<BMDPixelFormat> formats = signalGen->getSupportedPixelFormats();
-    if (index < 0 || index >= static_cast<int>(formats.size())) return -1;
-    
-    std::string formatName = signalGen->getPixelFormatName(formats[index]);
-    strncpy(name, formatName.c_str(), name_size - 1);
-    name[name_size - 1] = '\0';
-    return 0;
-}
-
-int decklink_set_pixel_format(DeckLinkHandle handle, int pixel_format_index) {
+int decklink_create_frame_from_data(DeckLinkHandle handle) {
     if (!handle) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->setPixelFormat(pixel_format_index);
+    return signalGen->createFrame();
+}
+
+int decklink_schedule_frame_for_output(DeckLinkHandle handle) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->scheduleFrame();
+}
+
+int decklink_start_scheduled_playback(DeckLinkHandle handle) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->startPlayback();
 }
 
 int decklink_get_pixel_format(DeckLinkHandle handle) {
@@ -678,13 +578,64 @@ int decklink_get_pixel_format(DeckLinkHandle handle) {
     return signalGen->getPixelFormat();
 }
 
-static std::string g_driver_version;
-static std::string g_sdk_version = BLACKMAGIC_DECKLINK_API_VERSION_STRING;
+int decklink_set_pixel_format(DeckLinkHandle handle, int pixel_format_index) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->setPixelFormat(pixel_format_index);
+}
 
+int decklink_get_supported_pixel_format_count(DeckLinkHandle handle) {
+    if (!handle) return 0;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    signalGen->cacheSupportedFormats();
+    return static_cast<int>(signalGen->getSupportedFormats().size());
+}
+
+int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, char* name, int name_size) {
+    if (!handle || !name || name_size <= 0) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    
+    signalGen->cacheSupportedFormats();
+    if (index < 0 || index >= static_cast<int>(signalGen->getSupportedFormats().size())) return -1;
+    
+    BMDPixelFormat format = signalGen->getSupportedFormats()[index];
+    // Interpret format as 4 ASCII characters
+    char fmtChars[5] = {
+        static_cast<char>((format >> 24) & 0xFF),
+        static_cast<char>((format >> 16) & 0xFF),
+        static_cast<char>((format >> 8) & 0xFF),
+        static_cast<char>(format & 0xFF),
+        '\0'
+    };
+    std::string formatName;
+    
+    switch (format) {
+        case bmdFormat8BitYUV: formatName = std::string("8-bit YUV (") + fmtChars + ")"; break;
+        case bmdFormat10BitYUV: formatName = std::string("10-bit YUV (") + fmtChars + ")"; break;
+        case bmdFormat10BitYUVA: formatName = std::string("10-bit YUVA (") + fmtChars + ")"; break;
+        
+        case bmdFormat8BitARGB: formatName = std::string("8-bit ARGB (") + std::to_string(format) + ")"; break;
+        case bmdFormat8BitBGRA: formatName = std::string("8-bit BGRA (") + fmtChars + ")"; break;
+        
+        case bmdFormat10BitRGB: formatName = std::string("10-bit RGB (") + fmtChars + ")"; break;
+        case bmdFormat12BitRGB: formatName = std::string("12-bit RGB (") + fmtChars + ")"; break;
+        case bmdFormat12BitRGBLE: formatName = std::string("12-bit RGB LE (") + fmtChars + ")"; break;
+
+        case bmdFormat10BitRGBXLE: formatName = std::string("10-bit RGBX LE (") + fmtChars + ")"; break;
+        case bmdFormat10BitRGBX: formatName = std::string("10-bit RGBX (") + fmtChars + ")"; break;
+        
+        default: formatName = std::string("Unknown (") + fmtChars + ")"; break;
+    }
+    
+    strncpy(name, formatName.c_str(), name_size - 1);
+    name[name_size - 1] = '\0';
+    return 0;
+}
+
+// Version info
 const char* decklink_get_driver_version() {
     static std::string version;
     if (!version.empty()) return version.c_str();
-    
     IDeckLinkAPIInformation* apiInfo = CreateDeckLinkAPIInformationInstance();
     if (apiInfo) {
         int64_t versionInt = 0;
@@ -706,7 +657,8 @@ const char* decklink_get_driver_version() {
 }
 
 const char* decklink_get_sdk_version() {
-    return g_sdk_version.c_str();
+    static std::string sdk_version = BLACKMAGIC_DECKLINK_API_VERSION_STRING;
+    return sdk_version.c_str();
 }
 
-} 
+} // extern "C" 

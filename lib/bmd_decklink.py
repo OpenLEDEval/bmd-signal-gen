@@ -57,16 +57,23 @@ if hasattr(decklink, 'decklink_set_eotf_metadata'):
 
 # Frame data management
 if hasattr(decklink, 'decklink_set_frame_data'):
-    decklink.decklink_set_frame_data.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_int, ctypes.c_int, ctypes.c_int]
+    decklink.decklink_set_frame_data.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint16), ctypes.c_int, ctypes.c_int]
     decklink.decklink_set_frame_data.restype = ctypes.c_int
 
-if hasattr(decklink, 'decklink_get_frame_buffer'):
-    decklink.decklink_get_frame_buffer.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
-    decklink.decklink_get_frame_buffer.restype = ctypes.POINTER(ctypes.c_uint8)
+# Frame management
+if hasattr(decklink, 'decklink_create_frame_from_data'):
+    decklink.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
+    decklink.decklink_create_frame_from_data.restype = ctypes.c_int
 
-if hasattr(decklink, 'decklink_commit_frame'):
-    decklink.decklink_commit_frame.argtypes = [ctypes.c_void_p]
-    decklink.decklink_commit_frame.restype = ctypes.c_int
+if hasattr(decklink, 'decklink_schedule_frame_for_output'):
+    decklink.decklink_schedule_frame_for_output.argtypes = [ctypes.c_void_p]
+    decklink.decklink_schedule_frame_for_output.restype = ctypes.c_int
+
+if hasattr(decklink, 'decklink_start_scheduled_playback'):
+    decklink.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
+    decklink.decklink_start_scheduled_playback.restype = ctypes.c_int
+
+
 
 # Version info
 if hasattr(decklink, 'decklink_get_driver_version'):
@@ -154,12 +161,11 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set EOTF metadata (error {res})")
     
-    def set_frame_data(self, frame_data, pixel_format_index=None):
+    def set_frame_data(self, frame_data):
         """Set frame data from numpy array.
         
         Args:
             frame_data: numpy array with shape (height, width, channels) or (height, width)
-            pixel_format_index: pixel format index to use (if None, uses current format)
         """
         if not self.handle:
             raise RuntimeError("Device not open")
@@ -176,59 +182,42 @@ class BMDDeckLink:
         else:
             raise ValueError("frame_data must be 2D or 3D array")
         
-        # Ensure data is contiguous
+        # Ensure data is uint16 and contiguous
+        if frame_data.dtype != np.uint16:
+            frame_data = frame_data.astype(np.uint16)
         frame_data = np.ascontiguousarray(frame_data)
         
         # Get pointer to data
-        data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
-        
-        # Use current pixel format if not specified
-        if pixel_format_index is None:
-            pixel_format_index = self.get_pixel_format()
-        
-        res = decklink.decklink_set_frame_data(self.handle, data_ptr, width, height, pixel_format_index)
+        data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
+        res = decklink.decklink_set_frame_data(self.handle, data_ptr, width, height)
         if res != 0:
             raise RuntimeError(f"Failed to set frame data (error {res})")
     
-    def get_frame_buffer(self):
-        """Get frame buffer as numpy array for direct writing.
-        
-        Returns:
-            numpy array with shape (height, width, channels) based on pixel format
-        """
+    def create_frame(self):
+        """Create a video frame from pending frame data."""
         if not self.handle:
             raise RuntimeError("Device not open")
-        
-        width = ctypes.c_int()
-        height = ctypes.c_int()
-        row_bytes = ctypes.c_int()
-        
-        buffer_ptr = decklink.decklink_get_frame_buffer(self.handle, ctypes.byref(width), ctypes.byref(height), ctypes.byref(row_bytes))
-        if not buffer_ptr:
-            raise RuntimeError("Failed to get frame buffer")
-        
-        # Create numpy array from buffer
-        # Note: This is a view into the C++ buffer, so be careful with lifetime
-        buffer_size = row_bytes.value * height.value
-        buffer_array = np.ctypeslib.as_array(buffer_ptr, shape=(buffer_size,))
-        
-        # Reshape based on pixel format
-        pixel_format = self.get_pixel_format()
-        if pixel_format in [0x42475241, 0x41524742]:  # BGRA, ARGB
-            return buffer_array.reshape(height.value, width.value, 4)
-        elif pixel_format in [0x52474220, 0x20524742]:  # RGB, BGR
-            return buffer_array.reshape(height.value, width.value, 3)
-        else:
-            # For other formats, return as 2D array
-            return buffer_array.reshape(height.value, row_bytes.value)
-    
-    def commit_frame(self):
-        """Commit the current frame buffer (call after writing to get_frame_buffer())."""
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        res = decklink.decklink_commit_frame(self.handle)
+        res = decklink.decklink_create_frame_from_data(self.handle)
         if res != 0:
-            raise RuntimeError(f"Failed to commit frame (error {res})")
+            raise RuntimeError(f"Failed to create frame (error {res})")
+    
+    def schedule_frame(self):
+        """Schedule the current frame for output."""
+        if not self.handle:
+            raise RuntimeError("Device not open")
+        res = decklink.decklink_schedule_frame_for_output(self.handle)
+        if res != 0:
+            raise RuntimeError(f"Failed to schedule frame (error {res})")
+    
+    def start_playback(self):
+        """Start scheduled playback."""
+        if not self.handle:
+            raise RuntimeError("Device not open")
+        res = decklink.decklink_start_scheduled_playback(self.handle)
+        if res != 0:
+            raise RuntimeError(f"Failed to start playback (error {res})")
+    
+
     
     def __enter__(self):
         return self

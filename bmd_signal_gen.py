@@ -65,6 +65,7 @@ def main():
                        default='solid', help='Pattern type to generate (only "solid" is supported)')
     parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
     parser.add_argument('--height', type=int, default=1080, help='Image height (default: 1080)')
+    parser.add_argument('--all', type=bool, default=False, help='Show all supported pixel formats')
     args = parser.parse_args()
 
     # Validate device index
@@ -76,13 +77,13 @@ def main():
     
     # Get all supported pixel formats from C++
     all_formats = decklink.get_supported_pixel_formats()
-    
+
     # Create a mapping of filtered formats to original indices
     filtered_formats = []
     format_mapping = []  # Maps filtered index to original index
     
     for idx, fmt in enumerate(all_formats):
-        if '8' not in fmt and 'RGBX' not in fmt and 'LE' not in fmt:
+        if args.all or ('8' not in fmt and 'RGBX' not in fmt and 'LE' not in fmt):
             filtered_formats.append(fmt)
             format_mapping.append(idx)
     
@@ -119,6 +120,8 @@ def main():
         # Map filtered index to original C++ index
         original_index = format_mapping[args.pixel_format]
     
+    decklink.set_pixel_format(original_index)
+    
     # After pixel format selection, determine bit depth and validate color arguments
     bit_depth = 12  # Default to 12-bit for high quality
     min_val, max_val = 0, 4095  # default to 12-bit min and max
@@ -136,13 +139,13 @@ def main():
             print(f"Error: {color_name} value {color_val} is out of range for {bit_depth}-bit format ({min_val}-{max_val})")
             return 1
 
-    print(f"\nSetting color to RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
+    print(f"\nGenerating full frame RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
     
     # Only support solid color for now
     image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth)
     
     # Set the frame data using the new method with pixel format
-    decklink.set_frame_data(image, original_index)
+    decklink.set_frame_data(image)
     
     # Configure HDR metadata (set once, before any color/output)
     if args.no_hdr:
@@ -162,7 +165,14 @@ def main():
     decklink.set_frame_eotf(eotf=eotf_setting, maxCLL=max_cll_setting, maxFALL=max_fall_setting)
     
     print("Starting output...")
+    # Enable video output
     decklink.start()
+    # Create frame from pending data
+    decklink.create_frame()
+    # Schedule the frame
+    decklink.schedule_frame()
+    # Start playback
+    decklink.start_playback()
     print(f"Outputting for {args.duration} seconds...")
     try:
         time.sleep(args.duration)
