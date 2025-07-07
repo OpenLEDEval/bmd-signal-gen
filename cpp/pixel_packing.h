@@ -33,7 +33,7 @@
  * @param rowBytes Bytes per row (including padding)
  * @param isBGRA true for BGRA format, false for ARGB format
  */
-void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
+void pack_8bpc_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
                         int32_t width, int32_t height, int32_t rowBytes, bool isBGRA = true);
 
 /**
@@ -49,7 +49,7 @@ void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* src
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
  */
-void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          int32_t width, int32_t height, int32_t rowBytes);
 
 /**
@@ -65,7 +65,7 @@ void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
  */
-void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+void pack_10bpc_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
                          int32_t width, int32_t height, int32_t rowBytes);
 
 /**
@@ -81,7 +81,7 @@ void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* 
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
  */
-void pack_12bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          int32_t width, int32_t height, int32_t rowBytes);
 
 #endif // PIXEL_PACKING_H 

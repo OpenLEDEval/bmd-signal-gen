@@ -174,7 +174,7 @@ int DeckLinkSignalGen::createFrame() {
                 b_8bit[i] = (b_channel[i] * 255) / 65535;
             }
             
-            pack_8bit_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
+            pack_8bpc_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
                               m_width, m_height, rowBytes, true);
             break;
         }
@@ -190,7 +190,7 @@ int DeckLinkSignalGen::createFrame() {
                 b_8bit[i] = (b_channel[i] * 255) / 65535;
             }
             
-            pack_8bit_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
+            pack_8bpc_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
                               m_width, m_height, rowBytes, false);
             break;
         }
@@ -206,7 +206,7 @@ int DeckLinkSignalGen::createFrame() {
                 b_10bit[i] = (b_channel[i] * 1023) / 65535;
             }
             
-            pack_10bit_rgb_image(frameData, r_10bit.data(), g_10bit.data(), b_10bit.data(),
+            pack_10bpc_rgb_image(frameData, r_10bit.data(), g_10bit.data(), b_10bit.data(),
                                m_width, m_height, rowBytes);
             break;
         }
@@ -232,7 +232,7 @@ int DeckLinkSignalGen::createFrame() {
                 v_channel[i] = std::min(std::max(v_channel[i], (uint16_t)0), (uint16_t)255);
             }
             
-            pack_10bit_yuv_image(frameData, y_channel.data(), u_channel.data(), v_channel.data(),
+            pack_10bpc_yuv_image(frameData, y_channel.data(), u_channel.data(), v_channel.data(),
                                m_width, m_height, rowBytes);
             break;
         }
@@ -248,7 +248,7 @@ int DeckLinkSignalGen::createFrame() {
                 b_12bit[i] = (b_channel[i] * 4095) / 65535;
             }
             
-            pack_12bit_rgb_image(frameData, r_12bit.data(), g_12bit.data(), b_12bit.data(),
+            pack_12bpc_rgb_image(frameData, r_12bit.data(), g_12bit.data(), b_12bit.data(),
                                m_width, m_height, rowBytes);
             break;
         }

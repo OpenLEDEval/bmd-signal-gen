@@ -5,7 +5,7 @@
 #include <vector>
 
 /*
- * Pixel Packing Implementation for Blackmagic DeckLink API
+ * Pixel Packing for Blackmagic DeckLink API
  * 
  * This file contains the implementation of various pixel packing schemes
  * used by Blackmagic DeckLink devices. Each function handles the specific
@@ -75,7 +75,7 @@ static uint8_t low_8_of_12(uint16_t channel) {
  *               = rowbytes * Height
  * In this format, 8 pixels fit into 36 bytes.
  */
-static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr, 
+static void pack_8_12bpc_pixels_into_36_bytes(uint8_t* groupPtr, 
                                        const uint16_t r_channels[8], 
                                        const uint16_t g_channels[8], 
                                        const uint16_t b_channels[8]) {
@@ -144,7 +144,7 @@ static void pack_8_pixels_into_36_bytes(uint8_t* groupPtr,
 
 // Packing functions that separate packing from filling
 
-void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
+void pack_8bpc_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
                         int32_t width, int32_t height, int32_t rowBytes, bool isBGRA) {
     /*
      * Pack 8-bit RGB image data into BGRA/ARGB format
@@ -181,7 +181,7 @@ void pack_8bit_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* src
               << " into " << (isBGRA ? "BGRA" : "ARGB") << " format" << std::endl;
 }
 
-void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          int32_t width, int32_t height, int32_t rowBytes) {
     /*
      * Pack 10-bit RGB image data into 10-bit RGB format
@@ -211,7 +211,7 @@ void pack_10bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
     std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
 }
 
-void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+void pack_10bpc_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
                          int32_t width, int32_t height, int32_t rowBytes) {
     /*
      * Pack 10-bit YUV image data into 10-bit YUV format
@@ -241,7 +241,7 @@ void pack_10bit_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* 
     std::cerr << "[PixelPacking] 10-bit YUV image packed: " << width << "x" << height << std::endl;
 }
 
-void pack_12bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          int32_t width, int32_t height, int32_t rowBytes) {
     /*
      * Pack 12-bit RGB image data into 12-bit RGB format
@@ -283,7 +283,7 @@ void pack_12bit_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
             }
             
             // Use the helper function to pack 8 pixels into 36 bytes
-            pack_8_pixels_into_36_bytes(groupPtr, r_channels, g_channels, b_channels);
+            pack_8_12bpc_pixels_into_36_bytes(groupPtr, r_channels, g_channels, b_channels);
         }
     }
     
