@@ -44,9 +44,9 @@ DeckLinkSignalGen::~DeckLinkSignalGen() {
 void DeckLinkSignalGen::logFrameInfo(const char* context) {
     if (m_frame) {
         BMDFrameFlags flags = m_frame->GetFlags();
-        int32_t width = m_frame->GetWidth();
-        int32_t height = m_frame->GetHeight();
-        int32_t rowBytes = m_frame->GetRowBytes();
+        uint16_t width = m_frame->GetWidth();
+        uint16_t height = m_frame->GetHeight();
+        uint16_t rowBytes = m_frame->GetRowBytes();
         BMDPixelFormat format = m_frame->GetPixelFormat();
         
         std::cerr << "[DeckLink] Frame info " << context << ":" << std::endl;
@@ -163,93 +163,45 @@ int DeckLinkSignalGen::createFrame() {
     // Pack the data according to the pixel format
     switch (m_pixelFormat) {
         case bmdFormat8BitBGRA: {
-            // Convert 16-bit to 8-bit
-            std::vector<uint8_t> r_8bit(m_width * m_height);
-            std::vector<uint8_t> g_8bit(m_width * m_height);
-            std::vector<uint8_t> b_8bit(m_width * m_height);
-            
-            for (int i = 0; i < m_width * m_height; i++) {
-                r_8bit[i] = (r_channel[i] * 255) / 65535;
-                g_8bit[i] = (g_channel[i] * 255) / 65535;
-                b_8bit[i] = (b_channel[i] * 255) / 65535;
-            }
-            
-            pack_8bpc_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
-                              m_width, m_height, rowBytes, true);
+            pack_8bpc_rgb_image(
+                frameData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_width, m_height,
+                rowBytes,
+                true);
             break;
         }
         case bmdFormat8BitARGB: {
-            // Convert 16-bit to 8-bit
-            std::vector<uint8_t> r_8bit(m_width * m_height);
-            std::vector<uint8_t> g_8bit(m_width * m_height);
-            std::vector<uint8_t> b_8bit(m_width * m_height);
-            
-            for (int i = 0; i < m_width * m_height; i++) {
-                r_8bit[i] = (r_channel[i] * 255) / 65535;
-                g_8bit[i] = (g_channel[i] * 255) / 65535;
-                b_8bit[i] = (b_channel[i] * 255) / 65535;
-            }
-            
-            pack_8bpc_rgb_image(frameData, r_8bit.data(), g_8bit.data(), b_8bit.data(),
-                              m_width, m_height, rowBytes, false);
+            pack_8bpc_rgb_image(
+                frameData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_width, m_height,
+                rowBytes,
+                false);
             break;
         }
         case bmdFormat10BitRGB: {
-            // Convert 16-bit to 10-bit
-            std::vector<uint16_t> r_10bit(m_width * m_height);
-            std::vector<uint16_t> g_10bit(m_width * m_height);
-            std::vector<uint16_t> b_10bit(m_width * m_height);
-            
-            for (int i = 0; i < m_width * m_height; i++) {
-                r_10bit[i] = (r_channel[i] * 1023) / 65535;
-                g_10bit[i] = (g_channel[i] * 1023) / 65535;
-                b_10bit[i] = (b_channel[i] * 1023) / 65535;
-            }
-            
-            pack_10bpc_rgb_image(frameData, r_10bit.data(), g_10bit.data(), b_10bit.data(),
-                               m_width, m_height, rowBytes);
+            pack_10bpc_rgb_image(
+                frameData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_width, m_height,
+                rowBytes);
             break;
         }
         case bmdFormat8BitYUV: {
-            // Convert RGB to YUV
-            std::vector<uint16_t> y_channel(m_width * m_height);
-            std::vector<uint16_t> u_channel(m_width * m_height);
-            std::vector<uint16_t> v_channel(m_width * m_height);
-            
-            for (int i = 0; i < m_width * m_height; i++) {
-                // Convert RGB to YUV (simplified conversion)
-                uint16_t r = r_channel[i];
-                uint16_t g = g_channel[i];
-                uint16_t b = b_channel[i];
-                
-                y_channel[i] = (66 * r + 129 * g + 25 * b + 128) >> 8;
-                u_channel[i] = (-38 * r - 74 * g + 112 * b + 128) >> 8;
-                v_channel[i] = (112 * r - 94 * g - 18 * b + 128) >> 8;
-                
-                // Clamp values
-                y_channel[i] = std::min(std::max(y_channel[i], (uint16_t)0), (uint16_t)255);
-                u_channel[i] = std::min(std::max(u_channel[i], (uint16_t)0), (uint16_t)255);
-                v_channel[i] = std::min(std::max(v_channel[i], (uint16_t)0), (uint16_t)255);
-            }
-            
-            pack_10bpc_yuv_image(frameData, y_channel.data(), u_channel.data(), v_channel.data(),
-                               m_width, m_height, rowBytes);
+            pack_10bpc_yuv_image(
+                frameData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_width, m_height,
+                rowBytes);
             break;
         }
         case bmdFormat12BitRGB: {
-            // Convert 16-bit to 12-bit
-            std::vector<uint16_t> r_12bit(m_width * m_height);
-            std::vector<uint16_t> g_12bit(m_width * m_height);
-            std::vector<uint16_t> b_12bit(m_width * m_height);
-            
-            for (int i = 0; i < m_width * m_height; i++) {
-                r_12bit[i] = (r_channel[i] * 4095) / 65535;
-                g_12bit[i] = (g_channel[i] * 4095) / 65535;
-                b_12bit[i] = (b_channel[i] * 4095) / 65535;
-            }
-            
-            pack_12bpc_rgb_image(frameData, r_12bit.data(), g_12bit.data(), b_12bit.data(),
-                               m_width, m_height, rowBytes);
+            pack_12bpc_rgb_image(
+                frameData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_width, m_height,
+                rowBytes);
             break;
         }
         default:

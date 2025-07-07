@@ -159,19 +159,19 @@ The implementation includes commented examples of alternative patterns:
 
 ```cpp
 // 8-bit RGB frame filling
-void fill_8bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+void fill_8bit_rgb_frame(void* frameData, uint16_t width, uint16_t height, uint16_t rowBytes,
                         uint8_t r, uint8_t g, uint8_t b, bool isBGRA = true);
 
 // 10-bit RGB frame filling (expects 10-bit values)
-void fill_10bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+void fill_10bit_rgb_frame(void* frameData, uint16_t width, uint16_t height, uint16_t rowBytes,
                          uint16_t r, uint16_t g, uint16_t b);
 
 // 10-bit YUV frame filling (expects 10-bit YUV values)
-void fill_10bit_yuv_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes,
+void fill_10bit_yuv_frame(void* frameData, uint16_t width, uint16_t height, uint16_t rowBytes,
                          uint16_t y, uint16_t u, uint16_t v);
 
 // 12-bit RGB frame filling (expects 12-bit values) - REFACTORED
-void fill_12bit_rgb_frame(void* frameData, int32_t width, int32_t height, int32_t rowBytes, 
+void fill_12bit_rgb_frame(void* frameData, uint16_t width, uint16_t height, uint16_t rowBytes, 
                          uint16_t r, uint16_t g, uint16_t b);
 ```
 

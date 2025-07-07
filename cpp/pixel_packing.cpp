@@ -9,22 +9,127 @@
  * 
  * This file contains the implementation of various pixel packing schemes
  * used by Blackmagic DeckLink devices. Each function handles the specific
- * bit depth and packing requirements for optimal hardware compatibility.
+ * bit depth and packing requirements per the DeckLink SDK documentation.
  * 
  * INPUT RANGES:
- * - 8-bit functions: Expect 8-bit values (0-255)
- * - 10-bit functions: Expect 10-bit values (0-1023)
- * - 12-bit function: Expect 12-bit values (0-4095)
+ * - 8-bit functions: Expect 8-bit values (0-255) in a 16-bit container
+ * - 10-bit functions: Expect 10-bit values (0-1023) in a 16-bit container
+ * - 12-bit function: Expect 12-bit values (0-4095) in a 16-bit container
  * 
  * All functions include range checking and will clamp values to valid ranges.
  * These functions are focused purely on packing existing image data.
+ * Specifically, the YUV packing functions simply pack the data, they do not
+ * perform any RGB to YUV conversion
  */
+
+
+
+void pack_8bpc_rgb_image(
+    void* destData,
+    const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+    uint16_t width, uint16_t height,
+    uint16_t rowBytes,
+    bool isBGRA) {
+    /*
+     * Pack 8-bit RGB image data into BGRA/ARGB format
+     * 
+     * Packs existing 8-bit RGB image data into BGRA or ARGB format.
+     */
+    
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint8_t r = srcR[srcIndex];
+            uint8_t g = srcG[srcIndex];
+            uint8_t b = srcB[srcIndex];
+            
+            uint32_t color;
+            if (isBGRA) {
+                // BGRA format: AABBGGRR
+                color = (0xFF << 24) | (r << 16) | (g << 8) | b;
+            } else {
+                // ARGB format: AARRGGBB  
+                color = (0xFF << 24) | (b << 16) | (g << 8) | r;
+            }
+            
+            pixels[destIndex] = color;
+        }
+    }
+    
+    std::cerr << "[PixelPacking] 8-bit RGB image packed: " << width << "x" << height 
+              << " into " << (isBGRA ? "BGRA" : "ARGB") << " format" << std::endl;
+}
+
+void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+                         uint16_t width, uint16_t height, uint16_t rowBytes) {
+    /*
+     * Pack 10-bit RGB image data into 10-bit RGB format
+     * 
+     * Packs existing 10-bit RGB image data into 10-bit RGB format.
+     * This function separates the packing logic from frame filling.
+     */
+    
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint16_t r = std::min(srcR[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t g = std::min(srcG[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t b = std::min(srcB[srcIndex], static_cast<uint16_t>(1023));
+            
+            // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
+            uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
+            
+            pixels[destIndex] = color;
+        }
+    }
+    
+    std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
+}
+
+void pack_10bpc_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+                         uint16_t width, uint16_t height, uint16_t rowBytes) {
+    /*
+     * Pack 10-bit YUV image data into 10-bit YUV format
+     * 
+     * Packs existing 10-bit YUV image data into 10-bit YUV format.
+     * This function separates the packing logic from frame filling.
+     */
+    
+    uint32_t* pixels = static_cast<uint32_t*>(destData);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int srcIndex = y * width + x;
+            int destIndex = y * (rowBytes / 4) + x;
+            
+            uint16_t y_val = std::min(srcY[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t u = std::min(srcU[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t v = std::min(srcV[srcIndex], static_cast<uint16_t>(1023));
+            
+            // Pack into 32-bit word: U[9:0] | Y[9:0] << 10 | V[9:0] << 20
+            uint32_t color = (u & 0x3FF) | ((y_val & 0x3FF) << 10) | ((v & 0x3FF) << 20);
+            
+            pixels[destIndex] = color;
+        }
+    }
+    
+    std::cerr << "[PixelPacking] 10-bit YUV image packed: " << width << "x" << height << std::endl;
+}
 
 /**
  * Swizzle a portion of two 12-bit color channels into a single byte
  * 
- * Takes two 12-bit color channels and swizzles a portion of them into a single byte with
- * the following format: low 4 bits of channel B, high 4 bits of channel A
+ * Takes two 12-bit color channels and swizzles a portion of them into a single
+ * byte with the following format:
+ * low 4 bits of channel B, high 4 bits of channel A
  * 
  * @param channelA First 12-bit channel (0-4095)
  * @param channelB Second 12-bit channel (0-4095)
@@ -142,107 +247,8 @@ static void pack_8_12bpc_pixels_into_36_bytes(uint8_t* groupPtr,
     groupPtr[32] = high_8_of_12(b_channels[7]);
 }
 
-// Packing functions that separate packing from filling
-
-void pack_8bpc_rgb_image(void* destData, const uint8_t* srcR, const uint8_t* srcG, const uint8_t* srcB,
-                        int32_t width, int32_t height, int32_t rowBytes, bool isBGRA) {
-    /*
-     * Pack 8-bit RGB image data into BGRA/ARGB format
-     * 
-     * Packs existing 8-bit RGB image data into BGRA or ARGB format.
-     * This function separates the packing logic from frame filling.
-     */
-    
-    uint32_t* pixels = static_cast<uint32_t*>(destData);
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int srcIndex = y * width + x;
-            int destIndex = y * (rowBytes / 4) + x;
-            
-            uint8_t r = srcR[srcIndex];
-            uint8_t g = srcG[srcIndex];
-            uint8_t b = srcB[srcIndex];
-            
-            uint32_t color;
-            if (isBGRA) {
-                // BGRA format: AABBGGRR
-                color = (0xFF << 24) | (r << 16) | (g << 8) | b;
-            } else {
-                // ARGB format: AARRGGBB  
-                color = (0xFF << 24) | (b << 16) | (g << 8) | r;
-            }
-            
-            pixels[destIndex] = color;
-        }
-    }
-    
-    std::cerr << "[PixelPacking] 8-bit RGB image packed: " << width << "x" << height 
-              << " into " << (isBGRA ? "BGRA" : "ARGB") << " format" << std::endl;
-}
-
-void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
-                         int32_t width, int32_t height, int32_t rowBytes) {
-    /*
-     * Pack 10-bit RGB image data into 10-bit RGB format
-     * 
-     * Packs existing 10-bit RGB image data into 10-bit RGB format.
-     * This function separates the packing logic from frame filling.
-     */
-    
-    uint32_t* pixels = static_cast<uint32_t*>(destData);
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int srcIndex = y * width + x;
-            int destIndex = y * (rowBytes / 4) + x;
-            
-            uint16_t r = std::min(srcR[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t g = std::min(srcG[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t b = std::min(srcB[srcIndex], static_cast<uint16_t>(1023));
-            
-            // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
-            uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
-            
-            pixels[destIndex] = color;
-        }
-    }
-    
-    std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
-}
-
-void pack_10bpc_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
-                         int32_t width, int32_t height, int32_t rowBytes) {
-    /*
-     * Pack 10-bit YUV image data into 10-bit YUV format
-     * 
-     * Packs existing 10-bit YUV image data into 10-bit YUV format.
-     * This function separates the packing logic from frame filling.
-     */
-    
-    uint32_t* pixels = static_cast<uint32_t*>(destData);
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int srcIndex = y * width + x;
-            int destIndex = y * (rowBytes / 4) + x;
-            
-            uint16_t y_val = std::min(srcY[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t u = std::min(srcU[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t v = std::min(srcV[srcIndex], static_cast<uint16_t>(1023));
-            
-            // Pack into 32-bit word: U[9:0] | Y[9:0] << 10 | V[9:0] << 20
-            uint32_t color = (u & 0x3FF) | ((y_val & 0x3FF) << 10) | ((v & 0x3FF) << 20);
-            
-            pixels[destIndex] = color;
-        }
-    }
-    
-    std::cerr << "[PixelPacking] 10-bit YUV image packed: " << width << "x" << height << std::endl;
-}
-
 void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
-                         int32_t width, int32_t height, int32_t rowBytes) {
+                         uint16_t width, uint16_t height, uint16_t rowBytes) {
     /*
      * Pack 12-bit RGB image data into 12-bit RGB format
      * 
