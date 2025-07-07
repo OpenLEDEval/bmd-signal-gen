@@ -110,16 +110,23 @@ int DeckLinkSignalGen::createFrame() {
               << ", height=" << m_height << std::endl;
     HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
     if (result != S_OK) {
-        std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
-        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat=0x" << std::hex << m_pixelFormat << std::dec
+        std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x"
+                  << std::hex << result << std::dec << std::endl;
+        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat=0x"
+                  << std::hex << m_pixelFormat << std::dec
                   << ", width=" << m_width
                   << ", height=" << m_height << std::endl;
         return -3;
     }
     // Output rowBytes in decimal notation
-    std::cerr << "[DeckLink][DEBUG] RowBytesForPixelFormat returned rowBytes=" << rowBytes << std::endl;
+    std::cerr << "[DeckLink][DEBUG] RowBytesForPixelFormat returned rowBytes="
+              << rowBytes << std::endl;
     
-    result = m_output->CreateVideoFrame(m_width, m_height, rowBytes, m_pixelFormat, bmdFrameFlagDefault, &m_frame);
+    result = m_output->CreateVideoFrame(
+        m_width, m_height, rowBytes,
+        m_pixelFormat,
+        bmdFrameFlagDefault,
+        &m_frame);
     if (!m_frame) {
         std::cerr << "[DeckLink] CreateVideoFrame failed" << std::endl;
         return -4;
@@ -149,71 +156,19 @@ int DeckLinkSignalGen::createFrame() {
     // Use pixel packing system to convert raw RGB data to the target format
     const uint16_t* srcData = m_pendingFrameData.data();
     
-    // Extract RGB channels from the raw data (3 uint16_t per pixel: R, G, B)
-    std::vector<uint16_t> r_channel(m_width * m_height);
-    std::vector<uint16_t> g_channel(m_width * m_height);
-    std::vector<uint16_t> b_channel(m_width * m_height);
-    
-    for (int i = 0; i < m_width * m_height; i++) {
-        r_channel[i] = srcData[i * 3 + 0];
-        g_channel[i] = srcData[i * 3 + 1];
-        b_channel[i] = srcData[i * 3 + 2];
-    }
-    
     // Pack the data according to the pixel format
-    switch (m_pixelFormat) {
-        case bmdFormat8BitBGRA: {
-            pack_8bpc_rgb_image(
+    int err = pack_pixel_format(
                 frameData,
-                r_channel.data(), g_channel.data(), b_channel.data(),
-                m_width, m_height,
-                rowBytes,
-                true);
-            break;
-        }
-        case bmdFormat8BitARGB: {
-            pack_8bpc_rgb_image(
-                frameData,
-                r_channel.data(), g_channel.data(), b_channel.data(),
-                m_width, m_height,
-                rowBytes,
-                false);
-            break;
-        }
-        case bmdFormat10BitRGB: {
-            pack_10bpc_rgb_image(
-                frameData,
-                r_channel.data(), g_channel.data(), b_channel.data(),
+                m_pixelFormat,
+                srcData,
                 m_width, m_height,
                 rowBytes);
-            break;
-        }
-        case bmdFormat8BitYUV: {
-            pack_10bpc_yuv_image(
-                frameData,
-                r_channel.data(), g_channel.data(), b_channel.data(),
-                m_width, m_height,
-                rowBytes);
-            break;
-        }
-        case bmdFormat12BitRGB: {
-            pack_12bpc_rgb_image(
-                frameData,
-                r_channel.data(), g_channel.data(), b_channel.data(),
-                m_width, m_height,
-                rowBytes);
-            break;
-        }
-        default:
-            std::cerr << "[DeckLink] Unsupported pixel format: 0x" << std::hex << m_pixelFormat << std::dec << std::endl;
-            videoBuffer->EndAccess(bmdBufferAccessWrite);
-            videoBuffer->Release();
-            return -8;
-    }
     
     videoBuffer->EndAccess(bmdBufferAccessWrite);
     videoBuffer->Release();
-    
+    if (err)
+        return err;
+
     // Apply EOTF metadata if set
     if (m_eotfType >= 0) {
         applyEOTFMetadata();

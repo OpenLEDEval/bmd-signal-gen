@@ -9,7 +9,8 @@
  * 
  * This file contains the implementation of various pixel packing schemes
  * used by Blackmagic DeckLink devices. Each function handles the specific
- * bit depth and packing requirements per the DeckLink SDK documentation.
+ * bit depth and packing requirements per the DeckLink SDK documentation
+ * section 3.4.
  * 
  * INPUT RANGES:
  * - 8-bit functions: Expect 8-bit values (0-255) in a 16-bit container
@@ -22,8 +23,20 @@
  * perform any RGB to YUV conversion
  */
 
-
-
+/**
+ * Pack 8-bit RGB image data into BGRA/ARGB format
+ * 
+ * Packs existing 8-bit RGB image data into BGRA or ARGB format.
+ * 
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (8-bit, 0-255)
+ * @param srcG Pointer to source green channel data (8-bit, 0-255)
+ * @param srcB Pointer to source blue channel data (8-bit, 0-255)
+ * @param width Frame width in pixels
+ * @param height Frame height in pixels
+ * @param rowBytes Bytes per row (including padding)
+ * @param isBGRA true for BGRA format, false for ARGB format
+ */
 void pack_8bpc_rgb_image(
     void* destData,
     const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
@@ -64,6 +77,19 @@ void pack_8bpc_rgb_image(
               << " into " << (isBGRA ? "BGRA" : "ARGB") << " format" << std::endl;
 }
 
+/**
+ * Pack 10-bit RGB image data into 10-bit RGB format
+ * 
+ * Packs existing 10-bit RGB image data into 10-bit RGB format.
+ * 
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (10-bit, 0-1023)
+ * @param srcG Pointer to source green channel data (10-bit, 0-1023)
+ * @param srcB Pointer to source blue channel data (10-bit, 0-1023)
+ * @param width Frame width in pixels
+ * @param height Frame height in pixels
+ * @param rowBytes Bytes per row (including padding)
+ */
 void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          uint16_t width, uint16_t height, uint16_t rowBytes) {
     /*
@@ -94,6 +120,19 @@ void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
     std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
 }
 
+/**
+ * Pack 10-bit YUV image data into 10-bit YUV format
+ * 
+ * Packs existing 10-bit YUV image data into 10-bit YUV format.
+ * 
+ * @param destData Pointer to destination frame buffer
+ * @param srcY Pointer to source Y channel data (10-bit, 0-1023)
+ * @param srcU Pointer to source U channel data (10-bit, 0-1023)
+ * @param srcV Pointer to source V channel data (10-bit, 0-1023)
+ * @param width Frame width in pixels
+ * @param height Frame height in pixels
+ * @param rowBytes Bytes per row (including padding)
+ */
 void pack_10bpc_yuv_image(void* destData, const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
                          uint16_t width, uint16_t height, uint16_t rowBytes) {
     /*
@@ -247,6 +286,19 @@ static void pack_8_12bpc_pixels_into_36_bytes(uint8_t* groupPtr,
     groupPtr[32] = high_8_of_12(b_channels[7]);
 }
 
+/**
+ * Pack 12-bit RGB image data into 12-bit RGB format
+ * 
+ * Packs existing 12-bit RGB image data into 12-bit RGB format using interleaved packing.
+ * 
+ * @param destData Pointer to destination frame buffer
+ * @param srcR Pointer to source red channel data (12-bit, 0-4095)
+ * @param srcG Pointer to source green channel data (12-bit, 0-4095)
+ * @param srcB Pointer to source blue channel data (12-bit, 0-4095)
+ * @param width Frame width in pixels
+ * @param height Frame height in pixels
+ * @param rowBytes Bytes per row (including padding)
+ */
 void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
                          uint16_t width, uint16_t height, uint16_t rowBytes) {
     /*
@@ -294,4 +346,73 @@ void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
     }
     
     std::cerr << "[PixelPacking] 12-bit RGB image packed successfully with interleaved packing" << std::endl;
-} 
+}
+
+int pack_pixel_format(
+    void* destData,
+    BMDPixelFormat pixelFormat,
+    const uint16_t* srcData,
+    uint16_t width, uint16_t height,
+    uint16_t rowBytes
+ ) {
+    // Extract RGB channels from the raw data (3 uint16_t per pixel: R, G, B)
+    std::vector<uint16_t> r_channel(width * height);
+    std::vector<uint16_t> g_channel(width * height);
+    std::vector<uint16_t> b_channel(width * height);
+    
+    for (int i = 0; i < width * height; i++) {
+        r_channel[i] = srcData[i * 3 + 0];
+        g_channel[i] = srcData[i * 3 + 1];
+        b_channel[i] = srcData[i * 3 + 2];
+    }
+    
+    // Pack the data according to the pixel format
+    switch (pixelFormat) {
+        case bmdFormat8BitBGRA: {
+            pack_8bpc_rgb_image(
+                destData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                width, height,
+                rowBytes,
+                true);
+            break;
+        }
+        case bmdFormat8BitARGB: {
+            pack_8bpc_rgb_image(
+                destData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                width, height,
+                rowBytes,
+                false);
+            break;
+        }
+        case bmdFormat10BitRGB: {
+            pack_10bpc_rgb_image(
+                destData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                width, height,
+                rowBytes);
+            break;
+        }
+        case bmdFormat8BitYUV: {
+            pack_10bpc_yuv_image(
+                destData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                width, height,
+                rowBytes);
+            break;
+        }
+        case bmdFormat12BitRGB: {
+            pack_12bpc_rgb_image(
+                destData,
+                r_channel.data(), g_channel.data(), b_channel.data(),
+                width, height,
+                rowBytes);
+            break;
+        }
+        default:
+            std::cerr << "[DeckLink] Unsupported pixel format: 0x" << std::hex << pixelFormat << std::dec << std::endl;
+            return -8;
+    }
+    return 0;
+ }
