@@ -7,10 +7,8 @@ import sys
 import time
 import argparse
 import numpy as np
-from typing import Tuple, List, Optional, Union
-from src.bmdsignalgen.patterns import PatternType, ColorValidator, PatternGenerator
-from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version, EOTFType
-from enum import Enum
+from src.bmdsignalgen.patterns import PatternType, PatternGenerator
+from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version, PixelFormatType, EOTFType
 
 def determine_bit_depth(format_name: str) -> int:
     """Determine bit depth from pixel format name."""
@@ -47,12 +45,12 @@ def main() -> int:
         '\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region'
     )
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('r', type=int, help='Red component (see --help for range)')
-    parser.add_argument('g', type=int, help='Green component (see --help for range)')
-    parser.add_argument('b', type=int, help='Blue component (see --help for range)')
+    parser.add_argument('r', type=int, default=4095, help='Red component (see --help for range)')
+    parser.add_argument('g', type=int, default=0, help='Green component (see --help for range)')
+    parser.add_argument('b', type=int, default=0, help='Blue component (see --help for range)')
     parser.add_argument('--duration', '-t', type=float, default=5.0, help='Duration in seconds (default: 5.0)')
     parser.add_argument('--device', '-d', type=int, default=0, help='Device index (default: 0)')
-    parser.add_argument('--pixel-format', '-p', type=int, help='Pixel format index (use -1 for auto-select)')
+    parser.add_argument('--pixel-format', '-p', type=int, help='Pixel format index (leave blank for auto-select)')
     parser.add_argument(
         '--eotf',
         type=EOTFType.parse,
@@ -70,7 +68,7 @@ def main() -> int:
         '--pattern',
         type=PatternType,  # This will call PatternType('solid'), etc.
         choices=list(PatternType),
-        default=PatternType.SOLID,
+        default=PatternType.TWO_COLOR,
         help='Pattern type to generate (default: solid)'
     )
     parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
@@ -78,10 +76,10 @@ def main() -> int:
     parser.add_argument('--all', type=bool, default=False, help='Show all supported pixel formats')
     
     # Region of Interest arguments
-    parser.add_argument('--roi-x', type=int, default=0, help='Region of interest X offset (default: 0)')
-    parser.add_argument('--roi-y', type=int, default=0, help='Region of interest Y offset (default: 0)')
-    parser.add_argument('--roi-width', type=int, default=None, help='Region of interest width (default: full image width)')
-    parser.add_argument('--roi-height', type=int, default=None, help='Region of interest height (default: full image height)')
+    parser.add_argument('--roi-x', type=int, default=64, help='Region of interest X offset (default: 0)')
+    parser.add_argument('--roi-y', type=int, default=64, help='Region of interest Y offset (default: 0)')
+    parser.add_argument('--roi-width', type=int, default=64, help='Region of interest width (default: full image width)')
+    parser.add_argument('--roi-height', type=int, default=64, help='Region of interest height (default: full image height)')
     
     # Two-color checkerboard arguments
     parser.add_argument('--r2', type=int, default=0, help='Red component for color 2 (2color pattern, default: 0)')
@@ -124,12 +122,17 @@ def main() -> int:
     # Auto-select pixel format if not specified
     if args.pixel_format is None or args.pixel_format == -1:
         # Try to find preferred formats in order: 12-bit formats first, then 10-bit, then 8-bit
-        preferred_formats = ['12BitRGB', '10BitRGB', '10BitYUV', '8BitBGRA', '8BitARGB']
+        preferred_formats = [
+            PixelFormatType.FORMAT_12BIT_RGB,
+            PixelFormatType.FORMAT_10BIT_RGB,
+            PixelFormatType.FORMAT_10BIT_YUV,
+            PixelFormatType.FORMAT_8BIT_BGRA,
+            PixelFormatType.FORMAT_8BIT_ARGB]
         selected_format = None
         
         for preferred in preferred_formats:
             for idx, fmt in enumerate(filtered_formats):
-                if preferred in fmt:
+                if preferred.value in fmt:
                     selected_format = idx
                     break
             if selected_format is not None:
@@ -138,7 +141,7 @@ def main() -> int:
         if selected_format is None:
             selected_format = 0  # Fallback to first available format
         
-        print(f"\nAuto-selected pixel format: {filtered_formats[selected_format]} (index {selected_format})")
+        print(f"\nAuto-selected pixel format: {filtered_formats[selected_format]} (CLI index {selected_format})")
         # Map filtered index to original C++ index
         original_index = format_mapping[selected_format]
     else:
@@ -146,7 +149,7 @@ def main() -> int:
         if args.pixel_format >= len(filtered_formats):
             print(f"Error: Pixel format index {args.pixel_format} not found. Available formats: 0-{len(filtered_formats)-1}")
             return 1
-        print(f"\nUsing pixel format: {filtered_formats[args.pixel_format]} (index {args.pixel_format})")
+        print(f"\nUsing pixel format: {filtered_formats[args.pixel_format]} (CLI index {args.pixel_format})")
         # Map filtered index to original C++ index
         original_index = format_mapping[args.pixel_format]
     

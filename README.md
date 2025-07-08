@@ -1,6 +1,6 @@
 # BMD Signal Generator
 
-This project enables the generation of test patterns in a cross-platform, highly deterministic way that is not perturbed by OS or GPU variability. It does this by providing C++ and Python wrappers for the BlackMagic Design Decklink API. Recommended output interfaces are the [UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11) and the [UltraStudio Monitor 3G](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-13).
+This project enables the generation of test patterns in a cross-platform, highly deterministic way that is not perturbed by OS or GPU variability. It does this by providing C++ and Python wrappers for the BlackMagic Design Decklink API. Recommended output interfaces are the [UltraStudio Monitor 3G](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-13) and the [UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11).
 The project includes a basic command-line tool to illustrate how to use the wrapper.
 
 ## Overview
@@ -8,7 +8,7 @@ The project includes a basic command-line tool to illustrate how to use the wrap
 This project allows you to:
 - Enumerate and select connected DeckLink devices
 - Query supported pixel formats for each device
-- Output solid RGB color test patterns to DeckLink devices
+- Output solid and checkerboard RGB color test patterns to DeckLink devices
 - Control output duration and device selection
 
 ## Requirements
@@ -17,13 +17,14 @@ This project allows you to:
 - Blackmagic Design Desktop Video drivers (tested with 14.5)
 - Blackmagic Design DeckLink SDK (tested with 14.4)
 - Python 3.11+ (for Python interface)
-- clang++ compiler
+- clang++ (c++20 or newer) compiler
 
 ## Project Structure
 
 ```
 bmd-signal-gen/
-├── cpp/                          # C++ wrapper library
+├── bmd_signal_gen.py             # Command-line application
+├── cpp/                          # BMD DeckLink API C++ wrapper
 │   ├── decklink_wrapper.h        # C API header
 │   ├── decklink_wrapper.cpp      # C API implementation
 │   ├── pixel_packing.h           # Pixel format conversion utilities
@@ -31,16 +32,17 @@ bmd-signal-gen/
 │   ├── PIXEL_PACKING_DOCUMENTATION.md  # Documentation for pixel packing
 │   ├── Makefile                  # Build configuration for C++ library
 │   └── Blackmagic DeckLink SDK 14.4/  # Blackmagic Design SDK
-├── lib/                          # Python interface and built library
-│   ├── bmd_decklink.py          # Python ctypes wrapper
-│   └── libdecklink.dylib        # Built dynamic library (macOS)
-├── bmd_signal_gen.py            # Command-line application
-├── pyproject.toml               # Python project configuration
-├── uv.lock                      # UV dependency lock file
-├── .python-version              # Python version specification
-├── .venv/                       # Python virtual environment
-├── Makefile                     # Build configuration
-└── README.md                    # This file
+├── lib/                          # Python interface and built library artifact
+│   ├── bmd_decklink.py           # Python ctypes wrapper
+│   └── libdecklink.dylib         # Built dynamic library (macOS)
+├── src/                          # Python package source code
+│   └── bmdsignalgen/             # Main Python package
+│       └── patterns.py           # Pattern generation classes and utilities
+├── tests/                        # Unit tests
+│   └── test_patterns.py          # Tests for pattern generation
+├── pyproject.toml                # UV project configuration
+├── uv.lock                       # UV dependency lock file
+└── README.md                     # This file
 ```
 
 ## Building
@@ -55,9 +57,7 @@ bmd-signal-gen/
 ### Build the C++ Library
 
 ```bash
-cd cpp
-make clean
-make
+cd cpp && make clean && make && cd ..
 ```
 
 This creates `lib/libdecklink.dylib` - a dynamic library that provides the C API for DeckLink device control.
@@ -163,46 +163,4 @@ decklink_close(handle);
 
 ### Python Classes
 
-- `BMDDeckLink(device_index=0)` - Main device interface
-- `get_decklink_devices()` - List available devices
-- `get_supported_pixel_formats(handle)` - Get pixel formats for device
-
-## Pixel Format Support
-
-The project includes comprehensive pixel format conversion utilities in `cpp/pixel_packing.h` and `cpp/pixel_packing.cpp`. These utilities handle conversion between RGB color values and various DeckLink pixel formats including:
-
-- 8-bit YUV (4:2:2)
-- 10-bit YUV (4:2:2)
-- 8-bit RGB
-- 10-bit RGB
-- 12-bit RGB
-
-See `cpp/PIXEL_PACKING_DOCUMENTATION.md` for detailed information about supported formats and conversion algorithms.
-
-## Troubleshooting
-
-### No Devices Found
-- Ensure DeckLink device is properly connected
-- Check that Blackmagic Desktop Video software is installed
-- Verify device drivers are up to date
-
-### Build Errors
-- Ensure DeckLink SDK is in the correct location
-- Check that all required frameworks are available
-- Verify compiler supports C++17
-
-### Runtime Errors
-- Check device permissions
-- Ensure no other application is using the DeckLink device
-- Verify the device supports video output
-
-## License
-
-This project is provided as-is for educational and development purposes. Please refer to the Blackmagic Design SDK license for DeckLink API usage terms.
-
-## Contributing
-
-Feel free to submit issues and enhancement requests. When contributing code, please ensure it compiles without warnings and follows the existing code style.
-
-
-
+- `

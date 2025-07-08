@@ -8,6 +8,22 @@ import sys
 import numpy as np
 from enum import Enum
 
+class PixelFormatType(Enum):
+    """Enumeration of supported pixel format types."""
+    FORMAT_8BIT_YUV = "2vuy"
+    FORMAT_10BIT_YUV = "v210"
+    FORMAT_10BIT_YUVA = "Ay10"
+    FORMAT_8BIT_ARGB = 32
+    FORMAT_8BIT_BGRA = "BGRA"
+    FORMAT_10BIT_RGB = "r210"
+    FORMAT_12BIT_RGB = "R12B"
+    FORMAT_12BIT_RGBLE = "R12L"
+    FORMAT_10BIT_RGBXLE = "R10l"
+    FORMAT_10BIT_RGBX = "R10b"
+
+    def __str__(self):
+        return f"{self.name[8:]}"
+
 class EOTFType(Enum):
     RESERVED = 0
     SDR = 1

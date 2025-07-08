@@ -6,6 +6,20 @@
 #include "DeckLinkAPIVersion.h"
 #include <CoreFoundation/CoreFoundation.h>
 
+// Helper function to convert a 32-bit integer to 4-character ASCII code
+std::string fourCharCode(int value) {
+    char chars[7] = {
+        '\'',
+        static_cast<char>((value >> 24) & 0xFF),
+        static_cast<char>((value >> 16) & 0xFF),
+        static_cast<char>((value >> 8) & 0xFF),
+        static_cast<char>(value & 0xFF),
+        '\'',
+        '\0'
+    };
+    return std::string(chars);
+}
+
 // DeckLinkSignalGen Implementation
 DeckLinkSignalGen::DeckLinkSignalGen() 
     : m_device(nullptr)
@@ -52,7 +66,7 @@ void DeckLinkSignalGen::logFrameInfo(const char* context) {
         std::cerr << "[DeckLink] Frame info " << context << ":" << std::endl;
         std::cerr << "  Width: " << std::dec << width << ", Height: " << std::dec << height << std::endl;
         std::cerr << "  RowBytes: " << std::dec << rowBytes << std::endl;
-        std::cerr << "  PixelFormat: 0x" << std::hex << format << std::dec << std::endl;
+        std::cerr << "  PixelFormat: " << fourCharCode(static_cast<int>(format)) << std::endl;
         std::cerr << "  Flags: 0x" << std::hex << flags << std::dec << std::endl;
     } else {
         std::cerr << "[DeckLink] No frame available for logging" << std::endl;
@@ -105,15 +119,15 @@ int DeckLinkSignalGen::createFrame() {
     int32_t rowBytes = 0;
     // Debug output for pixel format and dimensions
     std::cerr << "[DeckLink][DEBUG] Calling RowBytesForPixelFormat with:"
-              << " pixelFormat=0x" << std::hex << m_pixelFormat << std::dec
+              << " pixelFormat=" << fourCharCode(static_cast<int>(m_pixelFormat))
               << ", width=" << m_width
               << ", height=" << m_height << std::endl;
     HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
     if (result != S_OK) {
         std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x"
                   << std::hex << result << std::dec << std::endl;
-        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat=0x"
-                  << std::hex << m_pixelFormat << std::dec
+        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat="
+                  << fourCharCode(static_cast<int>(m_pixelFormat))
                   << ", width=" << m_width
                   << ", height=" << m_height << std::endl;
         return -3;
@@ -214,7 +228,6 @@ int DeckLinkSignalGen::startPlayback() {
 int DeckLinkSignalGen::setPixelFormat(int pixelFormatIndex) {
     if (!m_output) return -1;
     
-    // Cache supported formats if not already done
     if (!m_formatsCached) {
         cacheSupportedFormats();
     }
@@ -225,8 +238,8 @@ int DeckLinkSignalGen::setPixelFormat(int pixelFormatIndex) {
     }
     
     m_pixelFormat = m_supportedFormats[pixelFormatIndex];
-    std::cerr << "[DeckLink] Set pixel format to index " << pixelFormatIndex 
-              << " (0x" << std::hex << m_pixelFormat << std::dec << ")" << std::endl;
+    std::cerr << "[DeckLink] Set pixel format to API index " << pixelFormatIndex
+              << ", " << fourCharCode(static_cast<int>(m_pixelFormat)) << ")" << std::endl;
     
     return 0;
 }
@@ -511,30 +524,23 @@ int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, c
     if (index < 0 || index >= static_cast<int>(signalGen->getSupportedFormats().size())) return -1;
     
     BMDPixelFormat format = signalGen->getSupportedFormats()[index];
-    // Interpret format as 4 ASCII characters
-    char fmtChars[5] = {
-        static_cast<char>((format >> 24) & 0xFF),
-        static_cast<char>((format >> 16) & 0xFF),
-        static_cast<char>((format >> 8) & 0xFF),
-        static_cast<char>(format & 0xFF),
-        '\0'
-    };
+    std::string fmtChars = fourCharCode(static_cast<int>(format));
     std::string formatName;
     
     switch (format) {
-        case bmdFormat8BitYUV: formatName = std::string("8-bit YUV (") + fmtChars + ")"; break;
-        case bmdFormat10BitYUV: formatName = std::string("10-bit YUV (") + fmtChars + ")"; break;
-        case bmdFormat10BitYUVA: formatName = std::string("10-bit YUVA (") + fmtChars + ")"; break;
+        case bmdFormat8BitYUV: formatName = std::string("8Bit YUV (") + fmtChars + ")"; break;
+        case bmdFormat10BitYUV: formatName = std::string("10Bit YUV (") + fmtChars + ")"; break;
+        case bmdFormat10BitYUVA: formatName = std::string("10Bit YUVA (") + fmtChars + ")"; break;
         
-        case bmdFormat8BitARGB: formatName = std::string("8-bit ARGB (") + std::to_string(format) + ")"; break;
-        case bmdFormat8BitBGRA: formatName = std::string("8-bit BGRA (") + fmtChars + ")"; break;
+        case bmdFormat8BitARGB: formatName = std::string("8Bit ARGB (") + std::to_string(format) + ")"; break;
+        case bmdFormat8BitBGRA: formatName = std::string("8Bit BGRA (") + fmtChars + ")"; break;
         
-        case bmdFormat10BitRGB: formatName = std::string("10-bit RGB (") + fmtChars + ")"; break;
-        case bmdFormat12BitRGB: formatName = std::string("12-bit RGB (") + fmtChars + ")"; break;
-        case bmdFormat12BitRGBLE: formatName = std::string("12-bit RGB LE (") + fmtChars + ")"; break;
+        case bmdFormat10BitRGB: formatName = std::string("10Bit RGB (") + fmtChars + ")"; break;
+        case bmdFormat12BitRGB: formatName = std::string("12Bit RGB (") + fmtChars + ")"; break;
+        case bmdFormat12BitRGBLE: formatName = std::string("12Bit RGB LE (") + fmtChars + ")"; break;
 
-        case bmdFormat10BitRGBXLE: formatName = std::string("10-bit RGBX LE (") + fmtChars + ")"; break;
-        case bmdFormat10BitRGBX: formatName = std::string("10-bit RGBX (") + fmtChars + ")"; break;
+        case bmdFormat10BitRGBXLE: formatName = std::string("10Bit RGBX LE (") + fmtChars + ")"; break;
+        case bmdFormat10BitRGBX: formatName = std::string("10Bit RGBX (") + fmtChars + ")"; break;
         
         default: formatName = std::string("Unknown (") + fmtChars + ")"; break;
     }
