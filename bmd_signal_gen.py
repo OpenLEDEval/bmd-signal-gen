@@ -9,7 +9,8 @@ import argparse
 import numpy as np
 from typing import Tuple, List, Optional, Union
 from src.bmdsignalgen.patterns import PatternType, ColorValidator, PatternGenerator
-from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version
+from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version, EOTFType
+from enum import Enum
 
 def determine_bit_depth(format_name: str) -> int:
     """Determine bit depth from pixel format name."""
@@ -52,8 +53,13 @@ def main() -> int:
     parser.add_argument('--duration', '-t', type=float, default=5.0, help='Duration in seconds (default: 5.0)')
     parser.add_argument('--device', '-d', type=int, default=0, help='Device index (default: 0)')
     parser.add_argument('--pixel-format', '-p', type=int, help='Pixel format index (use -1 for auto-select)')
-    parser.add_argument('--eotf', type=int, choices=[0, 1, 2, 3, 4], default=3, 
-                       help='EOTF type (CEA 861.3): 0=Reserved, 1=SDR, 2=HDR, 3=PQ, 4=HLG (default: 3=PQ)')
+    parser.add_argument(
+        '--eotf',
+        type=EOTFType.parse,
+        choices=list(EOTFType),
+        default=EOTFType.PQ,
+        help='EOTF type (CEA 861.3): 0=RESERVED, 1=SDR, 2=HDR, 3=PQ, 4=HLG (default: 3=PQ)'
+    )
     parser.add_argument('--max-cll', type=int, default=1000, 
                        help='Maximum Content Light Level in cd/m² (default: 1000)')
     parser.add_argument('--max-fall', type=int, default=400, 
@@ -178,16 +184,15 @@ def main() -> int:
     # Configure HDR metadata (set once, before any color/output)
     if args.no_hdr:
         print(f"\nConfiguring device for SDR output (EOTF: SDR)")
-        eotf_setting = 1  # CEA 861.3: 1 = Traditional gamma - SDR
+        eotf_setting = EOTFType.SDR.value
         max_cll_setting = 0
         max_fall_setting = 0
     else:
-        eotf_names = {0: "Reserved", 1: "SDR", 2: "HDR", 3: "PQ", 4: "HLG"}
         print(f"\nConfiguring device for HDR output:")
-        print(f"  EOTF: {eotf_names[args.eotf]} ({args.eotf})")
+        print(f"  EOTF: {args.eotf.name} ({args.eotf.value})")
         print(f"  Max CLL: {args.max_cll} cd/m²")
         print(f"  Max FALL: {args.max_fall} cd/m²")
-        eotf_setting = args.eotf
+        eotf_setting = args.eotf.value
         max_cll_setting = args.max_cll
         max_fall_setting = args.max_fall
     decklink.set_frame_eotf(eotf=eotf_setting, maxCLL=max_cll_setting, maxFALL=max_fall_setting)

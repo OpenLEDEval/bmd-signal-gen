@@ -6,6 +6,33 @@ import ctypes
 import os
 import sys
 import numpy as np
+from enum import Enum
+
+class EOTFType(Enum):
+    RESERVED = 0
+    SDR = 1
+    HDR = 2
+    PQ = 3
+    HLG = 4
+
+    def __str__(self):
+        return f"{self.value}={self.name}"
+
+    @classmethod
+    def parse(cls, value):
+        # Try integer value
+        try:
+            return cls(int(value))
+        except (ValueError, KeyError):
+            pass
+        # Try by name (case-insensitive)
+        try:
+            return cls[value.upper()]
+        except KeyError:
+            valid = ', '.join(f'{e.value} ({e.name})' for e in cls)
+            raise ValueError(
+                f"Invalid EOTF value: {value}. Use one of: {valid}"
+            )
 
 # Load the DeckLink library
 try:
