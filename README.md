@@ -102,3 +102,11 @@ uv run bmd_signal_gen.py 4095 0 0
 - `r`, `g`, `b`: Red, green, blue components (0-4095)
 - `--duration`, `-d`: Output duration in seconds (default: 5.0)
 - `--device`: Device index to use (default: 0)
+
+## Coding Standards
+
+- Follow DRY (Don't Repeat Yourself) principles: avoid code duplication, use
+helpers/utilities where appropriate.
+- Maintain encapsulation: keep implementation details private, expose only clean
+public APIs.
+- Prefer clear, maintainable, and testable code.

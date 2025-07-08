@@ -1,0 +1,13 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Coding Standards
+
+- Always follow DRY (Don't Repeat Yourself) principles: avoid code duplication,
+use helpers/utilities where appropriate.
+- Maintain encapsulation: keep implementation details private, expose only clean
+public APIs.
+- Prefer clear, maintainable, and testable code.
