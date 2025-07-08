@@ -160,7 +160,10 @@ def main() -> int:
     bit_depth = determine_bit_depth(selected_format_name)
     
     # Create pattern generator with validation
-    pattern_gen = PatternGenerator(args.width, args.height, bit_depth, args.pattern)
+    pattern_gen = PatternGenerator(
+        args.width, args.height, bit_depth, args.pattern,
+        roi_x=args.roi_x, roi_y=args.roi_y, roi_width=args.roi_width, roi_height=args.roi_height
+    )
     
     # Generate pattern based on type (printing is now handled inside generate)
     try:
@@ -168,8 +171,7 @@ def main() -> int:
         color2 = (args.r2, args.g2, args.b2) if args.pattern in [PatternType.TWO_COLOR, PatternType.FOUR_COLOR] else None
         color3 = (args.r3, args.g3, args.b3) if args.pattern == PatternType.FOUR_COLOR else None
         color4 = (args.r4, args.g4, args.b4) if args.pattern == PatternType.FOUR_COLOR else None
-        
-        image = pattern_gen.generate(color1, color2, color3, color4, args.roi_x, args.roi_y, args.roi_width, args.roi_height)
+        image = pattern_gen.generate(color1, color2, color3, color4)
             
     except ValueError as e:
         print(f"Error: {e}")
