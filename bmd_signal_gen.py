@@ -27,6 +27,55 @@ def generate_solid_color(width, height, r, g, b, bit_depth=12):
     image[:, :, 2] = b
     return image
 
+def generate_4color_checkerboard(width, height, colors, bit_depth=12):
+    """Generate 4-color checkerboard pattern as numpy array.
+    
+    Args:
+        width, height: image dimensions
+        colors: list of 4 RGB tuples [(r1,g1,b1), (r2,g2,b2), (r3,g3,b3), (r4,g4,b4)]
+        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+    
+    Returns:
+        numpy array with shape (height, width, 3) in uint16 format
+    """
+    if len(colors) != 4:
+        raise ValueError("Must provide exactly 4 colors for 4-color checkerboard")
+    
+    # Always use uint16 for consistency
+    image = np.zeros((height, width, 3), dtype=np.uint16)
+    
+    # Create repeating 2x2 checkerboard pattern
+    for y in range(height):
+        for x in range(width):
+            # Determine which position in the 2x2 pattern this pixel belongs to
+            pattern_x = x % 2
+            pattern_y = y % 2
+            
+            # Map 2x2 position to color index
+            color_index = pattern_y * 2 + pattern_x
+            r, g, b = colors[color_index]
+            
+            image[y, x, 0] = r
+            image[y, x, 1] = g
+            image[y, x, 2] = b
+    
+    return image
+
+def generate_2color_checkerboard(width, height, color1, color2, bit_depth=12):
+    """Generate 2-color checkerboard pattern as numpy array.
+    
+    Args:
+        width, height: image dimensions
+        color1, color2: RGB tuples (r,g,b) for the two colors
+        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+    
+    Returns:
+        numpy array with shape (height, width, 3) in uint16 format
+    """
+    # Create 4-color checkerboard with two colors repeated
+    colors = [color1, color2, color2, color1]
+    return generate_4color_checkerboard(width, height, colors, bit_depth)
+
 def main():
     print(f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}")
     print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
@@ -45,6 +94,10 @@ def main():
         '\n  12-bit:  0-4095 (default, recommended)'
         '\n  10-bit:  0-1023'
         '\n  8-bit:   0-255 (fallback mode)'
+        '\n\nPattern types:'
+        '\n  solid: Single color (default)'
+        '\n  2color: Two-color checkerboard'
+        '\n  4color: Four-color checkerboard'
     )
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('r', type=int, help='Red component (see --help for range)')
@@ -61,11 +114,25 @@ def main():
                        help='Maximum Frame Average Light Level in cd/m² (default: 400)')
     parser.add_argument('--no-hdr', action='store_true', 
                        help='Disable HDR metadata (use SDR mode)')
-    parser.add_argument('--pattern', type=str, choices=['solid'], 
-                       default='solid', help='Pattern type to generate (only "solid" is supported)')
+    parser.add_argument('--pattern', type=str, choices=['solid', '2color', '4color'], 
+                       default='solid', help='Pattern type to generate (default: solid)')
     parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
     parser.add_argument('--height', type=int, default=1080, help='Image height (default: 1080)')
     parser.add_argument('--all', type=bool, default=False, help='Show all supported pixel formats')
+    
+    # Two-color checkerboard arguments
+    parser.add_argument('--r2', type=int, help='Red component for color 2 (2color pattern)')
+    parser.add_argument('--g2', type=int, help='Green component for color 2 (2color pattern)')
+    parser.add_argument('--b2', type=int, help='Blue component for color 2 (2color pattern)')
+    
+    # Four-color checkerboard arguments
+    parser.add_argument('--r3', type=int, help='Red component for color 3 (4color pattern)')
+    parser.add_argument('--g3', type=int, help='Green component for color 3 (4color pattern)')
+    parser.add_argument('--b3', type=int, help='Blue component for color 3 (4color pattern)')
+    parser.add_argument('--r4', type=int, help='Red component for color 4 (4color pattern)')
+    parser.add_argument('--g4', type=int, help='Green component for color 4 (4color pattern)')
+    parser.add_argument('--b4', type=int, help='Blue component for color 4 (4color pattern)')
+    
     args = parser.parse_args()
 
     # Validate device index
@@ -134,15 +201,55 @@ def main():
         min_val, max_val = 0, 1023
     # 12-bit is already the default
 
-    for color_name, color_val in zip(['Red', 'Green', 'Blue'], [args.r, args.g, args.b]):
-        if not (min_val <= color_val <= max_val):
-            print(f"Error: {color_name} value {color_val} is out of range for {bit_depth}-bit format ({min_val}-{max_val})")
-            return 1
-
-    print(f"\nGenerating full frame RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
-    
-    # Only support solid color for now
-    image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth)
+    # Validate color arguments based on pattern type
+    try:
+        if args.pattern == 'solid':
+            for color_name, color_val in zip(['Red', 'Green', 'Blue'], [args.r, args.g, args.b]):
+                if not (min_val <= color_val <= max_val):
+                    print(f"Error: {color_name} value {color_val} is out of range for {bit_depth}-bit format ({min_val}-{max_val})")
+                    return 1
+            
+            print(f"\nGenerating solid color RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
+            image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth)
+            
+        elif args.pattern == '2color':
+            if args.r2 is None or args.g2 is None or args.b2 is None:
+                print("Error: --r2, --g2, and --b2 are required for 2color pattern")
+                return 1
+            
+            # Validate all colors
+            for color_name, color_val in zip(['Red', 'Green', 'Blue', 'Red2', 'Green2', 'Blue2'], 
+                                           [args.r, args.g, args.b, args.r2, args.g2, args.b2]):
+                if not (min_val <= color_val <= max_val):
+                    print(f"Error: {color_name} value {color_val} is out of range for {bit_depth}-bit format ({min_val}-{max_val})")
+                    return 1
+            
+            color1 = (args.r, args.g, args.b)
+            color2 = (args.r2, args.g2, args.b2)
+            print(f"\nGenerating 2-color checkerboard RGB({args.r},{args.g},{args.b}) and RGB({args.r2},{args.g2},{args.b2}) for {bit_depth}-bit format...")
+            image = generate_2color_checkerboard(args.width, args.height, color1, color2, bit_depth)
+            
+        elif args.pattern == '4color':
+            if any(arg is None for arg in [args.r2, args.g2, args.b2, args.r3, args.g3, args.b3, args.r4, args.g4, args.b4]):
+                print("Error: --r2, --g2, --b2, --r3, --g3, --b3, --r4, --g4, and --b4 are required for 4color pattern")
+                return 1
+            
+            # Validate all colors
+            for color_name, color_val in zip(['Red', 'Green', 'Blue', 'Red2', 'Green2', 'Blue2', 'Red3', 'Green3', 'Blue3', 'Red4', 'Green4', 'Blue4'], 
+                                           [args.r, args.g, args.b, args.r2, args.g2, args.b2, args.r3, args.g3, args.b3, args.r4, args.g4, args.b4]):
+                if not (min_val <= color_val <= max_val):
+                    print(f"Error: {color_name} value {color_val} is out of range for {bit_depth}-bit format ({min_val}-{max_val})")
+                    return 1
+            
+            colors = [(args.r, args.g, args.b), (args.r2, args.g2, args.b2),
+                     (args.r3, args.g3, args.b3), (args.r4, args.g4, args.b4)]
+            print(f"\nGenerating 4-color checkerboard for {bit_depth}-bit format...")
+            print(f"  Colors: RGB({args.r},{args.g},{args.b}), RGB({args.r2},{args.g2},{args.b2}), RGB({args.r3},{args.g3},{args.b3}), RGB({args.r4},{args.g4},{args.b4})")
+            image = generate_4color_checkerboard(args.width, args.height, colors, bit_depth)
+            
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
     
     # Set the frame data using the new method with pixel format
     decklink.set_frame_data(image)
