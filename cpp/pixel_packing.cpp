@@ -3,6 +3,8 @@
 #include <iostream>
 #include <cstring>
 #include <vector>
+#include <bit>
+#include <numeric>
 
 /*
  * Pixel Packing for Blackmagic DeckLink API
@@ -22,6 +24,71 @@
  * Specifically, the YUV packing functions simply pack the data, they do not
  * perform any RGB to YUV conversion
  */
+
+/**
+ * bmdFormat8BitYUV : '2vuy' 4:2:2 Representation
+ * 
+ * Four 8-bit unsigned components (CCIR 601) are packed into one 32-bit little-
+ * endian word.
+ * 
+ * int framesize = (Width * 16 / 8) * Height
+ *               = rowbytes * Height
+ * 
+ * In this format, two pixels fits into 32 bits or 4 bytes, so one pixel fits
+ * into 16 bits or 2 bytes.
+ * 
+ * For the row bytes calculation, the image width is multiplied by the number of
+ * bytes per pixel.
+ * 
+ * For the frame size calculation, the row bytes are simply multiplied by the
+ * number of rows in the frame.
+ * 
+ * Note that in the source image, Y U and V are defined per pixel, however U and
+ * V are discarded for every second pixel
+ * 
+ * @param destData Pointer to destination frame buffer
+ * @param srcY Pointer to source Y channel data (8-bit, 0-255)
+ * @param srcU Pointer to source U channel data (8-bit, 0-255)
+ * @param srcV Pointer to source V channel data (8-bit, 0-255)
+ * @param width Frame width in pixels
+ * @param height Frame height in pixels
+ * @param rowBytes Bytes per row (including padding)
+ */
+void pack_8bpc_yuv_image(
+    void* destData,
+    const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
+    uint16_t width, uint16_t height,
+    uint16_t rowBytes) {
+    
+    uint8_t* bytes = static_cast<uint8_t*>(destData);
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x += 2) {
+            int srcIndex = y * width + x;
+            int destIndex = y * rowBytes + (x * 2); // 2 bytes per pixel in YUV 4:2:2
+            
+            uint8_t y_val = std::min(srcY[srcIndex], static_cast<uint16_t>(255));
+            uint8_t u = std::min(srcU[srcIndex], static_cast<uint16_t>(255));
+            uint8_t v = std::min(srcV[srcIndex], static_cast<uint16_t>(255));
+
+            // Pack into YUV 4:2:2 format: Y'0U0Y'1V0
+            // For even pixels: U0 Y0 V0 Y1
+            // For odd pixels:  U1 Y2 V1 Y3
+            if (x % 2 == 0) {
+                // Even pixel: store U and Y'0
+                bytes[destIndex] = v;
+                bytes[destIndex + 1] = y_val;
+            } else {
+                // Odd pixel: store U and Y'1
+                bytes[destIndex] = u;
+                bytes[destIndex + 1] = y_val;
+            }
+        }
+    }
+    
+    std::cerr << "[PixelPacking] 8-bit YUV image packed: " << width << "x" << height << std::endl;
+}
+
 
 /**
  * Pack 8-bit RGB image data into BGRA/ARGB format
@@ -78,9 +145,21 @@ void pack_8bpc_rgb_image(
 }
 
 /**
- * Pack 10-bit RGB image data into 10-bit RGB format
+ * bmdFormat10BitRGB : ‘r210’ 4:4:4 raw
  * 
- * Packs existing 10-bit RGB image data into 10-bit RGB format.
+ * Three 10-bit unsigned components are packed into one 32-bit big-endian word.
+ * 
+ * int framesize = ((Width + 63) / 64) * 256 * Height
+ *               = rowbytes * Height
+ * 
+ * In this format each line of video must be aligned a 256 byte boundary. One
+ * pixel fits into 4 bytes so 64 pixels fit into 256 bytes.
+ * 
+ * For the row bytes calculation, the image width is rounded to the nearest 64
+ * pixel boundary and multiplied by 256.
+ * 
+ * For the frame size calculation, the row bytes are simply multiplied by the
+ * number of rows in the frame. 
  * 
  * @param destData Pointer to destination frame buffer
  * @param srcR Pointer to source red channel data (10-bit, 0-1023)
@@ -90,14 +169,11 @@ void pack_8bpc_rgb_image(
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
  */
-void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
-                         uint16_t width, uint16_t height, uint16_t rowBytes) {
-    /*
-     * Pack 10-bit RGB image data into 10-bit RGB format
-     * 
-     * Packs existing 10-bit RGB image data into 10-bit RGB format.
-     * This function separates the packing logic from frame filling.
-     */
+void pack_10bpc_rgb_image(
+    void* destData,
+    const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+    uint16_t width, uint16_t height,
+    uint16_t rowBytes) {
     
     uint32_t* pixels = static_cast<uint32_t*>(destData);
     
@@ -110,14 +186,16 @@ void pack_10bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
             uint16_t g = std::min(srcG[srcIndex], static_cast<uint16_t>(1023));
             uint16_t b = std::min(srcB[srcIndex], static_cast<uint16_t>(1023));
             
-            // Pack into 32-bit word: B[9:0] | G[9:0] << 10 | R[9:0] << 20
-            uint32_t color = (b & 0x3FF) | ((g & 0x3FF) << 10) | ((r & 0x3FF) << 20);
-            
-            pixels[destIndex] = color;
+            uint32_t pixel = (b & 0x000F) << 24 | (b & 0x0300) << 8
+                           | (g & 0x003F) << 18 | (g & 0x03C0) << 2
+                           | (r & 0x000F) << 12 | (r & 0x03F0) >> 4;
+
+            pixels[destIndex] = pixel;
         }
     }
     
-    std::cerr << "[PixelPacking] 10-bit RGB image packed: " << width << "x" << height << std::endl;
+    std::cerr << "[PixelPacking] big-endian 10-bit RGB image packed: "
+              << width << "x" << height << std::endl;
 }
 
 /**
@@ -287,9 +365,18 @@ static void pack_8_12bpc_pixels_into_36_bytes(uint8_t* groupPtr,
 }
 
 /**
- * Pack 12-bit RGB image data into 12-bit RGB format
+ * bmdFormat12BitRGB : 'R12B'
  * 
- * Packs existing 12-bit RGB image data into 12-bit RGB format using interleaved packing.
+ * Big-endian RGB 12-bit per component with full range (0-4095). Packed as
+ * 12-bit per component.
+ * 
+ * This 12-bit pixel format is compatible with SMPTE 268M Digital Moving-Picture
+ * Exchange version 1, Annex C, Method C4 packing.
+ * 
+ * int framesize = ((Width * 36) / 8) * Height
+ *               = rowBytes * Height
+ * 
+ * In this format, 8 pixels fit into 36 bytes.
  * 
  * @param destData Pointer to destination frame buffer
  * @param srcR Pointer to source red channel data (12-bit, 0-4095)
@@ -299,19 +386,16 @@ static void pack_8_12bpc_pixels_into_36_bytes(uint8_t* groupPtr,
  * @param height Frame height in pixels
  * @param rowBytes Bytes per row (including padding)
  */
-void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
-                         uint16_t width, uint16_t height, uint16_t rowBytes) {
-    /*
-     * Pack 12-bit RGB image data into 12-bit RGB format
-     * 
-     * Packs existing 12-bit RGB image data into 12-bit RGB format using interleaved packing.
-     * This function separates the packing logic from frame filling.
-     */
+void pack_12bpc_rgb_image(
+    void* destData,
+    const uint16_t* srcR, const uint16_t* srcG, const uint16_t* srcB,
+    uint16_t width, uint16_t height,
+    uint16_t rowBytes) {
     
     uint8_t* bytes = static_cast<uint8_t*>(destData);
     
-    std::cerr << "[PixelPacking] Packing 12-bit RGB image: " << width << "x" << height 
-              << ", rowBytes: " << rowBytes << std::endl;
+    std::cerr << "[PixelPacking] Packing big-endian 12-bit RGB image: " << width << "x"
+              << height << ", rowBytes: " << rowBytes << std::endl;
     
     for (int y = 0; y < height; y++) {
         uint8_t* row = bytes + (y * rowBytes);
@@ -341,11 +425,13 @@ void pack_12bpc_rgb_image(void* destData, const uint16_t* srcR, const uint16_t* 
             }
             
             // Use the helper function to pack 8 pixels into 36 bytes
-            pack_8_12bpc_pixels_into_36_bytes(groupPtr, r_channels, g_channels, b_channels);
+            pack_8_12bpc_pixels_into_36_bytes(
+                groupPtr,
+                r_channels, g_channels, b_channels);
         }
     }
     
-    std::cerr << "[PixelPacking] 12-bit RGB image packed successfully with interleaved packing" << std::endl;
+    std::cerr << "[PixelPacking] big endian 12-bit RGB image packed successfully" << std::endl;
 }
 
 int pack_pixel_format(
@@ -366,6 +452,14 @@ int pack_pixel_format(
         b_channel[i] = srcData[i * 3 + 2];
     }
     
+    if (std::endian::native == std::endian::little) {
+        std::cout << "[PixelPacking] System is little endian" << std::endl;
+    } else if (std::endian::native == std::endian::big) {
+        std::cout << "[PixelPacking] System is big endian" << std::endl;
+    } else {
+        std::cout << "[PixelPacking] System endianness is mixed or unknown." << std::endl;
+    }
+
     // Pack the data according to the pixel format
     switch (pixelFormat) {
         case bmdFormat8BitBGRA: {

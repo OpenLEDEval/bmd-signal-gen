@@ -2,8 +2,9 @@
 # Requires Blackmagic DeckLink SDK
 
 # Compiler and flags
+# c++23 (!?!) is required for std::byteswap
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -O2 -fPIC -I"Blackmagic DeckLink SDK 14.4/Mac/include"
+CXXFLAGS = -std=c++23 -Wall -O2 -fPIC -I"Blackmagic DeckLink SDK 14.4/Mac/include"
 LDFLAGS = -dynamiclib -framework CoreFoundation -F/Library/Frameworks -framework DeckLinkAPI
 
 # Source files
