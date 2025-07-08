@@ -182,7 +182,12 @@ int DeckLinkSignalGen::scheduleFrame() {
     if (!m_output || !m_frame) return -1;
     
     // Schedule the frame for output
-    HRESULT result = m_output->ScheduleVideoFrame(m_frame, 0, 1000, 30000);
+    HRESULT result = m_output->ScheduleVideoFrame(
+        m_frame,
+        0,    // displayTime - start time
+        1000, // displayDuration in units (1/30s at 30fps)
+        30000 // timeScale (30000 units per second)
+    );
     if (result != S_OK) {
         std::cerr << "[DeckLink] ScheduleVideoFrame failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
         return -1;
