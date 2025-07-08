@@ -9,31 +9,15 @@ import argparse
 import numpy as np
 from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version
 
-def generate_solid_color(width, height, r, g, b, bit_depth=12):
-    """Generate solid color image as numpy array.
-    
-    Args:
-        width, height: image dimensions
-        r, g, b: color values (0-255 for 8-bit, 0-1023 for 10-bit, 0-4095 for 12-bit)
-        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
-    
-    Returns:
-        numpy array with shape (height, width, 3) in uint16 format
-    """
-    # Always use uint16 for consistency
-    image = np.zeros((height, width, 3), dtype=np.uint16)
-    image[:, :, 0] = r
-    image[:, :, 1] = g
-    image[:, :, 2] = b
-    return image
-
-def generate_4color_checkerboard(width, height, colors, bit_depth=12):
-    """Generate 4-color checkerboard pattern as numpy array.
+def generate_4color_checkerboard(width, height, colors, bit_depth=12, roi_x=0, roi_y=0, roi_width=None, roi_height=None):
+    """Generate 4-color checkerboard pattern as numpy array with optional region-of-interest.
     
     Args:
         width, height: image dimensions
         colors: list of 4 RGB tuples [(r1,g1,b1), (r2,g2,b2), (r3,g3,b3), (r4,g4,b4)]
         bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+        roi_x, roi_y: region-of-interest offset (default: 0, 0)
+        roi_width, roi_height: region-of-interest dimensions (default: full image)
     
     Returns:
         numpy array with shape (height, width, 3) in uint16 format
@@ -44,9 +28,19 @@ def generate_4color_checkerboard(width, height, colors, bit_depth=12):
     # Always use uint16 for consistency
     image = np.zeros((height, width, 3), dtype=np.uint16)
     
-    # Create repeating 2x2 checkerboard pattern
-    for y in range(height):
-        for x in range(width):
+    # Set ROI dimensions if not specified
+    if roi_width is None:
+        roi_width = width
+    if roi_height is None:
+        roi_height = height
+    
+    # Validate ROI boundaries
+    if roi_x < 0 or roi_y < 0 or roi_x + roi_width > width or roi_y + roi_height > height:
+        raise ValueError(f"Region of interest ({roi_x},{roi_y},{roi_width},{roi_height}) is outside image boundaries ({width}x{height})")
+    
+    # Create checkerboard pattern only within ROI
+    for y in range(roi_y, roi_y + roi_height):
+        for x in range(roi_x, roi_x + roi_width):
             # Determine which position in the 2x2 pattern this pixel belongs to
             pattern_x = x % 2
             pattern_y = y % 2
@@ -61,20 +55,39 @@ def generate_4color_checkerboard(width, height, colors, bit_depth=12):
     
     return image
 
-def generate_2color_checkerboard(width, height, color1, color2, bit_depth=12):
-    """Generate 2-color checkerboard pattern as numpy array.
+def generate_2color_checkerboard(width, height, color1, color2, bit_depth=12, roi_x=0, roi_y=0, roi_width=None, roi_height=None):
+    """Generate 2-color checkerboard pattern as numpy array with optional region-of-interest.
     
     Args:
         width, height: image dimensions
         color1, color2: RGB tuples (r,g,b) for the two colors
         bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+        roi_x, roi_y: region-of-interest offset (default: 0, 0)
+        roi_width, roi_height: region-of-interest dimensions (default: full image)
     
     Returns:
         numpy array with shape (height, width, 3) in uint16 format
     """
-    # Create 4-color checkerboard with two colors repeated
+    # Create 4-color checkerboard with two colors in checkerboard order
     colors = [color1, color2, color2, color1]
-    return generate_4color_checkerboard(width, height, colors, bit_depth)
+    return generate_4color_checkerboard(width, height, colors, bit_depth, roi_x, roi_y, roi_width, roi_height)
+
+def generate_solid_color(width, height, r, g, b, bit_depth=12, roi_x=0, roi_y=0, roi_width=None, roi_height=None):
+    """Generate solid color image as numpy array with optional region-of-interest.
+    
+    Args:
+        width, height: image dimensions
+        r, g, b: color values (0-255 for 8-bit, 0-1023 for 10-bit, 0-4095 for 12-bit)
+        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
+        roi_x, roi_y: region-of-interest offset (default: 0, 0)
+        roi_width, roi_height: region-of-interest dimensions (default: full image)
+    
+    Returns:
+        numpy array with shape (height, width, 3) in uint16 format
+    """
+    # Create 4-color checkerboard with same color repeated
+    colors = [(r, g, b), (r, g, b), (r, g, b), (r, g, b)]
+    return generate_4color_checkerboard(width, height, colors, bit_depth, roi_x, roi_y, roi_width, roi_height)
 
 def main():
     print(f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}")
@@ -98,6 +111,8 @@ def main():
         '\n  solid: Single color (default)'
         '\n  2color: Two-color checkerboard'
         '\n  4color: Four-color checkerboard'
+        '\n\nRegion of Interest:'
+        '\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region'
     )
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('r', type=int, help='Red component (see --help for range)')
@@ -119,6 +134,12 @@ def main():
     parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
     parser.add_argument('--height', type=int, default=1080, help='Image height (default: 1080)')
     parser.add_argument('--all', type=bool, default=False, help='Show all supported pixel formats')
+    
+    # Region of Interest arguments
+    parser.add_argument('--roi-x', type=int, default=0, help='Region of interest X offset (default: 0)')
+    parser.add_argument('--roi-y', type=int, default=0, help='Region of interest Y offset (default: 0)')
+    parser.add_argument('--roi-width', type=int, help='Region of interest width (default: full image width)')
+    parser.add_argument('--roi-height', type=int, help='Region of interest height (default: full image height)')
     
     # Two-color checkerboard arguments
     parser.add_argument('--r2', type=int, help='Red component for color 2 (2color pattern)')
@@ -210,7 +231,8 @@ def main():
                     return 1
             
             print(f"\nGenerating solid color RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format (range {min_val}-{max_val})...")
-            image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth)
+            image = generate_solid_color(args.width, args.height, args.r, args.g, args.b, bit_depth, 
+                                      args.roi_x, args.roi_y, args.roi_width, args.roi_height)
             
         elif args.pattern == '2color':
             if args.r2 is None or args.g2 is None or args.b2 is None:
@@ -227,7 +249,8 @@ def main():
             color1 = (args.r, args.g, args.b)
             color2 = (args.r2, args.g2, args.b2)
             print(f"\nGenerating 2-color checkerboard RGB({args.r},{args.g},{args.b}) and RGB({args.r2},{args.g2},{args.b2}) for {bit_depth}-bit format...")
-            image = generate_2color_checkerboard(args.width, args.height, color1, color2, bit_depth)
+            image = generate_2color_checkerboard(args.width, args.height, color1, color2, bit_depth,
+                                               args.roi_x, args.roi_y, args.roi_width, args.roi_height)
             
         elif args.pattern == '4color':
             if any(arg is None for arg in [args.r2, args.g2, args.b2, args.r3, args.g3, args.b3, args.r4, args.g4, args.b4]):
@@ -245,11 +268,18 @@ def main():
                      (args.r3, args.g3, args.b3), (args.r4, args.g4, args.b4)]
             print(f"\nGenerating 4-color checkerboard for {bit_depth}-bit format...")
             print(f"  Colors: RGB({args.r},{args.g},{args.b}), RGB({args.r2},{args.g2},{args.b2}), RGB({args.r3},{args.g3},{args.b3}), RGB({args.r4},{args.g4},{args.b4})")
-            image = generate_4color_checkerboard(args.width, args.height, colors, bit_depth)
+            image = generate_4color_checkerboard(args.width, args.height, colors, bit_depth,
+                                               args.roi_x, args.roi_y, args.roi_width, args.roi_height)
             
     except ValueError as e:
         print(f"Error: {e}")
         return 1
+    
+    # Log ROI information if specified
+    if args.roi_x != 0 or args.roi_y != 0 or args.roi_width is not None or args.roi_height is not None:
+        roi_w = args.roi_width if args.roi_width is not None else args.width
+        roi_h = args.roi_height if args.roi_height is not None else args.height
+        print(f"  Region of Interest: ({args.roi_x},{args.roi_y}) {roi_w}x{roi_h}")
     
     # Set the frame data using the new method with pixel format
     decklink.set_frame_data(image)
