@@ -17,92 +17,6 @@ class PatternType(Enum):
     TWO_COLOR = "2color"
     FOUR_COLOR = "4color"
 
-def generate_4color_checkerboard(width: int, height: int, colors: List[Tuple[int, int, int]], 
-                                bit_depth: int = 12, roi_x: int = 0, roi_y: int = 0, 
-                                roi_width: Optional[int] = None, roi_height: Optional[int] = None) -> np.ndarray:
-    """Generate 4-color checkerboard pattern as numpy array with optional region-of-interest.
-    
-    Args:
-        width, height: image dimensions
-        colors: list of 4 RGB tuples [(r1,g1,b1), (r2,g2,b2), (r3,g3,b3), (r4,g4,b4)]
-        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
-        roi_x, roi_y: region-of-interest offset (default: 0, 0)
-        roi_width, roi_height: region-of-interest dimensions (default: full image)
-    
-    Returns:
-        numpy array with shape (height, width, 3) in uint16 format
-    """
-    if len(colors) != 4:
-        raise ValueError("Must provide exactly 4 colors for 4-color checkerboard")
-    
-    # Always use uint16 for consistency
-    image = np.zeros((height, width, 3), dtype=np.uint16)
-    
-    # Set ROI dimensions if not specified
-    if roi_width is None:
-        roi_width = width
-    if roi_height is None:
-        roi_height = height
-    
-    # Validate ROI boundaries
-    if roi_x < 0 or roi_y < 0 or roi_x + roi_width > width or roi_y + roi_height > height:
-        raise ValueError(f"Region of interest ({roi_x},{roi_y},{roi_width},{roi_height}) is outside image boundaries ({width}x{height})")
-    
-    # Create checkerboard pattern only within ROI
-    for y in range(roi_y, roi_y + roi_height):
-        for x in range(roi_x, roi_x + roi_width):
-            # Determine which position in the 2x2 pattern this pixel belongs to
-            pattern_x = x % 2
-            pattern_y = y % 2
-            
-            # Map 2x2 position to color index
-            color_index = pattern_y * 2 + pattern_x
-            r, g, b = colors[color_index]
-            
-            image[y, x, 0] = r
-            image[y, x, 1] = g
-            image[y, x, 2] = b
-    
-    return image
-
-def generate_2color_checkerboard(width: int, height: int, color1: Tuple[int, int, int], 
-                                color2: Tuple[int, int, int], bit_depth: int = 12, roi_x: int = 0, roi_y: int = 0, 
-                                roi_width: Optional[int] = None, roi_height: Optional[int] = None) -> np.ndarray:
-    """Generate 2-color checkerboard pattern as numpy array with optional region-of-interest.
-    
-    Args:
-        width, height: image dimensions
-        color1, color2: RGB tuples (r,g,b) for the two colors
-        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
-        roi_x, roi_y: region-of-interest offset (default: 0, 0)
-        roi_width, roi_height: region-of-interest dimensions (default: full image)
-    
-    Returns:
-        numpy array with shape (height, width, 3) in uint16 format
-    """
-    # Create 4-color checkerboard with two colors in checkerboard order
-    colors = [color1, color2, color2, color1]
-    return generate_4color_checkerboard(width, height, colors, bit_depth, roi_x, roi_y, roi_width, roi_height)
-
-def generate_solid_color(width: int, height: int, r: int, g: int, b: int, bit_depth: int = 12, 
-                        roi_x: int = 0, roi_y: int = 0, roi_width: Optional[int] = None, 
-                        roi_height: Optional[int] = None) -> np.ndarray:
-    """Generate solid color image as numpy array with optional region-of-interest.
-    
-    Args:
-        width, height: image dimensions
-        r, g, b: color values (0-255 for 8-bit, 0-1023 for 10-bit, 0-4095 for 12-bit)
-        bit_depth: bit depth (8, 10, or 12) - defaults to 12 for high quality
-        roi_x, roi_y: region-of-interest offset (default: 0, 0)
-        roi_width, roi_height: region-of-interest dimensions (default: full image)
-    
-    Returns:
-        numpy array with shape (height, width, 3) in uint16 format
-    """
-    # Create 4-color checkerboard with same color repeated
-    colors = [(r, g, b), (r, g, b), (r, g, b), (r, g, b)]
-    return generate_4color_checkerboard(width, height, colors, bit_depth, roi_x, roi_y, roi_width, roi_height)
-
 class ColorValidator:
     """Validates color values against bit depth ranges."""
     
@@ -207,14 +121,16 @@ class PatternGenerator:
     def generate(self, color1: Tuple[int, int, int], color2: Optional[Tuple[int, int, int]] = None,
                 color3: Optional[Tuple[int, int, int]] = None, color4: Optional[Tuple[int, int, int]] = None,
                 roi_x: int = 0, roi_y: int = 0, roi_width: Optional[int] = None, roi_height: Optional[int] = None) -> np.ndarray:
-        """Generate pattern based on pattern_type with the provided colors."""
+        """Generate pattern based on pattern_type with the provided colors and print pattern info."""
         if self.pattern_type == PatternType.SOLID:
             r, g, b = color1
+            print(f"\nGenerating solid color RGB({r}, {g}, {b}) for {self.bit_depth}-bit format...")
             return self.generate_solid(r, g, b, roi_x, roi_y, roi_width, roi_height)
         
         elif self.pattern_type == PatternType.TWO_COLOR:
             if color2 is None:
                 color2 = (0, 0, 0)  # Default to black
+            print(f"\nGenerating 2-color checkerboard RGB{color1} and RGB{color2} for {self.bit_depth}-bit format...")
             return self.generate_2color(color1, color2, roi_x, roi_y, roi_width, roi_height)
         
         elif self.pattern_type == PatternType.FOUR_COLOR:
@@ -225,6 +141,8 @@ class PatternGenerator:
             if color4 is None:
                 color4 = (0, 0, 0)
             colors = [color1, color2, color3, color4]
+            print(f"\nGenerating 4-color checkerboard for {self.bit_depth}-bit format...")
+            print(f"  Colors: RGB{color1}, RGB{color2}, RGB{color3}, RGB{color4}")
             return self.generate_4color(colors, roi_x, roi_y, roi_width, roi_height)
         
         else:
@@ -279,8 +197,13 @@ def main() -> int:
                        help='Maximum Frame Average Light Level in cd/m² (default: 400)')
     parser.add_argument('--no-hdr', action='store_true', 
                        help='Disable HDR metadata (use SDR mode)')
-    parser.add_argument('--pattern', type=str, choices=['solid', '2color', '4color'], 
-                       default='solid', help='Pattern type to generate (default: solid)')
+    parser.add_argument(
+        '--pattern',
+        type=PatternType,  # This will call PatternType('solid'), etc.
+        choices=list(PatternType),
+        default=PatternType.SOLID,
+        help='Pattern type to generate (default: solid)'
+    )
     parser.add_argument('--width', type=int, default=1920, help='Image width (default: 1920)')
     parser.add_argument('--height', type=int, default=1080, help='Image height (default: 1080)')
     parser.add_argument('--all', type=bool, default=False, help='Show all supported pixel formats')
@@ -364,30 +287,17 @@ def main() -> int:
     selected_format_name = filtered_formats[selected_format] if args.pixel_format is None or args.pixel_format == -1 else filtered_formats[args.pixel_format]
     bit_depth = determine_bit_depth(selected_format_name)
     
-    # Convert pattern string to enum
-    pattern_type = PatternType(args.pattern)
-    
     # Create pattern generator with validation
-    pattern_gen = PatternGenerator(args.width, args.height, bit_depth, pattern_type)
+    pattern_gen = PatternGenerator(args.width, args.height, bit_depth, args.pattern)
     
-    # Generate pattern based on type
+    # Generate pattern based on type (printing is now handled inside generate)
     try:
         color1 = (args.r, args.g, args.b)
-        color2 = (args.r2, args.g2, args.b2) if args.pattern in ['2color', '4color'] else None
-        color3 = (args.r3, args.g3, args.b3) if args.pattern == '4color' else None
-        color4 = (args.r4, args.g4, args.b4) if args.pattern == '4color' else None
+        color2 = (args.r2, args.g2, args.b2) if args.pattern in [PatternType.TWO_COLOR, PatternType.FOUR_COLOR] else None
+        color3 = (args.r3, args.g3, args.b3) if args.pattern == PatternType.FOUR_COLOR else None
+        color4 = (args.r4, args.g4, args.b4) if args.pattern == PatternType.FOUR_COLOR else None
         
-        # Generate the pattern
         image = pattern_gen.generate(color1, color2, color3, color4, args.roi_x, args.roi_y, args.roi_width, args.roi_height)
-        
-        # Print pattern information
-        if args.pattern == 'solid':
-            print(f"\nGenerating solid color RGB({args.r}, {args.g}, {args.b}) for {bit_depth}-bit format...")
-        elif args.pattern == '2color':
-            print(f"\nGenerating 2-color checkerboard RGB({args.r},{args.g},{args.b}) and RGB{color2} for {bit_depth}-bit format...")
-        elif args.pattern == '4color':
-            print(f"\nGenerating 4-color checkerboard for {bit_depth}-bit format...")
-            print(f"  Colors: RGB({args.r},{args.g},{args.b}), RGB{color2}, RGB{color3}, RGB{color4}")
             
     except ValueError as e:
         print(f"Error: {e}")
