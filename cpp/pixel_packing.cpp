@@ -5,6 +5,7 @@
 #include <vector>
 #include <bit>
 #include <numeric>
+#include <cstdint>
 
 /*
  * Pixel Packing for Blackmagic DeckLink API
@@ -145,7 +146,7 @@ void pack_8bpc_rgb_image(
 }
 
 /**
- * bmdFormat10BitRGB : ‘r210’ 4:4:4 raw
+ * bmdFormat10BitRGB : 'r210' 4:4:4 raw
  * 
  * Three 10-bit unsigned components are packed into one 32-bit big-endian word.
  * 
@@ -182,13 +183,14 @@ void pack_10bpc_rgb_image(
             int srcIndex = y * width + x;
             int destIndex = y * (rowBytes / 4) + x;
             
-            uint16_t r = std::min(srcR[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t g = std::min(srcG[srcIndex], static_cast<uint16_t>(1023));
-            uint16_t b = std::min(srcB[srcIndex], static_cast<uint16_t>(1023));
+            uint16_t r = srcR[srcIndex];
+            uint16_t g = srcG[srcIndex];
+            uint16_t b = srcB[srcIndex];
             
-            uint32_t pixel = (b & 0x000F) << 24 | (b & 0x0300) << 8
-                           | (g & 0x003F) << 18 | (g & 0x03C0) << 2
-                           | (r & 0x000F) << 12 | (r & 0x03F0) >> 4;
+            // Pack using Blackmagic's reference implementation in ColorBars.cpp
+            // Refer to DeckLink SDK Manual, section 2.7.4 for packing structure
+            uint32_t pixel = ((b & 0x3FC) << 22) | ((g & 0x0FC) << 16) | ((b & 0xC00) << 6)
+                           | ((r & 0x03C) << 10) | (g & 0xF00) | ((r & 0xFC0) >> 6);
 
             pixels[destIndex] = pixel;
         }
@@ -434,6 +436,21 @@ void pack_12bpc_rgb_image(
     std::cerr << "[PixelPacking] big endian 12-bit RGB image packed successfully" << std::endl;
 }
 
+// Clamp a channel buffer to a given bit depth
+static void clamp_channel(std::vector<uint16_t>& channel, int bits) {
+    uint16_t maxval = (1u << bits) - 1;
+    for (auto& v : channel) {
+        if (v > maxval) v = maxval;
+    }
+}
+
+// Clamp all channels to a given bit depth
+static void clamp_image_channels(std::vector<uint16_t>& r, std::vector<uint16_t>& g, std::vector<uint16_t>& b, int bits) {
+    clamp_channel(r, bits);
+    clamp_channel(g, bits);
+    clamp_channel(b, bits);
+}
+
 int pack_pixel_format(
     void* destData,
     BMDPixelFormat pixelFormat,
@@ -462,7 +479,8 @@ int pack_pixel_format(
 
     // Pack the data according to the pixel format
     switch (pixelFormat) {
-        case bmdFormat8BitBGRA: {
+        case bmdFormat8BitBGRA:
+            clamp_image_channels(r_channel, g_channel, b_channel, 8);
             pack_8bpc_rgb_image(
                 destData,
                 r_channel.data(), g_channel.data(), b_channel.data(),
@@ -470,8 +488,8 @@ int pack_pixel_format(
                 rowBytes,
                 true);
             break;
-        }
-        case bmdFormat8BitARGB: {
+        case bmdFormat8BitARGB:
+            clamp_image_channels(r_channel, g_channel, b_channel, 8);
             pack_8bpc_rgb_image(
                 destData,
                 r_channel.data(), g_channel.data(), b_channel.data(),
@@ -479,31 +497,30 @@ int pack_pixel_format(
                 rowBytes,
                 false);
             break;
-        }
-        case bmdFormat10BitRGB: {
+        case bmdFormat10BitRGB:
+            clamp_image_channels(r_channel, g_channel, b_channel, 10);
             pack_10bpc_rgb_image(
                 destData,
                 r_channel.data(), g_channel.data(), b_channel.data(),
                 width, height,
                 rowBytes);
             break;
-        }
-        case bmdFormat8BitYUV: {
+        case bmdFormat8BitYUV:
+            clamp_image_channels(r_channel, g_channel, b_channel, 8);
             pack_10bpc_yuv_image(
                 destData,
                 r_channel.data(), g_channel.data(), b_channel.data(),
                 width, height,
                 rowBytes);
             break;
-        }
-        case bmdFormat12BitRGB: {
+        case bmdFormat12BitRGB:
+            clamp_image_channels(r_channel, g_channel, b_channel, 12);
             pack_12bpc_rgb_image(
                 destData,
                 r_channel.data(), g_channel.data(), b_channel.data(),
                 width, height,
                 rowBytes);
             break;
-        }
         default:
             std::cerr << "[DeckLink] Unsupported pixel format: 0x" << std::hex << pixelFormat << std::dec << std::endl;
             return -8;

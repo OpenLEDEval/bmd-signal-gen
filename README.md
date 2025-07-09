@@ -108,10 +108,10 @@ uv run uvicorn bmd_signal_gen:app
 - `--duration`, `-d`: Output duration in seconds (default: 5.0)
 - `--device`: Device index to use (default: 0)
 
-## Coding Standards
+## Contributing
 
-- Follow DRY (Don't Repeat Yourself) principles: avoid code duplication, use
-helpers/utilities where appropriate.
-- Maintain encapsulation: keep implementation details private, expose only clean
-public APIs.
-- Prefer clear, maintainable, and testable code.
+See CONTRIBUTING.md
+
+## License
+
+See LICENSE
