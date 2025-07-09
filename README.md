@@ -92,9 +92,14 @@ uv run bmd_signal_gen.py <r> <g> <b> [options]
 
 #### Examples
 
-Output 12-bit red color for 5 seconds:
+CLI usage: output 12-bit red color for 5 seconds:
 ```bash
 uv run bmd_signal_gen.py 4095 0 0
+```
+
+# REST API (default host 127.0.0.1 port 8000)
+```bash
+uv run uvicorn bmd_signal_gen:app
 ```
 
 #### Command-Line Options

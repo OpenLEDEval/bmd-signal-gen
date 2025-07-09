@@ -9,28 +9,43 @@ import argparse
 import numpy as np
 from src.bmdsignalgen.patterns import PatternType, PatternGenerator
 from lib.bmd_decklink import BMDDeckLink, get_decklink_devices, get_decklink_driver_version, get_decklink_sdk_version, PixelFormatType, EOTFType
+from fastapi import FastAPI
+from src.bmdsignalgen.api import router as bmd_router
+from typing import Optional
+from src.bmdsignalgen.decklink_control import (
+    setup_decklink_device,
+    generate_and_display_image,
+    cleanup_decklink_device,
+    initialize_decklink_for_api,
+    decklink_instance
+)
+import src.bmdsignalgen.decklink_control as decklink_control
 
-def determine_bit_depth(format_name: str) -> int:
-    """Determine bit depth from pixel format name."""
-    if '8' in format_name:
-        return 8
-    elif '10' in format_name:
-        return 10
-    else:  # 12-bit is default
-        return 12
+app = FastAPI()
+app.include_router(bmd_router)
+
+# Global DeckLink instance for API usage
+decklink_instance = None
+decklink_bit_depth = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize DeckLink when FastAPI starts."""
+    print("DEBUG: FastAPI startup event called")
+    success, error = initialize_decklink_for_api()
+    print(f"DEBUG: initialize_decklink_for_api returned: success={success}, error={error}")
+    if not success:
+        print(f"Warning: Failed to initialize DeckLink for API: {error}")
+    else:
+        print("DeckLink initialized for API usage")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up DeckLink when FastAPI shuts down."""
+    if decklink_control.decklink_instance:
+        cleanup_decklink_device(decklink_control.decklink_instance)
 
 def main() -> int:
-    print(f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}")
-    print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
-    devices = get_decklink_devices()
-    print("Available DeckLink devices:")
-    for idx, name in enumerate(devices):
-        print(f"  {idx}: {name}")
-    
-    if not devices:
-        print("No DeckLink devices found.")
-        return 1
-    
     description = (
         'Output solid RGB color to DeckLink device with HDR metadata support'
         '\n\nColor value ranges by pixel format:'
@@ -95,131 +110,17 @@ def main() -> int:
     parser.add_argument('--b4', type=int, default=0, help='Blue component for color 4 (4color pattern, default: 0)')
     
     args = parser.parse_args()
-
-    # Validate device index
-    if args.device >= len(devices):
-        print(f"Error: Device index {args.device} not found. Available devices: 0-{len(devices)-1}")
+    decklink, bit_depth, devices = setup_decklink_device(args)
+    if decklink is None:
         return 1
-
-    decklink = BMDDeckLink(device_index=args.device)
-    
-    # Get all supported pixel formats from C++
-    all_formats = decklink.get_supported_pixel_formats()
-
-    # Create a mapping of filtered formats to original indices
-    filtered_formats = []
-    format_mapping = []  # Maps filtered index to original index
-    
-    for idx, fmt in enumerate(all_formats):
-        if args.all or ('8' not in fmt and 'RGBX' not in fmt and 'LE' not in fmt):
-            filtered_formats.append(fmt)
-            format_mapping.append(idx)
-    
-    print(f"\nPixel formats supported by device {args.device} ({devices[args.device]}):")
-    for idx, fmt in enumerate(filtered_formats):
-        print(f"  {idx}: {fmt}")
-    
-    # Auto-select pixel format if not specified
-    if args.pixel_format is None or args.pixel_format == -1:
-        # Try to find preferred formats in order: 12-bit formats first, then 10-bit, then 8-bit
-        preferred_formats = [
-            PixelFormatType.FORMAT_12BIT_RGB,
-            PixelFormatType.FORMAT_10BIT_RGB,
-            PixelFormatType.FORMAT_10BIT_YUV,
-            PixelFormatType.FORMAT_8BIT_BGRA,
-            PixelFormatType.FORMAT_8BIT_ARGB]
-        selected_format = None
-        
-        for preferred in preferred_formats:
-            for idx, fmt in enumerate(filtered_formats):
-                if preferred.value in fmt:
-                    selected_format = idx
-                    break
-            if selected_format is not None:
-                break
-        
-        if selected_format is None:
-            selected_format = 0  # Fallback to first available format
-        
-        print(f"\nAuto-selected pixel format: {filtered_formats[selected_format]} (CLI index {selected_format})")
-        # Map filtered index to original C++ index
-        original_index = format_mapping[selected_format]
-    else:
-        # Use specified pixel format
-        if args.pixel_format >= len(filtered_formats):
-            print(f"Error: Pixel format index {args.pixel_format} not found. Available formats: 0-{len(filtered_formats)-1}")
-            return 1
-        print(f"\nUsing pixel format: {filtered_formats[args.pixel_format]} (CLI index {args.pixel_format})")
-        # Map filtered index to original C++ index
-        original_index = format_mapping[args.pixel_format]
-    
-    decklink.set_pixel_format(original_index)
-    
-    # Determine bit depth from selected format
-    selected_format_name = filtered_formats[selected_format] if args.pixel_format is None or args.pixel_format == -1 else filtered_formats[args.pixel_format]
-    bit_depth = determine_bit_depth(selected_format_name)
-    
-    # Create pattern generator with validation
-    pattern_gen = PatternGenerator(
-        args.width, args.height, bit_depth, args.pattern,
-        roi_x=args.roi_x, roi_y=args.roi_y, roi_width=args.roi_width, roi_height=args.roi_height
-    )
-    
-    # Generate pattern based on type (printing is now handled inside generate)
-    try:
-        color1 = (args.r, args.g, args.b)
-        color2 = (args.r2, args.g2, args.b2) if args.pattern in [PatternType.TWO_COLOR, PatternType.FOUR_COLOR] else None
-        color3 = (args.r3, args.g3, args.b3) if args.pattern == PatternType.FOUR_COLOR else None
-        color4 = (args.r4, args.g4, args.b4) if args.pattern == PatternType.FOUR_COLOR else None
-        image = pattern_gen.generate(color1, color2, color3, color4)
-            
-    except ValueError as e:
-        print(f"Error: {e}")
-        return 1
-    
-    # Log ROI information if specified
-    if args.roi_x != 0 or args.roi_y != 0 or args.roi_width is not None or args.roi_height is not None:
-        roi_w = args.roi_width if args.roi_width is not None else args.width
-        roi_h = args.roi_height if args.roi_height is not None else args.height
-        print(f"  Region of Interest: ({args.roi_x},{args.roi_y}) {roi_w}x{roi_h}")
-    
-    # Set the frame data using the new method with pixel format
-    decklink.set_frame_data(image)
-    
-    # Configure HDR metadata (set once, before any color/output)
-    if args.no_hdr:
-        print(f"\nConfiguring device for SDR output (EOTF: SDR)")
-        eotf_setting = EOTFType.SDR.value
-        max_cll_setting = 0
-        max_fall_setting = 0
-    else:
-        print(f"\nConfiguring device for HDR output:")
-        print(f"  EOTF: {args.eotf.name} ({args.eotf.value})")
-        print(f"  Max CLL: {args.max_cll} cd/m²")
-        print(f"  Max FALL: {args.max_fall} cd/m²")
-        eotf_setting = args.eotf.value
-        max_cll_setting = args.max_cll
-        max_fall_setting = args.max_fall
-    decklink.set_frame_eotf(eotf=eotf_setting, maxCLL=max_cll_setting, maxFALL=max_fall_setting)
-    
-    print("Starting output...")
-    # Enable video output
-    decklink.start()
-    # Create frame from pending data
-    decklink.create_frame()
-    # Schedule the frame
-    decklink.schedule_frame()
-    # Start playback
-    decklink.start_playback()
-    print(f"Outputting for {args.duration} seconds...")
-    try:
-        time.sleep(args.duration)
-    except KeyboardInterrupt:
-        print("\nInterrupted by user.")
-    print("Stopping output and closing device.")
-    decklink.close()
-
-    return 0
+    success = generate_and_display_image(args, decklink, bit_depth)
+    cleanup_decklink_device(decklink)
+    return 0 if success else 1
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    import sys
+    if "--api" in sys.argv:
+        import uvicorn
+        uvicorn.run("bmd_signal_gen:app", host="127.0.0.1", port=8000, reload=True)
+    else:
+        sys.exit(main()) 
