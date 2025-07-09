@@ -213,7 +213,7 @@ void pack_10bpc_rgb_image(
  *               = rowBytes * Height
  * 
  * In this format, 8 pixels fit into 36 bytes.
- * 
+ *
  * @param destData Pointer to destination frame buffer
  * @param srcR Pointer to source red channel data (12-bit, 0-4095)
  * @param srcG Pointer to source green channel data (12-bit, 0-4095)
@@ -230,7 +230,11 @@ void pack_12bpc_rgble_image(
     
     uint32_t* pixels = static_cast<uint32_t*>(destData);
     
-    std::cerr << "[PixelPacking] Packing big-endian 12-bit RGB image: " << width << "x"
+    if (std::endian::native != std::endian::little) {
+        std::cerr << "[PixelPacking] System is not little endian, but 12b packing implementation likely depends on it for byte ordering. Proceed with caution" << std::endl;
+    } 
+
+    std::cerr << "[PixelPacking] Packing little-endian 12-bit RGB image: " << width << "x"
               << height << ", rowBytes: " << rowBytes << std::endl;
     
     for (int y = 0; y < height; y++) {
@@ -251,7 +255,7 @@ void pack_12bpc_rgble_image(
         }
     }
     
-    std::cerr << "[PixelPacking] big endian 12-bit RGB image packed successfully" << std::endl;
+    std::cerr << "[PixelPacking] little-endian 12-bit RGB image packed successfully" << std::endl;
 }
 
 // Clamp a channel buffer to a given bit depth
@@ -285,14 +289,6 @@ int pack_pixel_format(
         r_channel[i] = srcData[i * 3 + 0];
         g_channel[i] = srcData[i * 3 + 1];
         b_channel[i] = srcData[i * 3 + 2];
-    }
-
-    if (std::endian::native == std::endian::little) {
-        std::cout << "[PixelPacking] System is little endian" << std::endl;
-    } else if (std::endian::native == std::endian::big) {
-        std::cout << "[PixelPacking] System is big endian" << std::endl;
-    } else {
-        std::cout << "[PixelPacking] System endianness is mixed or unknown." << std::endl;
     }
 
     // Pack the data according to the pixel format
