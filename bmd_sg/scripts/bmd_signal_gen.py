@@ -96,7 +96,7 @@ def main() -> int:
         type=EOTFType.parse,
         choices=list(EOTFType),
         default=EOTFType.PQ,
-        help="EOTF type (CEA 861.3): 0=RESERVED, 1=SDR, 2=HDR, 3=PQ, 4=HLG (default: 3=PQ)",
+        help="EOTF type (CEA 861.3): 1=SDR, 2=PQ, 3=HLG, (default: 2=PQ)",
     )
     parser.add_argument(
         "--max-cll",

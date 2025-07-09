@@ -27,9 +27,8 @@ class PixelFormatType(Enum):
 class EOTFType(Enum):
     RESERVED = 0
     SDR = 1
-    HDR = 2
-    PQ = 3
-    HLG = 4
+    PQ = 2
+    HLG = 3
 
     def __str__(self):
         return f"{self.value}={self.name}"
