@@ -1,10 +1,13 @@
 # BMD Signal Generator
 
-This project enables the generation of test patterns in a cross-platform,
-highly deterministic way that is not perturbed by OS or GPU variability. It does
-this by providing C++ and Python wrappers for the BlackMagic Design Decklink
-API. Recommended output interfaces are the [UltraStudio Monitor 3G](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-13) and the
-[UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11). Both interfaces should be able to output full 12-bit RGB at 1080p30.
+This project enables the generation of test patterns in a cross-platform, highly
+deterministic way that is not perturbed by OS or GPU variability. It does this
+by providing C++ and Python wrappers for the BlackMagic Design Decklink API.
+Recommended output interfaces are the
+[UltraStudio Monitor 3G](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-13)
+and the
+[UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11).
+Both interfaces should be able to output full 12-bit RGB at 1080p30.
 
 The project includes a basic command-line tool to illustrate how to use the
 wrapper.
@@ -12,6 +15,7 @@ wrapper.
 ## Overview
 
 This project allows you to:
+
 - Enumerate and select connected DeckLink devices
 - Query supported pixel formats for each device
 - Output solid and checkerboard RGB color test patterns to DeckLink devices
@@ -57,7 +61,8 @@ bmd-signal-gen/
 
 1. Install the Blackmagic Design Desktop Video driver
 2. Install the Blackmagic Design DeckLink SDK
-3. Ensure the SDK is located at `cpp/Blackmagic DeckLink SDK 14.4/` relative to the project root
+3. Ensure the SDK is located at `cpp/Blackmagic DeckLink SDK 14.4/` relative to
+   the project root
 4. Install Python 3.11+ and UV package manager
 
 ### Build the C++ Library
@@ -66,7 +71,8 @@ bmd-signal-gen/
 cd cpp && make clean && make && cd ..
 ```
 
-This creates `lib/libdecklink.dylib` - a dynamic library that provides the C API for DeckLink device control.
+This creates `lib/libdecklink.dylib` - a dynamic library that provides the C API
+for DeckLink device control.
 
 ### Python Environment Setup
 
@@ -84,7 +90,8 @@ uv sync
 
 ### Python Command-Line Interface
 
-The easiest way to use this project is through the Python command-line interface:
+The easiest way to use this project is through the Python command-line
+interface:
 
 ```bash
 uv run bmd_signal_gen.py <r> <g> <b> [options]
@@ -93,11 +100,13 @@ uv run bmd_signal_gen.py <r> <g> <b> [options]
 #### Examples
 
 CLI usage: output 12-bit red color for 5 seconds:
+
 ```bash
 uv run bmd_signal_gen.py 4095 0 0
 ```
 
 # REST API (default host 127.0.0.1 port 8000)
+
 ```bash
 uv run uvicorn bmd_signal_gen:app
 ```

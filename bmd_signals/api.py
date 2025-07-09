@@ -1,19 +1,22 @@
+from typing import Any, List, Optional
+
+import yaml
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Any
-import yaml
 
-from .patterns import PatternType
-from .decklink_control import decklink_instance, decklink_bit_depth, create_api_args, generate_and_display_image
-import src.bmdsignalgen.decklink_control as decklink_control
+import bmd_signals.decklink_control as decklink_control
+from bmd_signals.decklink_control import create_api_args, generate_and_display_image
+from bmd_signals.patterns import PatternType
 
 router = APIRouter()
+
 
 class Color(BaseModel):
     r: int = Field(..., ge=0, description="Red component")
     g: int = Field(..., ge=0, description="Green component")
     b: int = Field(..., ge=0, description="Blue component")
+
 
 class FourColorPatternRequest(BaseModel):
     width: int = 1920
@@ -31,6 +34,7 @@ class FourColorPatternRequest(BaseModel):
             raise ValueError("Exactly 4 colors must be provided")
         return v
 
+
 async def parse_and_validate_request(request: Request, model):
     try:
         data = await request.json()
@@ -39,11 +43,18 @@ async def parse_and_validate_request(request: Request, model):
             raw = await request.body()
             data = yaml.safe_load(raw)
         except Exception as e:
-            return None, JSONResponse(status_code=400, content={"error": "Invalid JSON or YAML", "details": str(e)})
+            return None, JSONResponse(
+                status_code=400,
+                content={"error": "Invalid JSON or YAML", "details": str(e)},
+            )
     try:
         return model(**data), None
     except Exception as e:
-        return None, JSONResponse(status_code=422, content={"error": "Invalid pattern parameters", "details": str(e)})
+        return None, JSONResponse(
+            status_code=422,
+            content={"error": "Invalid pattern parameters", "details": str(e)},
+        )
+
 
 @router.post("/bmd-signal-gen/4color")
 async def four_color_pattern(request: Request, body: Any = Body(...)):
@@ -51,15 +62,19 @@ async def four_color_pattern(request: Request, body: Any = Body(...)):
     if error:
         return error
     if pattern is None:
-        return JSONResponse(status_code=400, content={"error": "Pattern validation failed"})
-    
+        return JSONResponse(
+            status_code=400, content={"error": "Pattern validation failed"}
+        )
+
     # Check if DeckLink is initialized - use the module reference to ensure we get the current state
     if decklink_control.decklink_instance is None:
-        return JSONResponse(status_code=503, content={"error": "DeckLink not initialized"})
-    
+        return JSONResponse(
+            status_code=503, content={"error": "DeckLink not initialized"}
+        )
+
     # Prepare colors as tuples
     color_tuples = [(c.r, c.g, c.b) for c in pattern.colors]
-    
+
     # Create API args and call generate function
     try:
         api_args = create_api_args(
@@ -70,19 +85,28 @@ async def four_color_pattern(request: Request, body: Any = Body(...)):
             roi_x=pattern.roi_x,
             roi_y=pattern.roi_y,
             roi_width=pattern.roi_width,
-            roi_height=pattern.roi_height
+            roi_height=pattern.roi_height,
         )
-        
-        success = generate_and_display_image(api_args, decklink_control.decklink_instance, decklink_control.decklink_bit_depth)
-        
+
+        success = generate_and_display_image(
+            api_args,
+            decklink_control.decklink_instance,
+            decklink_control.decklink_bit_depth,
+        )
+
         if success:
             return {
                 "message": "4-color pattern generated and displayed",
                 "shape": f"{pattern.width}x{pattern.height}",
-                "colors": color_tuples
+                "colors": color_tuples,
             }
         else:
-            return JSONResponse(status_code=500, content={"error": "Pattern generation failed"})
-            
+            return JSONResponse(
+                status_code=500, content={"error": "Pattern generation failed"}
+            )
+
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": "Pattern generation failed", "details": str(e)}) 
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Pattern generation failed", "details": str(e)},
+        )
