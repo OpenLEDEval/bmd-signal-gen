@@ -71,8 +71,8 @@ bmd-signal-gen/
 cd cpp && make clean && make && cd ..
 ```
 
-This creates `lib/libdecklink.dylib` - a dynamic library that provides the C API
-for DeckLink device control.
+This creates `bmd_sg/decklink/libdecklink.dylib` - a dynamic library that
+provides the C API for DeckLink device control.
 
 ### Python Environment Setup
 
@@ -91,10 +91,17 @@ uv sync
 ### Python Command-Line Interface
 
 The easiest way to use this project is through the Python command-line
-interface:
+interface. After installing / `uv sync` you can activate your `.venv` by calling
+
+```sh
+source .venv/bin/activate
+```
+
+or one of the other activate scripts depending on your choice of shell (for
+example, `source .venv/bin/activate.fish`)
 
 ```bash
-uv run bmd_signal_gen.py <r> <g> <b> [options]
+bmd_signal_gen <r> <g> <b> [options]
 ```
 
 #### Examples
@@ -102,13 +109,13 @@ uv run bmd_signal_gen.py <r> <g> <b> [options]
 CLI usage: output 12-bit red color for 5 seconds:
 
 ```bash
-uv run bmd_signal_gen.py 4095 0 0
+bmd_signal_gen 4095 0 0
 ```
 
 # REST API (default host 127.0.0.1 port 8000)
 
 ```bash
-uv run uvicorn bmd_signal_gen:app
+uvicorn bmd_signal_gen:app
 ```
 
 #### Command-Line Options

@@ -22,4 +22,4 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["bmd_sg"]
 include = ["LICENSE"]
-exclude = ["data/", "examples/", "manuals/", "scripts/"]
+exclude = ["data/", "cpp/", "tests/"]
