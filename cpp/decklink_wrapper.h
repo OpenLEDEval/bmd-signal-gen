@@ -27,6 +27,27 @@ extern "C" {
 #define DECKLINK_ERROR_OUTPUT_FAILED -3
 #define DECKLINK_ERROR_FRAME_FAILED -4
 
+// Complete HDR metadata structure (matching SignalGenHDR sample)
+struct ChromaticityCoordinates {
+    double RedX;
+    double RedY;
+    double GreenX;
+    double GreenY;
+    double BlueX;
+    double BlueY;
+    double WhiteX;
+    double WhiteY;
+};
+
+struct HDRMetadata {
+    int64_t EOTF;
+    ChromaticityCoordinates referencePrimaries;
+    double maxDisplayMasteringLuminance;
+    double minDisplayMasteringLuminance;
+    double maxCLL;
+    double maxFALL;
+};
+
 // C++ Implementation Class
 class DeckLinkSignalGen {
 public:
@@ -46,8 +67,8 @@ public:
     int setPixelFormat(int pixelFormatIndex);
     int getPixelFormat() const;
     
-    // EOTF metadata management
-    int setEOTFMetadata(int eotf, uint16_t maxCLL, uint16_t maxFALL);
+    // Complete HDR metadata management
+    int setHDRMetadata(const HDRMetadata& metadata);
     
     // Frame data management
     int setFrameData(const uint16_t* data, int width, int height);
@@ -72,10 +93,8 @@ private:
     bool m_outputEnabled;
     BMDPixelFormat m_pixelFormat;
     
-    // HDR metadata
-    int m_eotfType;
-    uint16_t m_maxCLL;
-    uint16_t m_maxFALL;
+    // Complete HDR metadata
+    HDRMetadata m_hdrMetadata;
     
     // Cached supported formats
     std::vector<BMDPixelFormat> m_supportedFormats;
@@ -85,7 +104,7 @@ private:
     std::vector<uint16_t> m_pendingFrameData;
     
     // Private helper methods
-    int applyEOTFMetadata();
+    int applyHDRMetadata();
     void logFrameInfo(const char* context);
 };
 
@@ -117,8 +136,8 @@ int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, c
 int decklink_set_pixel_format(DeckLinkHandle handle, int pixel_format_index);
 int decklink_get_pixel_format(DeckLinkHandle handle);
 
-// EOTF metadata control
-int decklink_set_eotf_metadata(DeckLinkHandle handle, int eotf, uint16_t maxCLL, uint16_t maxFALL);
+// Complete HDR metadata control
+int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata* metadata);
 
 // Frame data management
 int decklink_set_frame_data(DeckLinkHandle handle, const uint16_t* data, int width, int height);

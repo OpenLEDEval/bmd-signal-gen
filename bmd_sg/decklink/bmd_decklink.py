@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Python wrapper for DeckLink signal generation using ctypes.
+Thin Python wrapper for the Blackmagic DeckLink SDK using ctypes.
 """
 import ctypes
 import os
@@ -50,6 +50,31 @@ class EOTFType(Enum):
                 f"Invalid EOTF value: {value}. Use one of: {valid}"
             )
 
+# Complete HDR metadata structures (matching C++ implementation)
+class ChromaticityCoordinates(ctypes.Structure):
+    """Chromaticity coordinates for display primaries and white point."""
+    _fields_ = [
+        ("RedX", ctypes.c_double),
+        ("RedY", ctypes.c_double),
+        ("GreenX", ctypes.c_double),
+        ("GreenY", ctypes.c_double),
+        ("BlueX", ctypes.c_double),
+        ("BlueY", ctypes.c_double),
+        ("WhiteX", ctypes.c_double),
+        ("WhiteY", ctypes.c_double),
+    ]
+
+class HDRMetadata(ctypes.Structure):
+    """Complete HDR metadata structure."""
+    _fields_ = [
+        ("EOTF", ctypes.c_int64),
+        ("referencePrimaries", ChromaticityCoordinates),
+        ("maxDisplayMasteringLuminance", ctypes.c_double),
+        ("minDisplayMasteringLuminance", ctypes.c_double),
+        ("maxCLL", ctypes.c_double),
+        ("maxFALL", ctypes.c_double),
+    ]
+
 # Load the DeckLink library
 try:
     # Try to load from the lib directory relative to this script
@@ -98,6 +123,11 @@ if hasattr(decklink, 'decklink_set_eotf_metadata'):
     decklink.decklink_set_eotf_metadata.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint16, ctypes.c_uint16]
     decklink.decklink_set_eotf_metadata.restype = ctypes.c_int
 
+# Complete HDR metadata function
+if hasattr(decklink, 'decklink_set_hdr_metadata'):
+    decklink.decklink_set_hdr_metadata.argtypes = [ctypes.c_void_p, ctypes.POINTER(HDRMetadata)]
+    decklink.decklink_set_hdr_metadata.restype = ctypes.c_int
+
 # Frame data management
 if hasattr(decklink, 'decklink_set_frame_data'):
     decklink.decklink_set_frame_data.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint16), ctypes.c_int, ctypes.c_int]
@@ -115,8 +145,6 @@ if hasattr(decklink, 'decklink_schedule_frame_for_output'):
 if hasattr(decklink, 'decklink_start_scheduled_playback'):
     decklink.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
     decklink.decklink_start_scheduled_playback.restype = ctypes.c_int
-
-
 
 # Version info
 if hasattr(decklink, 'decklink_get_driver_version'):
@@ -148,8 +176,6 @@ class BMDDeckLink:
                 decklink.decklink_stop_output(self.handle)
             decklink.decklink_close(self.handle)
             self.handle = None
-    
-
     
     def start(self):
         """Start outputting the color patch."""
@@ -197,12 +223,24 @@ class BMDDeckLink:
         return decklink.decklink_get_pixel_format(self.handle)
     
     def set_frame_eotf(self, eotf=0, maxCLL=0, maxFALL=0):
-        """Set EOTF metadata for all future frames."""
+        """Set EOTF metadata for all future frames (legacy method)."""
         if not self.handle:
             raise RuntimeError("Device not open")
         res = decklink.decklink_set_eotf_metadata(self.handle, eotf, maxCLL, maxFALL)
         if res != 0:
             raise RuntimeError(f"Failed to set EOTF metadata (error {res})")
+    
+    def set_hdr_metadata(self, metadata):
+        """Set complete HDR metadata for all future frames.
+        
+        Args:
+            metadata: HDRMetadata structure with complete HDR parameters
+        """
+        if not self.handle:
+            raise RuntimeError("Device not open")
+        res = decklink.decklink_set_hdr_metadata(self.handle, ctypes.byref(metadata))
+        if res != 0:
+            raise RuntimeError(f"Failed to set HDR metadata (error {res})")
     
     def set_frame_data(self, frame_data):
         """Set frame data from numpy array.
@@ -260,8 +298,6 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to start playback (error {res})")
     
-
-    
     def __enter__(self):
         return self
     
@@ -277,3 +313,21 @@ def get_decklink_devices():
         if decklink.decklink_get_device_name_by_index(i, name, 256) == 0:
             devices.append(name.value.decode('utf-8'))
     return devices
+
+def create_default_hdr_metadata():
+    """Create default HDR metadata with Rec2020 primaries (matching SignalGenHDR sample)."""
+    metadata = HDRMetadata()
+    metadata.EOTF = 3  # PQ
+    metadata.referencePrimaries.RedX = 0.708
+    metadata.referencePrimaries.RedY = 0.292
+    metadata.referencePrimaries.GreenX = 0.170
+    metadata.referencePrimaries.GreenY = 0.797
+    metadata.referencePrimaries.BlueX = 0.131
+    metadata.referencePrimaries.BlueY = 0.046
+    metadata.referencePrimaries.WhiteX = 0.3127
+    metadata.referencePrimaries.WhiteY = 0.3290
+    metadata.maxDisplayMasteringLuminance = 1000.0
+    metadata.minDisplayMasteringLuminance = 0.0001
+    metadata.maxCLL = 1000.0
+    metadata.maxFALL = 50.0
+    return metadata

@@ -29,10 +29,22 @@ DeckLinkSignalGen::DeckLinkSignalGen()
     , m_height(1080)
     , m_outputEnabled(false)
     , m_pixelFormat(bmdFormat12BitRGBLE)
-    , m_eotfType(-1)
-    , m_maxCLL(2000)
-    , m_maxFALL(400)
-    , m_formatsCached(false) {
+    , m_formatsCached(false)
+{
+    // Initialize HDR metadata with default Rec2020 values (matching SignalGenHDR sample)
+    m_hdrMetadata.EOTF = 3; // PQ
+    m_hdrMetadata.referencePrimaries.RedX = 0.708;
+    m_hdrMetadata.referencePrimaries.RedY = 0.292;
+    m_hdrMetadata.referencePrimaries.GreenX = 0.170;
+    m_hdrMetadata.referencePrimaries.GreenY = 0.797;
+    m_hdrMetadata.referencePrimaries.BlueX = 0.131;
+    m_hdrMetadata.referencePrimaries.BlueY = 0.046;
+    m_hdrMetadata.referencePrimaries.WhiteX = 0.3127;
+    m_hdrMetadata.referencePrimaries.WhiteY = 0.3290;
+    m_hdrMetadata.maxDisplayMasteringLuminance = 1000.0;
+    m_hdrMetadata.minDisplayMasteringLuminance = 0.0001;
+    m_hdrMetadata.maxCLL = 1000.0;
+    m_hdrMetadata.maxFALL = 50.0;
 }
 
 DeckLinkSignalGen::~DeckLinkSignalGen() {
@@ -184,8 +196,8 @@ int DeckLinkSignalGen::createFrame() {
         return err;
 
     // Apply EOTF metadata if set
-    if (m_eotfType >= 0) {
-        applyEOTFMetadata();
+    if (m_hdrMetadata.EOTF >= 0) { // Changed from m_eotfType to m_hdrMetadata.EOTF
+        applyHDRMetadata(); // Changed from applyEOTFMetadata to applyHDRMetadata
     }
     
     logFrameInfo("created");
@@ -257,13 +269,19 @@ int DeckLinkSignalGen::getPixelFormat() const {
     return -1;
 }
 
-int DeckLinkSignalGen::setEOTFMetadata(int eotf, uint16_t maxCLL, uint16_t maxFALL) {
-    m_eotfType = eotf;
-    m_maxCLL = maxCLL;
-    m_maxFALL = maxFALL;
+int DeckLinkSignalGen::setHDRMetadata(const HDRMetadata& metadata) {
+    m_hdrMetadata = metadata;
     
-    std::cerr << "[DeckLink] Set EOTF metadata - EOTF: " << eotf 
-              << ", MaxCLL: " << maxCLL << ", MaxFALL: " << maxFALL << std::endl;
+    std::cerr << "[DeckLink] Set complete HDR metadata:" << std::endl;
+    std::cerr << "  EOTF: " << metadata.EOTF << std::endl;
+    std::cerr << "  Red Primary: (" << metadata.referencePrimaries.RedX << ", " << metadata.referencePrimaries.RedY << ")" << std::endl;
+    std::cerr << "  Green Primary: (" << metadata.referencePrimaries.GreenX << ", " << metadata.referencePrimaries.GreenY << ")" << std::endl;
+    std::cerr << "  Blue Primary: (" << metadata.referencePrimaries.BlueX << ", " << metadata.referencePrimaries.BlueY << ")" << std::endl;
+    std::cerr << "  White Point: (" << metadata.referencePrimaries.WhiteX << ", " << metadata.referencePrimaries.WhiteY << ")" << std::endl;
+    std::cerr << "  Max Display Mastering Luminance: " << metadata.maxDisplayMasteringLuminance << std::endl;
+    std::cerr << "  Min Display Mastering Luminance: " << metadata.minDisplayMasteringLuminance << std::endl;
+    std::cerr << "  MaxCLL: " << metadata.maxCLL << std::endl;
+    std::cerr << "  MaxFALL: " << metadata.maxFALL << std::endl;
     
     return 0;
 }
@@ -369,43 +387,90 @@ void DeckLinkSignalGen::cacheSupportedFormats() {
     m_formatsCached = true;
 }
 
-int DeckLinkSignalGen::applyEOTFMetadata() {
-    if (!m_frame || m_eotfType < 0) return 0;
+int DeckLinkSignalGen::applyHDRMetadata() {
+    if (!m_frame) return 0;
     
     // Get the metadata extensions interface
     IDeckLinkVideoFrameMutableMetadataExtensions* metadataExt = nullptr;
     HRESULT result = m_frame->QueryInterface(IID_IDeckLinkVideoFrameMutableMetadataExtensions, (void**)&metadataExt);
-    if (result != S_OK || !metadataExt) return -1;
-    
-    // Set EOTF metadata (0-7 as per CEA 861.3)
-    if (m_eotfType >= 0 && m_eotfType <= 7) {
-        metadataExt->SetInt(bmdDeckLinkFrameMetadataHDRElectroOpticalTransferFunc, m_eotfType);
+    if (result != S_OK || !metadataExt) {
+        std::cerr << "[DeckLink] Warning: Could not get metadata extensions interface (HRESULT: 0x" 
+                  << std::hex << result << std::dec << "). HDR metadata will not be applied." << std::endl;
+        return 0; // Don't fail the frame creation, just skip metadata
     }
     
-    // Set HDR metadata if provided
-    if (m_maxCLL > 0) {
-        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumContentLightLevel, static_cast<double>(m_maxCLL));
-    }
-    if (m_maxFALL > 0) {
-        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumFrameAverageLightLevel, static_cast<double>(m_maxFALL));
+    // Set colorspace metadata (Rec2020 for HDR)
+    result = metadataExt->SetInt(bmdDeckLinkFrameMetadataColorspace, bmdColorspaceRec2020);
+    if (result != S_OK) {
+        std::cerr << "[DeckLink] Warning: Failed to set colorspace metadata (HRESULT: 0x" 
+                  << std::hex << result << std::dec << ")" << std::endl;
     }
     
-    // Set the HDR metadata flag
-    BMDFrameFlags currentFlags = m_frame->GetFlags();
-    m_frame->SetFlags(currentFlags | bmdFrameContainsHDRMetadata);
+    // Set EOTF metadata
+    result = metadataExt->SetInt(bmdDeckLinkFrameMetadataHDRElectroOpticalTransferFunc, m_hdrMetadata.EOTF);
+    if (result != S_OK) {
+        std::cerr << "[DeckLink] Warning: Failed to set EOTF metadata (HRESULT: 0x" 
+                  << std::hex << result << std::dec << ")" << std::endl;
+    }
+    
+    // Only apply full HDR metadata for PQ (EOTF = 3)
+    if (m_hdrMetadata.EOTF == 3) {
+        // Set the HDR metadata flag
+        BMDFrameFlags currentFlags = m_frame->GetFlags();
+        m_frame->SetFlags(currentFlags | bmdFrameContainsHDRMetadata);
+        
+        // Set display primaries
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedX, m_hdrMetadata.referencePrimaries.RedX);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set RedX" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedY, m_hdrMetadata.referencePrimaries.RedY);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set RedY" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenX, m_hdrMetadata.referencePrimaries.GreenX);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set GreenX" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenY, m_hdrMetadata.referencePrimaries.GreenY);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set GreenY" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueX, m_hdrMetadata.referencePrimaries.BlueX);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set BlueX" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueY, m_hdrMetadata.referencePrimaries.BlueY);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set BlueY" << std::endl;
+        
+        // Set white point
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointX, m_hdrMetadata.referencePrimaries.WhiteX);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set WhiteX" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointY, m_hdrMetadata.referencePrimaries.WhiteY);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set WhiteY" << std::endl;
+        
+        // Set mastering display luminance
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaxDisplayMasteringLuminance, m_hdrMetadata.maxDisplayMasteringLuminance);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxDisplayMasteringLuminance" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMinDisplayMasteringLuminance, m_hdrMetadata.minDisplayMasteringLuminance);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MinDisplayMasteringLuminance" << std::endl;
+        
+        // Set content light level
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumContentLightLevel, m_hdrMetadata.maxCLL);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxCLL" << std::endl;
+        
+        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumFrameAverageLightLevel, m_hdrMetadata.maxFALL);
+        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxFALL" << std::endl;
+    } else {
+        // Remove HDR metadata flag for non-PQ EOTF
+        BMDFrameFlags currentFlags = m_frame->GetFlags();
+        m_frame->SetFlags(currentFlags & ~bmdFrameContainsHDRMetadata);
+    }
     
     metadataExt->Release();
+    std::cerr << "[DeckLink] HDR metadata applied successfully" << std::endl;
     return 0;
 }
 
 // Thin C wrapper implementation
 extern "C" {
-
-int decklink_set_eotf_metadata(DeckLinkHandle handle, int eotf, uint16_t maxCLL, uint16_t maxFALL) {
-    if (!handle) return -1;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->setEOTFMetadata(eotf, maxCLL, maxFALL);
-}
 
 int decklink_set_frame_data(DeckLinkHandle handle, const uint16_t* data, int width, int height) {
     if (!handle || !data) return -1;
@@ -577,6 +642,13 @@ const char* decklink_get_driver_version() {
 const char* decklink_get_sdk_version() {
     static std::string sdk_version = BLACKMAGIC_DECKLINK_API_VERSION_STRING;
     return sdk_version.c_str();
+}
+
+// Add new C wrapper function for complete HDR metadata
+int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata* metadata) {
+    if (!handle || !metadata) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->setHDRMetadata(*metadata);
 }
 
 } // extern "C" 

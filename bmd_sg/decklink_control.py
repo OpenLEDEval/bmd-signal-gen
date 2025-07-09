@@ -1,3 +1,10 @@
+"""
+This file holds the basic application structure for signal generation using a
+DeckLink output device.
+It can be executed directly from the command line as a script, or used as part
+of the HTTP API.
+"""
+
 import time
 from typing import Optional
 
@@ -6,6 +13,8 @@ from bmd_sg.decklink.bmd_decklink import (
     EOTFType,
     PixelFormatType,
     get_decklink_devices,
+    create_default_hdr_metadata,
+    HDRMetadata,
 )
 
 from .patterns import PatternGenerator, PatternType
@@ -205,74 +214,69 @@ def create_api_args(
 
 
 def generate_and_display_image(args, decklink, bit_depth):
-    pattern_gen = PatternGenerator(
-        args.width,
-        args.height,
-        bit_depth,
-        args.pattern,
-        roi_x=args.roi_x,
-        roi_y=args.roi_y,
-        roi_width=args.roi_width,
-        roi_height=args.roi_height,
-    )
+    """Generate and display image with complete HDR metadata support."""
     try:
-        color1 = (args.r, args.g, args.b)
-        color2 = (
-            (args.r2, args.g2, args.b2)
-            if args.pattern in [PatternType.TWO_COLOR, PatternType.FOUR_COLOR]
-            else None
+        # Start the DeckLink output first
+        decklink.start()
+        
+        # Create pattern generator
+        generator = PatternGenerator(
+            width=args.width,
+            height=args.height,
+            bit_depth=bit_depth,
+            pattern_type=args.pattern,
+            roi_x=args.roi_x,
+            roi_y=args.roi_y,
+            roi_width=args.roi_width,
+            roi_height=args.roi_height,
         )
-        color3 = (
-            (args.r3, args.g3, args.b3)
-            if args.pattern == PatternType.FOUR_COLOR
-            else None
-        )
-        color4 = (
-            (args.r4, args.g4, args.b4)
-            if args.pattern == PatternType.FOUR_COLOR
-            else None
-        )
-        image = pattern_gen.generate(color1, color2, color3, color4)
-    except ValueError as e:
-        print(f"Error: {e}")
+
+        # Generate pattern based on type
+        if args.pattern == PatternType.SOLID:
+            image = generator.generate((args.r, args.g, args.b))
+        elif args.pattern == PatternType.TWO_COLOR:
+            image = generator.generate((args.r, args.g, args.b), (args.r2, args.g2, args.b2))
+        elif args.pattern == PatternType.FOUR_COLOR:
+            image = generator.generate(
+                (args.r, args.g, args.b),
+                (args.r2, args.g2, args.b2),
+                (args.r3, args.g3, args.b3),
+                (args.r4, args.g4, args.b4),
+            )
+        else:
+            raise ValueError(f"Unsupported pattern type: {args.pattern}")
+
+        # Set complete HDR metadata if not disabled
+        if not args.no_hdr:
+            # Create complete HDR metadata with default Rec2020 values
+            hdr_metadata = create_default_hdr_metadata()
+
+            # Update with user-provided values
+            hdr_metadata.EOTF = args.eotf.value
+            hdr_metadata.maxCLL = float(args.max_cll)
+            hdr_metadata.maxFALL = float(args.max_fall)
+
+            # Set the complete HDR metadata
+            decklink.set_hdr_metadata(hdr_metadata)
+            print(f"Set complete HDR metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}")
+        else:
+            # Use legacy EOTF method for SDR
+            decklink.set_frame_eotf(args.eotf.value, args.max_cll, args.max_fall)
+            print(f"Set basic EOTF metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}")
+
+        # Set frame data and create frame
+        decklink.set_frame_data(image)
+        decklink.create_frame()
+        decklink.schedule_frame()
+        decklink.start_playback()
+
+        print(f"Generated {args.pattern.value} pattern: {args.width}x{args.height}")
+        
+        return True
+
+    except Exception as e:
+        print(f"Error generating and displaying image: {e}")
         return False
-    if (
-        args.roi_x != 0
-        or args.roi_y != 0
-        or args.roi_width is not None
-        or args.roi_height is not None
-    ):
-        roi_w = args.roi_width if args.roi_width is not None else args.width
-        roi_h = args.roi_height if args.roi_height is not None else args.height
-        print(f"  Region of Interest: ({args.roi_x},{args.roi_y}) {roi_w}x{roi_h}")
-    decklink.set_frame_data(image)
-    if args.no_hdr:
-        print("\nConfiguring device for SDR output (EOTF: SDR)")
-        eotf_setting = EOTFType.SDR.value
-        max_cll_setting = 0
-        max_fall_setting = 0
-    else:
-        print("\nConfiguring device for HDR output:")
-        print(f"  EOTF: {args.eotf.name} ({args.eotf.value})")
-        print(f"  Max CLL: {args.max_cll} cd/m²")
-        print(f"  Max FALL: {args.max_fall} cd/m²")
-        eotf_setting = args.eotf.value
-        max_cll_setting = args.max_cll
-        max_fall_setting = args.max_fall
-    decklink.set_frame_eotf(
-        eotf=eotf_setting, maxCLL=max_cll_setting, maxFALL=max_fall_setting
-    )
-    print("Starting output...")
-    decklink.start()
-    decklink.create_frame()
-    decklink.schedule_frame()
-    decklink.start_playback()
-    print(f"Outputting for {args.duration} seconds...")
-    try:
-        time.sleep(args.duration)
-    except KeyboardInterrupt:
-        print("\nInterrupted by user.")
-    return True
 
 
 def cleanup_decklink_device(decklink):

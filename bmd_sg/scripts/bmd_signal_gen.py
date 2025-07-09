@@ -6,6 +6,7 @@ Supports HDR metadata configuration including EOTF settings and pixel format sel
 
 import argparse
 import sys
+import time
 
 from fastapi import FastAPI
 
@@ -211,7 +212,13 @@ def main() -> int:
     decklink, bit_depth, devices = setup_decklink_device(args)
     if decklink is None:
         return 1
+    
     success = generate_and_display_image(args, decklink, bit_depth)
+    if success:
+        # Wait for the specified duration only in CLI mode
+        print(f"Displaying for {args.duration} seconds...")
+        time.sleep(args.duration)
+    
     cleanup_decklink_device(decklink)
     return 0 if success else 1
 
