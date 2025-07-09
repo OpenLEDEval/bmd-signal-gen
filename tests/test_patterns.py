@@ -1,7 +1,7 @@
 import numpy as np
 import pytest  # type: ignore # pytest must be installed for these tests
 
-from bmd_signals.patterns import ColorValidator, PatternGenerator, PatternType
+from bmd_sg.patterns import ColorValidator, PatternGenerator, PatternType
 
 
 # --- PatternType Enum ---

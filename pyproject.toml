@@ -1,5 +1,5 @@
 [project]
-name = "bmd-signal-gen"
+name = "bmd-signal-generator"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -13,13 +13,13 @@ dependencies = [
 ]
 
 [project.scripts]
-bmd_signal_gen = "bmd_signals.scripts.bmd_signal_gen:main"
+bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["bmd_signals"]
+packages = ["bmd_sg"]
 include = ["LICENSE"]
 exclude = ["data/", "examples/", "manuals/", "scripts/"]

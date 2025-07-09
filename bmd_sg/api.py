@@ -5,9 +5,9 @@ from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 
-import bmd_signals.decklink_control as decklink_control
-from bmd_signals.decklink_control import create_api_args, generate_and_display_image
-from bmd_signals.patterns import PatternType
+import bmd_sg.decklink_control as decklink_control
+from bmd_sg.decklink_control import create_api_args, generate_and_display_image
+from bmd_sg.patterns import PatternType
 
 router = APIRouter()
 

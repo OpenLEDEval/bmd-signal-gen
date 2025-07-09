@@ -1,7 +1,7 @@
 import time
 from typing import Optional
 
-from bmd_signals.decklink.bmd_decklink import (
+from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
     EOTFType,
     PixelFormatType,
@@ -34,7 +34,7 @@ def _initialize_decklink_device(
     global decklink_instance, decklink_bit_depth
 
     try:
-        from bmd_signals.decklink.bmd_decklink import (
+        from bmd_sg.decklink.bmd_decklink import (
             get_decklink_driver_version,
             get_decklink_sdk_version,
         )
@@ -69,7 +69,7 @@ def _initialize_decklink_device(
         format_mapping = []
 
         for idx, fmt in enumerate(all_formats):
-            if '8' not in fmt and 'RGBX' not in fmt:
+            if "8" not in fmt and "RGBX" not in fmt:
                 filtered_formats.append(fmt)
                 format_mapping.append(idx)
 

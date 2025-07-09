@@ -9,7 +9,7 @@ LDFLAGS = -dynamiclib -framework CoreFoundation -F/Library/Frameworks -framework
 
 # Source files
 SRC = decklink_wrapper.cpp pixel_packing.cpp
-TARGET = ../bmd_signals/decklink/libdecklink.dylib
+TARGET = ../bmd_sg/decklink/libdecklink.dylib
 
 # Default target
 all: $(TARGET)

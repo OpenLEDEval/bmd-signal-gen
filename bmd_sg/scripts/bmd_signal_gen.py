@@ -9,17 +9,17 @@ import sys
 
 from fastapi import FastAPI
 
-import bmd_signals.decklink_control as decklink_control
-from bmd_signals.api import router as bmd_router
-from bmd_signals.decklink.bmd_decklink import EOTFType
-from bmd_signals.decklink_control import (
+import bmd_sg.decklink_control as decklink_control
+from bmd_sg.api import router as bmd_router
+from bmd_sg.decklink.bmd_decklink import EOTFType
+from bmd_sg.decklink_control import (
     cleanup_decklink_device,
     decklink_instance,
     generate_and_display_image,
     initialize_decklink_for_api,
     setup_decklink_device,
 )
-from bmd_signals.patterns import PatternType
+from bmd_sg.patterns import PatternType
 
 pat_server = FastAPI()
 pat_server.include_router(bmd_router)
