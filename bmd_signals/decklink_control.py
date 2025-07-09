@@ -69,7 +69,7 @@ def _initialize_decklink_device(
         format_mapping = []
 
         for idx, fmt in enumerate(all_formats):
-            if "8" not in fmt and "RGBX" not in fmt and "LE" not in fmt:
+            if '8' not in fmt and 'RGBX' not in fmt:
                 filtered_formats.append(fmt)
                 format_mapping.append(idx)
 
@@ -82,7 +82,7 @@ def _initialize_decklink_device(
 
         if pixel_format_index is None:
             preferred_formats = [
-                PixelFormatType.FORMAT_12BIT_RGB,
+                PixelFormatType.FORMAT_12BIT_RGBLE,
                 PixelFormatType.FORMAT_10BIT_RGB,
                 PixelFormatType.FORMAT_10BIT_YUV,
                 PixelFormatType.FORMAT_8BIT_BGRA,
