@@ -32,7 +32,7 @@ DeckLinkSignalGen::DeckLinkSignalGen()
     , m_formatsCached(false)
 {
     // Initialize HDR metadata with default Rec2020 values (matching SignalGenHDR sample)
-    m_hdrMetadata.EOTF = 3; // PQ
+    m_hdrMetadata.EOTF = 2; // PQ
     m_hdrMetadata.referencePrimaries.RedX = 0.708;
     m_hdrMetadata.referencePrimaries.RedY = 0.292;
     m_hdrMetadata.referencePrimaries.GreenX = 0.170;
@@ -413,8 +413,8 @@ int DeckLinkSignalGen::applyHDRMetadata() {
                   << std::hex << result << std::dec << ")" << std::endl;
     }
     
-    // Only apply full HDR metadata for PQ (EOTF = 3)
-    if (m_hdrMetadata.EOTF == 3) {
+    // Only apply full HDR metadata for PQ (EOTF = 2)
+    if (m_hdrMetadata.EOTF == 2) {
         // Set the HDR metadata flag
         BMDFrameFlags currentFlags = m_frame->GetFlags();
         m_frame->SetFlags(currentFlags | bmdFrameContainsHDRMetadata);

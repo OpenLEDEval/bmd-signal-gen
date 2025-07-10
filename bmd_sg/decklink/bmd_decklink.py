@@ -57,7 +57,7 @@ def _try_load_decklink_sdk():
     try:
         # Try to load from the lib directory relative to this script
         if lib_path.exists() and lib_path.is_file():
-            decklink = ctypes.CDLL(lib_path)
+            decklink = ctypes.CDLL(str(lib_path))
         else:
             raise FileNotFoundError(
                 f"Could not find libdecklink.dylib in Python project: {lib_path.absolute()}"
