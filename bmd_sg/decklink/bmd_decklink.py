@@ -96,8 +96,8 @@ class HDRMetadata(ctypes.Structure):
         ("referencePrimaries", ChromaticityCoordinates),
         ("maxDisplayMasteringLuminance", ctypes.c_double),
         ("minDisplayMasteringLuminance", ctypes.c_double),
-        ("maxFALL", ctypes.c_double),
         ("maxCLL", ctypes.c_double),
+        ("maxFALL", ctypes.c_double),
     ]
 
 
