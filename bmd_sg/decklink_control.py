@@ -9,17 +9,18 @@ from typing import Optional
 
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
-    EOTFType,
-    HDRMetadata,
     PixelFormatType,
     get_decklink_devices,
 )
 
-from .patterns import PatternGenerator, PatternType
+from bmd_sg.pattern_generator import PatternGenerator
+from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
 
 # Global DeckLink instance for API usage
 decklink_instance = None
 decklink_bit_depth = None
+decklink_width = None
+decklink_height = None
 
 
 def determine_bit_depth(format_name: str) -> int:
@@ -38,7 +39,7 @@ def _initialize_decklink_device(
     use_global: bool = False,
 ):
     """Common DeckLink initialization logic. Returns (success, decklink, bit_depth, devices, error_msg)."""
-    global decklink_instance, decklink_bit_depth
+    global decklink_instance, decklink_bit_depth, decklink_width, decklink_height
 
     try:
         from bmd_sg.decklink.bmd_decklink import (
@@ -162,124 +163,26 @@ def initialize_decklink_for_api(
     return success, error
 
 
-def create_api_args(
-    width: int,
-    height: int,
-    pattern: PatternType,
-    colors: list,
-    roi_x: int = 0,
-    roi_y: int = 0,
-    roi_width: Optional[int] = None,
-    roi_height: Optional[int] = None,
-    duration: float = 5.0,
-    no_hdr: bool = False,
-    eotf: EOTFType = EOTFType.PQ,
-    max_cll: int = 1000,
-    max_fall: int = 400,
-):
-    class ApiArgs:
-        def __init__(self):
-            self.width = width
-            self.height = height
-            self.pattern = pattern
-            self.roi_x = roi_x
-            self.roi_y = roi_y
-            self.roi_width = roi_width
-            self.roi_height = roi_height
-            self.duration = duration
-            self.no_hdr = no_hdr
-            self.eotf = eotf
-            self.max_cll = max_cll
-            self.max_fall = max_fall
-            if len(colors) >= 1:
-                self.r, self.g, self.b = colors[0]
-            else:
-                self.r, self.g, self.b = 4095, 0, 0
-            if len(colors) >= 2:
-                self.r2, self.g2, self.b2 = colors[1]
-            else:
-                self.r2, self.g2, self.b2 = 0, 0, 0
-            if len(colors) >= 3:
-                self.r3, self.g3, self.b3 = colors[2]
-            else:
-                self.r3, self.g3, self.b3 = 0, 0, 0
-            if len(colors) >= 4:
-                self.r4, self.g4, self.b4 = colors[3]
-            else:
-                self.r4, self.g4, self.b4 = 0, 0, 0
-
-    return ApiArgs()
 
 
-def generate_and_display_image(args, decklink, bit_depth):
-    """Generate and display image with complete HDR metadata support."""
+
+def display_pattern(settings: PatternSettings, decklink: BMDDeckLink):
+    """Generate and display a pattern on the DeckLink device."""
     try:
-        # Start the DeckLink output first
-        decklink.start()
-
         # Create pattern generator
         generator = PatternGenerator(
-            width=args.width,
-            height=args.height,
-            bit_depth=bit_depth,
-            pattern_type=args.pattern,
-            roi_x=args.roi_x,
-            roi_y=args.roi_y,
-            roi_width=args.roi_width,
-            roi_height=args.roi_height,
+            width=settings.width,
+            height=settings.height,
+            bit_depth=settings.bit_depth,
+            pattern_type=settings.pattern,
+            roi_x=settings.roi_x,
+            roi_y=settings.roi_y,
+            roi_width=settings.roi_width,
+            roi_height=settings.roi_height,
         )
 
         # Generate pattern based on type
-        if args.pattern == PatternType.SOLID:
-            image = generator.generate((args.r, args.g, args.b))
-        elif args.pattern == PatternType.TWO_COLOR:
-            image = generator.generate(
-                (args.r, args.g, args.b), (args.r2, args.g2, args.b2)
-            )
-        elif args.pattern == PatternType.FOUR_COLOR:
-            image = generator.generate(
-                (args.r, args.g, args.b),
-                (args.r2, args.g2, args.b2),
-                (args.r3, args.g3, args.b3),
-                (args.r4, args.g4, args.b4),
-            )
-        else:
-            raise ValueError(f"Unsupported pattern type: {args.pattern}")
-
-        # Set complete HDR metadata if not disabled
-        if not args.no_hdr:
-            # Create complete HDR metadata with default Rec2020 values
-            hdr_metadata = HDRMetadata()
-
-            # Update with user-provided values
-            hdr_metadata.EOTF = args.eotf.int_value
-            hdr_metadata.maxCLL = float(args.max_cll)
-            hdr_metadata.maxFALL = float(args.max_fall)
-            # Set mastering display luminance
-            hdr_metadata.maxDisplayMasteringLuminance = float(
-                args.max_display_mastering_luminance
-            )
-            hdr_metadata.minDisplayMasteringLuminance = float(
-                args.min_display_mastering_luminance
-            )
-            # Set display primaries and white point chromaticity coordinates
-            hdr_metadata.referencePrimaries.RedX = float(args.red[0])
-            hdr_metadata.referencePrimaries.RedY = float(args.red[1])
-            hdr_metadata.referencePrimaries.GreenX = float(args.green[0])
-            hdr_metadata.referencePrimaries.GreenY = float(args.green[1])
-            hdr_metadata.referencePrimaries.BlueX = float(args.blue[0])
-            hdr_metadata.referencePrimaries.BlueY = float(args.blue[1])
-            hdr_metadata.referencePrimaries.WhiteX = float(args.white[0])
-            hdr_metadata.referencePrimaries.WhiteY = float(args.white[1])
-
-            # Set the complete HDR metadata
-            decklink.set_hdr_metadata(hdr_metadata)
-        else:
-            # Use legacy EOTF method for SDR
-            decklink.set_frame_eotf(args.eotf.int_value, args.max_cll, args.max_fall)
-            print(
-                f"Set basic EOTF metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}"
-            )
+        image = generator.generate(settings.colors)
 
         # Set frame data and create frame
         decklink.set_frame_data(image)
@@ -287,7 +190,7 @@ def generate_and_display_image(args, decklink, bit_depth):
         decklink.schedule_frame()
         decklink.start_playback()
 
-        print(f"Generated {args.pattern.value} pattern: {args.width}x{args.height}")
+        print(f"Generated {settings.pattern.value} pattern: {settings.width}x{settings.height}")
 
         return True
 
@@ -301,12 +204,55 @@ def cleanup_decklink_device(decklink):
     decklink.close()
 
 
-def setup_decklink_device(args):
+def setup_decklink_device(settings: DeckLinkSettings, device_index: int, pixel_format_index: Optional[int]):
     """Setup DeckLink for CLI usage. Returns (decklink, bit_depth, devices)."""
     success, decklink, bit_depth, devices, error = _initialize_decklink_device(
-        args.device, args.pixel_format, show_logs=True, use_global=False
+        device_index, pixel_format_index, show_logs=True, use_global=False
     )
     if not success:
         print(f"Error: {error}")
         return None, None, None
+
+    # Store width and height for later use
+    decklink.width = settings.width
+    decklink.height = settings.height
+
+    # Set complete HDR metadata if not disabled
+    if not settings.no_hdr:
+        # Create complete HDR metadata with default Rec2020 values
+        hdr_metadata = create_default_hdr_metadata()
+
+        # Update with user-provided values
+        hdr_metadata.EOTF = settings.eotf.value
+        hdr_metadata.maxCLL = float(settings.max_cll)
+        hdr_metadata.maxFALL = float(settings.max_fall)
+        # Set mastering display luminance
+        hdr_metadata.maxDisplayMasteringLuminance = float(
+            settings.max_display_mastering_luminance
+        )
+        hdr_metadata.minDisplayMasteringLuminance = float(
+            settings.min_display_mastering_luminance
+        )
+        # Set display primaries and white point chromaticity coordinates
+        hdr_metadata.referencePrimaries.RedX = float(settings.red_primary[0])
+        hdr_metadata.referencePrimaries.RedY = float(settings.red_primary[1])
+        hdr_metadata.referencePrimaries.GreenX = float(settings.green_primary[0])
+        hdr_metadata.referencePrimaries.GreenY = float(settings.green_primary[1])
+        hdr_metadata.referencePrimaries.BlueX = float(settings.blue_primary[0])
+        hdr_metadata.referencePrimaries.BlueY = float(settings.blue_primary[1])
+        hdr_metadata.referencePrimaries.WhiteX = float(settings.white_point[0])
+        hdr_metadata.referencePrimaries.WhiteY = float(settings.white_point[1])
+
+        # Set the complete HDR metadata
+        decklink.set_hdr_metadata(hdr_metadata)
+    else:
+        # Use legacy EOTF method for SDR
+        decklink.set_frame_eotf(
+            settings.eotf.value, settings.max_cll, settings.max_fall
+        )
+        print(
+            f"Set basic EOTF metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+        )
+
+    decklink.start()
     return decklink, bit_depth, devices

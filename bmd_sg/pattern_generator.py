@@ -80,8 +80,7 @@ class PatternGenerator:
         for i, color in enumerate(colors, 1):
             print(f"  Color {i}: RGB{color}")
 
-    def _pad_colors(self, colors: List[Tuple[int, int, int]], required: int) -> List[Tuple[int, int, int]]:
-        return colors + [(0, 0, 0)] * (required - len(colors))
+    
 
     def _generate_solid(self, r: int, g: int, b: int) -> np.ndarray:
         colors = [(r, g, b)] * 4
@@ -108,15 +107,18 @@ class PatternGenerator:
         self._draw_checkerboard_pattern(image, colors, self.roi_x, self.roi_y, self.roi_width, self.roi_height)
         return image
 
-    def generate(self, color1: Tuple[int, int, int], color2: Optional[Tuple[int, int, int]] = None,
-                color3: Optional[Tuple[int, int, int]] = None, color4: Optional[Tuple[int, int, int]] = None) -> np.ndarray:
+    def generate(self, colors: List[Tuple[int, int, int]]) -> np.ndarray:
         if self.pattern_type == PatternType.SOLID:
-            return self._generate_solid(*color1)
+            if len(colors) != 1:
+                raise ValueError("SOLID pattern requires exactly one color")
+            return self._generate_solid(*colors[0])
         elif self.pattern_type == PatternType.TWO_COLOR:
-            colors = self._pad_colors([color1, color2 or (0, 0, 0)], 2)
+            if len(colors) != 2:
+                raise ValueError("TWO_COLOR pattern requires exactly two colors")
             return self._generate_2color(*colors)
         elif self.pattern_type == PatternType.FOUR_COLOR:
-            colors = self._pad_colors([color1, color2 or (0, 0, 0), color3 or (0, 0, 0), color4 or (0, 0, 0)], 4)
+            if len(colors) != 4:
+                raise ValueError("FOUR_COLOR pattern requires exactly four colors")
             return self._generate_4color(colors)
         else:
             raise ValueError(f"Unsupported pattern type: {self.pattern_type}") 

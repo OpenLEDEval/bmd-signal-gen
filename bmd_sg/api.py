@@ -6,9 +6,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 
 import bmd_sg.decklink_control as decklink_control
-from bmd_sg.decklink_control import create_api_args, generate_and_display_image
-from bmd_sg.patterns import PatternType
-from bmd_sg.decklink.bmd_decklink import HDRMetadata
+from bmd_sg.pattern_generator import PatternType
+from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
+
 
 router = APIRouter()
 
@@ -19,42 +19,28 @@ class Color(BaseModel):
     b: int = Field(..., ge=0, description="Blue component")
 
 
-class HDRMetadataRequest(BaseModel):
-    """Complete HDR metadata request model."""
-    eotf: int = Field(3, ge=1, le=3, description="EOTF type (0-7 as per CEA 861.3)")
-    max_cll: int = Field(1000, ge=0, description="Maximum Content Light Level in cd/m²")
-    max_fall: int = Field(50, ge=0, description="Maximum Frame Average Light Level in cd/m²")
-    
-    # Display primaries (Rec2020 default values)
-    red_x: float = Field(0.708, ge=0.0, le=1.0, description="Red primary X coordinate")
-    red_y: float = Field(0.292, ge=0.0, le=1.0, description="Red primary Y coordinate")
-    green_x: float = Field(0.170, ge=0.0, le=1.0, description="Green primary X coordinate")
-    green_y: float = Field(0.797, ge=0.0, le=1.0, description="Green primary Y coordinate")
-    blue_x: float = Field(0.131, ge=0.0, le=1.0, description="Blue primary X coordinate")
-    blue_y: float = Field(0.046, ge=0.0, le=1.0, description="Blue primary Y coordinate")
-    white_x: float = Field(0.3127, ge=0.0, le=1.0, description="White point X coordinate")
-    white_y: float = Field(0.3290, ge=0.0, le=1.0, description="White point Y coordinate")
-    
-    # Mastering display luminance
-    max_display_mastering_luminance: float = Field(1000.0, ge=0.0, description="Max display mastering luminance in cd/m²")
-    min_display_mastering_luminance: float = Field(0.0001, ge=0.0, description="Min display mastering luminance in cd/m²")
 
 
-class FourColorPatternRequest(BaseModel):
-    width: int = 1920
-    height: int = 1080
-    bit_depth: int = 12
+
+class PatternRequest(BaseModel):
+    pattern: PatternType = PatternType.SOLID
     roi_x: int = 0
     roi_y: int = 0
     roi_width: Optional[int] = None
     roi_height: Optional[int] = None
-    colors: List[Color] = Field(..., description="List of 4 RGB colors")
-    hdr_metadata: Optional[HDRMetadataRequest] = Field(None, description="Complete HDR metadata")
+    colors: List[Color] = Field(..., description="List of 1 to 4 RGB colors")
 
     @validator("colors")
-    def check_colors_length(cls, v):
-        if len(v) != 4:
-            raise ValueError("Exactly 4 colors must be provided")
+    def check_colors_length(cls, v, values):
+        pattern = values.get("pattern")
+        if pattern == PatternType.SOLID and len(v) != 1:
+            raise ValueError("Exactly 1 color must be provided for solid pattern")
+        if pattern == PatternType.TWO_COLOR and len(v) != 2:
+            raise ValueError("Exactly 2 colors must be provided for 2color pattern")
+        if pattern == PatternType.FOUR_COLOR and len(v) != 4:
+            raise ValueError("Exactly 4 colors must be provided for 4color pattern")
+        if len(v) > 4:
+            raise ValueError("Maximum of 4 colors are supported")
         return v
 
 
@@ -79,14 +65,40 @@ async def parse_and_validate_request(request: Request, model):
         )
 
 
-@router.post("/bmd-signal-gen/4color")
-async def four_color_pattern(request: Request, body: Any = Body(...)):
-    pattern, error = await parse_and_validate_request(request, FourColorPatternRequest)
+@router.post("/bmd-signal-gen/setup")
+async def setup_decklink(request: Request, body: Any = Body(...)):
+    decklink_settings, error = await parse_and_validate_request(request, DeckLinkSettings)
     if error:
         return error
-    if pattern is None:
+    if decklink_settings is None:
         return JSONResponse(
-            status_code=400, content={"error": "Pattern validation failed"}
+            status_code=400, content={"error": "DeckLink settings validation failed"}
+        )
+
+    success, error = decklink_control.initialize_decklink_for_api()
+    if not success:
+        return JSONResponse(
+            status_code=503, content={"error": "DeckLink not initialized", "details": error}
+        )
+
+    decklink_control.setup_decklink_device(decklink_settings, 0, None)
+    
+    # Store width and height globally for pattern generation
+    decklink_control.decklink_width = decklink_settings.width
+    decklink_control.decklink_height = decklink_settings.height
+
+    return {"message": "DeckLink device setup complete"}
+
+
+@router.post("/bmd-signal-gen/pattern")
+@router.post("/bmd-signal-gen/display")
+async def display_pattern(request: Request, body: Any = Body(...)):
+    pattern_request, error = await parse_and_validate_request(request, PatternRequest)
+    if error:
+        return error
+    if pattern_request is None:
+        return JSONResponse(
+            status_code=400, content={"error": "Pattern settings validation failed"}
         )
 
     # Check if DeckLink is initialized
@@ -96,60 +108,41 @@ async def four_color_pattern(request: Request, body: Any = Body(...)):
         )
 
     # Prepare colors as tuples
-    color_tuples = [(c.r, c.g, c.b) for c in pattern.colors]
+    color_tuples = [(c.r, c.g, c.b) for c in pattern_request.colors]
 
-    # Create API args and call generate function
+    # Create PatternSettings object
+    pattern_settings = PatternSettings(
+        pattern=pattern_request.pattern,
+        colors=color_tuples,
+        roi_x=pattern_request.roi_x,
+        roi_y=pattern_request.roi_y,
+        roi_width=pattern_request.roi_width,
+        roi_height=pattern_request.roi_height,
+        bit_depth=decklink_control.decklink_bit_depth,
+        width=decklink_control.decklink_width or 1920,
+        height=decklink_control.decklink_height or 1080,
+    )
+
+    # Display the pattern
     try:
-        api_args = create_api_args(
-            width=pattern.width,
-            height=pattern.height,
-            pattern=PatternType.FOUR_COLOR,
-            colors=color_tuples,
-            roi_x=pattern.roi_x,
-            roi_y=pattern.roi_y,
-            roi_width=pattern.roi_width,
-            roi_height=pattern.roi_height,
-        )
-
-        # Set complete HDR metadata if provided
-        if pattern.hdr_metadata:
-            hdr_metadata = HDRMetadata()
-            hdr_metadata.EOTF = pattern.hdr_metadata.eotf
-            hdr_metadata.maxCLL = float(pattern.hdr_metadata.max_cll)
-            hdr_metadata.maxFALL = float(pattern.hdr_metadata.max_fall)
-            hdr_metadata.referencePrimaries.RedX = pattern.hdr_metadata.red_x
-            hdr_metadata.referencePrimaries.RedY = pattern.hdr_metadata.red_y
-            hdr_metadata.referencePrimaries.GreenX = pattern.hdr_metadata.green_x
-            hdr_metadata.referencePrimaries.GreenY = pattern.hdr_metadata.green_y
-            hdr_metadata.referencePrimaries.BlueX = pattern.hdr_metadata.blue_x
-            hdr_metadata.referencePrimaries.BlueY = pattern.hdr_metadata.blue_y
-            hdr_metadata.referencePrimaries.WhiteX = pattern.hdr_metadata.white_x
-            hdr_metadata.referencePrimaries.WhiteY = pattern.hdr_metadata.white_y
-            hdr_metadata.maxDisplayMasteringLuminance = pattern.hdr_metadata.max_display_mastering_luminance
-            hdr_metadata.minDisplayMasteringLuminance = pattern.hdr_metadata.min_display_mastering_luminance
-            
-            decklink_control.decklink_instance.set_hdr_metadata(hdr_metadata)
-
-        success = generate_and_display_image(
-            api_args,
+        success = decklink_control.display_pattern(
+            pattern_settings,
             decklink_control.decklink_instance,
-            decklink_control.decklink_bit_depth,
         )
 
         if success:
             return {
-                "message": "4-color pattern generated and displayed",
-                "shape": f"{pattern.width}x{pattern.height}",
-                "colors": color_tuples,
-                "hdr_metadata": pattern.hdr_metadata.dict() if pattern.hdr_metadata else None,
+                "message": f"{pattern_settings.pattern.value} pattern displayed",
+                "shape": f"{pattern_settings.width}x{pattern_settings.height}",
+                "colors": pattern_settings.colors,
             }
         else:
             return JSONResponse(
-                status_code=500, content={"error": "Pattern generation failed"}
+                status_code=500, content={"error": "Pattern display failed"}
             )
 
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"error": "Pattern generation failed", "details": str(e)},
+            content={"error": "Pattern display failed", "details": str(e)},
         )

@@ -17,11 +17,12 @@ from bmd_sg.decklink.bmd_decklink import EOTFType
 from bmd_sg.decklink_control import (
     cleanup_decklink_device,
     decklink_instance,
-    generate_and_display_image,
+    display_pattern,
     initialize_decklink_for_api,
     setup_decklink_device,
 )
-from bmd_sg.patterns import PatternType
+from bmd_sg.pattern_generator import PatternType
+from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
 
 pat_server = FastAPI()
 pat_server.include_router(bmd_router)
@@ -69,221 +70,7 @@ async def shutdown_event():
         cleanup_decklink_device(decklink_control.decklink_instance)
 
 
-def add_decklink_setup_arguments(parser):
-    """Add DeckLink device setup arguments to the parser.
-    
-    Args:
-        parser: argparse.ArgumentParser instance
-    """
-    parser.add_argument(
-        "--device", "-d", type=int, default=0, help="Device index (default: 0)"
-    )
-    parser.add_argument(
-        "--pixel-format",
-        "-p",
-        type=int,
-        help="Pixel format index (leave blank for auto-select)",
-    )
-    parser.add_argument(
-        "--eotf",
-        type=EOTFType.parse,
-        choices=list(EOTFType),
-        default=EOTFType.PQ,
-        help="EOTF type (CEA 861.3): 1=SDR, 2=PQ, 3=HLG, (default: 2=PQ)",
-    )
-    
-    # HDR Metadata - Display Mastering Luminance
-    parser.add_argument(
-        "--max-display-mastering-luminance",
-        type=float,
-        default=1000.0,
-        help="Maximum display mastering luminance in cd/m² (default: 1000.0)",
-    )
-    parser.add_argument(
-        "--min-display-mastering-luminance",
-        type=float,
-        default=0.0001,
-        help="Minimum display mastering luminance in cd/m² (default: 0.0001)",
-    )
-    
-    # HDR Metadata - Content Light Level
-    parser.add_argument(
-        "--max-cll",
-        type=float,
-        default=10000.0,
-        help="Maximum Content Light Level in cd/m² (default: 1000.0)",
-    )
-    parser.add_argument(
-        "--max-fall",
-        type=float,
-        default=400.0, # use a diffuse white of 400 for now
-        help="Maximum Frame Average Light Level in cd/m² (default: 50.0)",
-    )
-    
-    # HDR Metadata - Display Primaries (Chromaticity Coordinates)
-    parser.add_argument(
-        "--red",
-        nargs=2,
-        type=float,
-        default=(0.708, 0.292),
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help="Red primary coordinates (default: 0.708 0.292 for Rec2020)",
-    )
-    parser.add_argument(
-        "--green",
-        nargs=2,
-        type=float,
-        default=(0.170, 0.797),
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help="Green primary coordinates (default: 0.170 0.797 for Rec2020)",
-    )
-    parser.add_argument(
-        "--blue",
-        nargs=2,
-        type=float,
-        default=(0.131, 0.046),
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help="Blue primary coordinates (default: 0.131 0.046 for Rec2020)",
-    )
-    parser.add_argument(
-        "--white",
-        nargs=2,
-        type=float,
-        default=(0.3127, 0.3290),
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help="White point coordinates (default: 0.3127 0.3290 for D65)",
-    )
-    
-    parser.add_argument(
-        "--no-hdr", action="store_true", help="Disable HDR metadata (use SDR mode)"
-    )
-    parser.add_argument(
-        "--all", type=bool, default=False, help="Show all supported pixel formats"
-    )
 
-
-def add_pattern_generation_arguments(parser):
-    """Add pattern generation arguments to the parser.
-    
-    Args:
-        parser: argparse.ArgumentParser instance
-    """
-    # Basic color arguments
-    parser.add_argument(
-        "r", type=int, default=4095, help="Red component (see --help for range)"
-    )
-    parser.add_argument(
-        "g", type=int, default=0, help="Green component (see --help for range)"
-    )
-    parser.add_argument(
-        "b", type=int, default=0, help="Blue component (see --help for range)"
-    )
-
-    # Add CLI-specific duration argument
-    parser.add_argument(
-        "--duration",
-        "-t",
-        type=float,
-        default=5.0,
-        help="Duration in seconds (default: 5.0)",
-    )
-    
-    # Pattern type and dimensions
-    parser.add_argument(
-        "--pattern",
-        type=PatternType,  # This will call PatternType('solid'), etc.
-        choices=list(PatternType),
-        default=PatternType.TWO_COLOR,
-        help="Pattern type to generate (default: solid)",
-    )
-    parser.add_argument(
-        "--width", type=int, default=1920, help="Image width (default: 1920)"
-    )
-    parser.add_argument(
-        "--height", type=int, default=1080, help="Image height (default: 1080)"
-    )
-
-    # Region of Interest arguments
-    parser.add_argument(
-        "--roi-x", type=int, default=64, help="Region of interest X offset (default: 0)"
-    )
-    parser.add_argument(
-        "--roi-y", type=int, default=64, help="Region of interest Y offset (default: 0)"
-    )
-    parser.add_argument(
-        "--roi-width",
-        type=int,
-        default=64,
-        help="Region of interest width (default: full image width)",
-    )
-    parser.add_argument(
-        "--roi-height",
-        type=int,
-        default=64,
-        help="Region of interest height (default: full image height)",
-    )
-
-    # Two-color checkerboard arguments
-    parser.add_argument(
-        "--r2",
-        type=int,
-        default=0,
-        help="Red component for color 2 (2color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--g2",
-        type=int,
-        default=0,
-        help="Green component for color 2 (2color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--b2",
-        type=int,
-        default=0,
-        help="Blue component for color 2 (2color pattern, default: 0)",
-    )
-
-    # Four-color checkerboard arguments
-    parser.add_argument(
-        "--r3",
-        type=int,
-        default=0,
-        help="Red component for color 3 (4color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--g3",
-        type=int,
-        default=0,
-        help="Green component for color 3 (4color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--b3",
-        type=int,
-        default=0,
-        help="Blue component for color 3 (4color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--r4",
-        type=int,
-        default=0,
-        help="Red component for color 4 (4color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--g4",
-        type=int,
-        default=0,
-        help="Green component for color 4 (4color pattern, default: 0)",
-    )
-    parser.add_argument(
-        "--b4",
-        type=int,
-        default=0,
-        help="Blue component for color 4 (4color pattern, default: 0)",
-    )
 
 def main() -> int:
     description = (
@@ -302,25 +89,178 @@ def main() -> int:
         "\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region"
     )
     parser = argparse.ArgumentParser(description=description)
-    
-    # Add shared arguments
-    add_decklink_setup_arguments(parser)
-    # Add CLI-specific pattern generation arguments
-    add_pattern_generation_arguments(parser)
+
+    # Add arguments to the parser, directly mapping to SignalSettings fields
+    parser.add_argument(
+        "--device", "-d", type=int, default=0, help="Device index (default: 0)"
+    )
+    parser.add_argument(
+        "--pixel-format",
+        "-p",
+        type=int,
+        help="Pixel format index (leave blank for auto-select)",
+    )
+    parser.add_argument(
+        "--width", type=int, default=1920, help="Image width (default: 1920)"
+    )
+    parser.add_argument(
+        "--height", type=int, default=1080, help="Image height (default: 1080)"
+    )
+    parser.add_argument(
+        "--pattern",
+        type=PatternType,
+        choices=list(PatternType),
+        default=PatternType.SOLID,
+        help="Pattern type to generate (default: solid)",
+    )
+    parser.add_argument(
+        "--colors",
+        nargs='+',
+        type=int,
+        default=[4095, 0, 0],
+        help="List of colors as R G B values. E.g., --colors 4095 0 0 0 4095 0",
+    )
+    parser.add_argument(
+        "--roi-x", type=int, default=0, help="Region of interest X offset (default: 0)"
+    )
+    parser.add_argument(
+        "--roi-y", type=int, default=0, help="Region of interest Y offset (default: 0)"
+    )
+    parser.add_argument(
+        "--roi-width",
+        type=int,
+        help="Region of interest width (default: full image width)",
+    )
+    parser.add_argument(
+        "--roi-height",
+        type=int,
+        help="Region of interest height (default: full image height)",
+    )
+    parser.add_argument(
+        "--no-hdr", action="store_true", help="Disable HDR metadata (use SDR mode)"
+    )
+    parser.add_argument(
+        "--eotf",
+        type=EOTFType.parse,
+        choices=list(EOTFType),
+        default=EOTFType.PQ,
+        help="EOTF type (CEA 861.3): 1=SDR, 2=PQ, 3=HLG, (default: 2=PQ)",
+    )
+    parser.add_argument(
+        "--max-cll",
+        type=float,
+        default=1000.0,
+        help="Maximum Content Light Level in cd/m² (default: 1000.0)",
+    )
+    parser.add_argument(
+        "--max-fall",
+        type=float,
+        default=400.0,
+        help="Maximum Frame Average Light Level in cd/m² (default: 400.0)",
+    )
+    parser.add_argument(
+        "--max-display-mastering-luminance",
+        type=float,
+        default=1000.0,
+        help="Maximum display mastering luminance in cd/m² (default: 1000.0)",
+    )
+    parser.add_argument(
+        "--min-display-mastering-luminance",
+        type=float,
+        default=0.0001,
+        help="Minimum display mastering luminance in cd/m² (default: 0.0001)",
+    )
+    parser.add_argument(
+        "--red-primary",
+        nargs=2,
+        type=float,
+        default=(0.708, 0.292),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Red primary coordinates (default: 0.708 0.292 for Rec2020)",
+    )
+    parser.add_argument(
+        "--green-primary",
+        nargs=2,
+        type=float,
+        default=(0.170, 0.797),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Green primary coordinates (default: 0.170 0.797 for Rec2020)",
+    )
+    parser.add_argument(
+        "--blue-primary",
+        nargs=2,
+        type=float,
+        default=(0.131, 0.046),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Blue primary coordinates (default: 0.131 0.046 for Rec2020)",
+    )
+    parser.add_argument(
+        "--white-point",
+        nargs=2,
+        type=float,
+        default=(0.3127, 0.3290),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="White point coordinates (default: 0.3127 0.3290 for D65)",
+    )
+    parser.add_argument(
+        "--duration",
+        "-t",
+        type=float,
+        default=5.0,
+        help="Duration in seconds (default: 5.0)",
+    )
 
     args = parser.parse_args()
-    decklink, bit_depth, devices = setup_decklink_device(args)
+
+    # Group colors into tuples
+    if len(args.colors) % 3 != 0:
+        parser.error("Colors must be provided in groups of three (R G B)")
+    colors = [tuple(args.colors[i:i+3]) for i in range(0, len(args.colors), 3)]
+
+    # Create DeckLinkSettings object from parsed arguments
+    decklink_settings = DeckLinkSettings(
+        width=args.width,
+        height=args.height,
+        no_hdr=args.no_hdr,
+        eotf=args.eotf,
+        max_cll=args.max_cll,
+        max_fall=args.max_fall,
+        max_display_mastering_luminance=args.max_display_mastering_luminance,
+        min_display_mastering_luminance=args.min_display_mastering_luminance,
+        red_primary=args.red_primary,
+        green_primary=args.green_primary,
+        blue_primary=args.blue_primary,
+        white_point=args.white_point,
+    )
+
+    decklink, bit_depth, devices = setup_decklink_device(decklink_settings, args.device, args.pixel_format)
     if decklink is None:
         return 1
-    
-    success = generate_and_display_image(args, decklink, bit_depth)
+
+    # Create PatternSettings object from parsed arguments
+    pattern_settings = PatternSettings(
+        pattern=args.pattern,
+        colors=colors,
+        roi_x=args.roi_x,
+        roi_y=args.roi_y,
+        roi_width=args.roi_width,
+        roi_height=args.roi_height,
+        bit_depth=bit_depth if bit_depth is not None else 12,
+    )
+
+    success = display_pattern(pattern_settings, decklink)
     if success:
         # Wait for the specified duration only in CLI mode
         print(f"Displaying for {args.duration} seconds...")
         time.sleep(args.duration)
-    
+
     cleanup_decklink_device(decklink)
     return 0 if success else 1
+
 
 
 if __name__ == "__main__":
