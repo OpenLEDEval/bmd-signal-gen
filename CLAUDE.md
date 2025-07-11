@@ -90,6 +90,73 @@ python -m pytest tests/
 - **Refactor Immediately**: Don't defer deduplication - fix patterns when found
 - **All Languages**: Apply DRY to C++, Python, and build scripts
 
+### Documentation Standards
+
+All Python code must use **Sphinx-compatible docstrings** following **NumPy documentation standards**.
+
+#### Required Documentation
+
+1. **All public modules** must have comprehensive module-level docstrings
+2. **All public classes** must have detailed class docstrings with Parameters, Attributes, Examples, and Notes sections
+3. **All public functions and methods** must have complete docstrings with Parameters, Returns, Raises, and Examples sections
+4. **All public constants and enums** must be documented with brief descriptions
+
+#### NumPy Docstring Format
+
+Use these sections in docstrings:
+- **Parameters** - Document all parameters with types and descriptions
+- **Returns** - Document return values with types and descriptions  
+- **Raises** - Document all exceptions that can be raised
+- **Examples** - Include practical usage examples with expected output
+- **Notes** - Important implementation details or performance considerations
+- **See Also** - Cross-references to related functionality
+
+#### Example Class Docstring
+
+```python
+class HDRMetadata(ctypes.Structure):
+    """
+    Complete HDR metadata structure for DeckLink output.
+    
+    This structure defines comprehensive HDR metadata including EOTF
+    (Electro-Optical Transfer Function), display primaries, and luminance values.
+    
+    Parameters
+    ----------
+    eotf : int, optional
+        EOTF type (0=Reserved, 1=SDR, 2=PQ, 3=HLG). Default is 3.
+    max_display_luminance : float, optional
+        Maximum display mastering luminance in cd/m². Default is 1000.0.
+    
+    Attributes
+    ----------
+    EOTF : int
+        Electro-Optical Transfer Function type
+    referencePrimaries : ChromaticityCoordinates
+        Display color primaries and white point
+    
+    Examples
+    --------
+    Create HDR metadata with default values:
+    
+    >>> metadata = HDRMetadata()
+    >>> print(f"EOTF: {metadata.EOTF}")
+    EOTF: 3
+    
+    Notes
+    -----
+    The structure automatically sets Rec.2020 color primaries as defaults.
+    """
+```
+
+#### Documentation Quality Requirements
+
+- **Complete parameter documentation** - All parameters must be documented with types and descriptions
+- **Practical examples required** - Include real-world usage examples
+- **Exception documentation** - Document all exceptions that can be raised
+- **Cross-references** - Use See Also sections to link related functionality
+- **Consistent terminology** - Use the same terms throughout the project
+
 ### HDR Metadata Handling
 
 The project supports complete HDR metadata with:
