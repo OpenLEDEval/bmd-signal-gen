@@ -192,3 +192,11 @@ The project supports complete HDR metadata with:
 - Blackmagic Design DeckLink SDK 14.4
 - clang++ with C++20 support (macOS)
 - UV package manager for Python environment
+
+## Claude Code Guidelines
+
+- **Refactoring Workflow**:
+  - Always make refactor suggestions using edit or multi edit tools so I can see the changes in my diff browser
+  - Only use code snippets in the chat when I ask for an example or a clarifying question
+  - When asked for refactor suggestions, first describe suggestions briefly with minimal code in the chat
+  - Wait for explicit confirmation before using edit or multi edit tools to implement refactoring
