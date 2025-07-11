@@ -31,9 +31,8 @@ class PixelFormatType(Enum):
 class EOTFType(Enum):
     RESERVED = 0
     SDR = 1
-    HDR = 2
-    PQ = 3
-    HLG = 4
+    PQ = 2
+    HLG = 3
 
     def __str__(self):
         return f"{self.value}={self.name}"
@@ -58,7 +57,7 @@ def _try_load_decklink_sdk():
     try:
         # Try to load from the lib directory relative to this script
         if lib_path.exists() and lib_path.is_file():
-            decklink = ctypes.CDLL(lib_path)
+            decklink = ctypes.CDLL(str(lib_path))
         else:
             raise FileNotFoundError(
                 f"Could not find libdecklink.dylib in Python project: {lib_path.absolute()}"
@@ -97,8 +96,8 @@ class HDRMetadata(ctypes.Structure):
         ("referencePrimaries", ChromaticityCoordinates),
         ("maxDisplayMasteringLuminance", ctypes.c_double),
         ("minDisplayMasteringLuminance", ctypes.c_double),
-        ("maxFALL", ctypes.c_double),
         ("maxCLL", ctypes.c_double),
+        ("maxFALL", ctypes.c_double),
     ]
 
 

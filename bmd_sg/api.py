@@ -21,7 +21,7 @@ class Color(BaseModel):
 
 class HDRMetadataRequest(BaseModel):
     """Complete HDR metadata request model."""
-    eotf: int = Field(3, ge=0, le=7, description="EOTF type (0-7 as per CEA 861.3)")
+    eotf: int = Field(3, ge=1, le=3, description="EOTF type (0-7 as per CEA 861.3)")
     max_cll: int = Field(1000, ge=0, description="Maximum Content Light Level in cd/m²")
     max_fall: int = Field(50, ge=0, description="Maximum Frame Average Light Level in cd/m²")
     

@@ -255,10 +255,21 @@ def generate_and_display_image(args, decklink, bit_depth):
             hdr_metadata.EOTF = args.eotf.value
             hdr_metadata.maxCLL = float(args.max_cll)
             hdr_metadata.maxFALL = float(args.max_fall)
+            # Set mastering display luminance
+            hdr_metadata.maxDisplayMasteringLuminance = float(args.max_display_mastering_luminance)
+            hdr_metadata.minDisplayMasteringLuminance = float(args.min_display_mastering_luminance)
+            # Set display primaries and white point chromaticity coordinates
+            hdr_metadata.referencePrimaries.RedX = float(args.red[0])
+            hdr_metadata.referencePrimaries.RedY = float(args.red[1])
+            hdr_metadata.referencePrimaries.GreenX = float(args.green[0])
+            hdr_metadata.referencePrimaries.GreenY = float(args.green[1])
+            hdr_metadata.referencePrimaries.BlueX = float(args.blue[0])
+            hdr_metadata.referencePrimaries.BlueY = float(args.blue[1])
+            hdr_metadata.referencePrimaries.WhiteX = float(args.white[0])
+            hdr_metadata.referencePrimaries.WhiteY = float(args.white[1])
 
             # Set the complete HDR metadata
             decklink.set_hdr_metadata(hdr_metadata)
-            print(f"Set complete HDR metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}")
         else:
             # Use legacy EOTF method for SDR
             decklink.set_frame_eotf(args.eotf.value, args.max_cll, args.max_fall)

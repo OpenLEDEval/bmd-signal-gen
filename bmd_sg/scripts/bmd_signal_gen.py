@@ -7,6 +7,7 @@ Supports HDR metadata configuration including EOTF settings and pixel format sel
 import argparse
 import sys
 import time
+from typing import Tuple
 
 from fastapi import FastAPI
 
@@ -30,6 +31,23 @@ decklink_instance = None
 decklink_bit_depth = None
 
 
+class ChromaticityAction(argparse.Action):
+    """Custom action for chromaticity coordinate pairs (x, y)."""
+    
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values is None or len(values) != 2:
+            parser.error(f"{option_string} requires exactly 2 values (x y)")
+        
+        try:
+            x, y = float(values[0]), float(values[1])
+            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+                parser.error(f"{option_string} coordinates must be between 0.0 and 1.0")
+        except ValueError:
+            parser.error(f"{option_string} coordinates must be valid numbers")
+        
+        setattr(namespace, self.dest, (x, y))
+
+
 @pat_server.on_event("startup")
 async def startup_event():
     """Initialize DeckLink when FastAPI starts."""
@@ -51,37 +69,12 @@ async def shutdown_event():
         cleanup_decklink_device(decklink_control.decklink_instance)
 
 
-def main() -> int:
-    description = (
-        "Output solid RGB color to DeckLink device with HDR metadata support"
-        "\n\nColor value ranges by pixel format:"
-        "\n  12-bit:  0-4095 (default, recommended)"
-        "\n  10-bit:  0-1023"
-        "\n  8-bit:   0-255 (fallback mode)"
-        "\n\nPattern types:"
-        "\n  solid: Single color (default)"
-        "\n  2color: Two-color checkerboard"
-        "\n  4color: Four-color checkerboard"
-        "\n\nRegion of Interest:"
-        "\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region"
-    )
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument(
-        "r", type=int, default=4095, help="Red component (see --help for range)"
-    )
-    parser.add_argument(
-        "g", type=int, default=0, help="Green component (see --help for range)"
-    )
-    parser.add_argument(
-        "b", type=int, default=0, help="Blue component (see --help for range)"
-    )
-    parser.add_argument(
-        "--duration",
-        "-t",
-        type=float,
-        default=5.0,
-        help="Duration in seconds (default: 5.0)",
-    )
+def add_decklink_setup_arguments(parser):
+    """Add DeckLink device setup arguments to the parser.
+    
+    Args:
+        parser: argparse.ArgumentParser instance
+    """
     parser.add_argument(
         "--device", "-d", type=int, default=0, help="Device index (default: 0)"
     )
@@ -96,23 +89,110 @@ def main() -> int:
         type=EOTFType.parse,
         choices=list(EOTFType),
         default=EOTFType.PQ,
-        help="EOTF type (CEA 861.3): 0=RESERVED, 1=SDR, 2=HDR, 3=PQ, 4=HLG (default: 3=PQ)",
+        help="EOTF type (CEA 861.3): 1=SDR, 2=PQ, 3=HLG, (default: 2=PQ)",
+    )
+    
+    # HDR Metadata - Display Mastering Luminance
+    parser.add_argument(
+        "--max-display-mastering-luminance",
+        type=float,
+        default=1000.0,
+        help="Maximum display mastering luminance in cd/m² (default: 1000.0)",
     )
     parser.add_argument(
+        "--min-display-mastering-luminance",
+        type=float,
+        default=0.0001,
+        help="Minimum display mastering luminance in cd/m² (default: 0.0001)",
+    )
+    
+    # HDR Metadata - Content Light Level
+    parser.add_argument(
         "--max-cll",
-        type=int,
-        default=1000,
-        help="Maximum Content Light Level in cd/m² (default: 1000)",
+        type=float,
+        default=10000.0,
+        help="Maximum Content Light Level in cd/m² (default: 1000.0)",
     )
     parser.add_argument(
         "--max-fall",
-        type=int,
-        default=400,
-        help="Maximum Frame Average Light Level in cd/m² (default: 400)",
+        type=float,
+        default=400.0, # use a diffuse white of 400 for now
+        help="Maximum Frame Average Light Level in cd/m² (default: 50.0)",
     )
+    
+    # HDR Metadata - Display Primaries (Chromaticity Coordinates)
+    parser.add_argument(
+        "--red",
+        nargs=2,
+        type=float,
+        default=(0.708, 0.292),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Red primary coordinates (default: 0.708 0.292 for Rec2020)",
+    )
+    parser.add_argument(
+        "--green",
+        nargs=2,
+        type=float,
+        default=(0.170, 0.797),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Green primary coordinates (default: 0.170 0.797 for Rec2020)",
+    )
+    parser.add_argument(
+        "--blue",
+        nargs=2,
+        type=float,
+        default=(0.131, 0.046),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="Blue primary coordinates (default: 0.131 0.046 for Rec2020)",
+    )
+    parser.add_argument(
+        "--white",
+        nargs=2,
+        type=float,
+        default=(0.3127, 0.3290),
+        action=ChromaticityAction,
+        metavar=('X', 'Y'),
+        help="White point coordinates (default: 0.3127 0.3290 for D65)",
+    )
+    
     parser.add_argument(
         "--no-hdr", action="store_true", help="Disable HDR metadata (use SDR mode)"
     )
+    parser.add_argument(
+        "--all", type=bool, default=False, help="Show all supported pixel formats"
+    )
+
+
+def add_pattern_generation_arguments(parser):
+    """Add pattern generation arguments to the parser.
+    
+    Args:
+        parser: argparse.ArgumentParser instance
+    """
+    # Basic color arguments
+    parser.add_argument(
+        "r", type=int, default=4095, help="Red component (see --help for range)"
+    )
+    parser.add_argument(
+        "g", type=int, default=0, help="Green component (see --help for range)"
+    )
+    parser.add_argument(
+        "b", type=int, default=0, help="Blue component (see --help for range)"
+    )
+
+    # Add CLI-specific duration argument
+    parser.add_argument(
+        "--duration",
+        "-t",
+        type=float,
+        default=5.0,
+        help="Duration in seconds (default: 5.0)",
+    )
+    
+    # Pattern type and dimensions
     parser.add_argument(
         "--pattern",
         type=PatternType,  # This will call PatternType('solid'), etc.
@@ -125,9 +205,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--height", type=int, default=1080, help="Image height (default: 1080)"
-    )
-    parser.add_argument(
-        "--all", type=bool, default=False, help="Show all supported pixel formats"
     )
 
     # Region of Interest arguments
@@ -207,6 +284,29 @@ def main() -> int:
         default=0,
         help="Blue component for color 4 (4color pattern, default: 0)",
     )
+
+def main() -> int:
+    description = (
+        "Programatically output signals from a Blackmagic Design DeckLink "
+        "device with HDR metadata support. The pattern can be configured by "
+        "an http API for remote automation"
+        "\n\nColor value ranges by pixel format:"
+        "\n  12-bit:  0-4095 (default, recommended)"
+        "\n  10-bit:  0-1023"
+        "\n  8-bit:   0-255 (fallback mode)"
+        "\n\nPattern types:"
+        "\n  solid: Single color (default)"
+        "\n  2color: Two-color checkerboard"
+        "\n  4color: Four-color checkerboard"
+        "\n\nRegion of Interest:"
+        "\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region"
+    )
+    parser = argparse.ArgumentParser(description=description)
+    
+    # Add shared arguments
+    add_decklink_setup_arguments(parser)
+    # Add CLI-specific pattern generation arguments
+    add_pattern_generation_arguments(parser)
 
     args = parser.parse_args()
     decklink, bit_depth, devices = setup_decklink_device(args)
