@@ -71,9 +71,70 @@ class ChromaticityCoordinates(ctypes.Structure):
         ("WhiteY", ctypes.c_double),
     ]
 
+    def __init__(
+        self,
+        red_xy: tuple[float, float],
+        green_xy: tuple[float, float],
+        blue_xy: tuple[float, float],
+        white_xy: tuple[float, float],
+    ):
+        super().__init__()
+        self.RedX = red_xy[0]
+        self.RedY = red_xy[1]
+        self.GreenX = green_xy[0]
+        self.GreenY = green_xy[1]
+        self.BlueX = blue_xy[0]
+        self.BlueY = blue_xy[1]
+        self.WhiteX = white_xy[0]
+        self.WhiteY = white_xy[1]
+
+
+# Standard chromaticity coordinates for common color spaces
+CHROMATICITYCOORDINATES_REC709 = ChromaticityCoordinates(
+    red_xy=(0.640, 0.330),    # Rec.709 Red
+    green_xy=(0.300, 0.600),  # Rec.709 Green
+    blue_xy=(0.150, 0.060),   # Rec.709 Blue
+    white_xy=(0.3127, 0.3290) # D65 White Point
+)
+
+CHROMATICITYCOORDINATES_REC2020 = ChromaticityCoordinates(
+    red_xy=(0.708, 0.292),    # Rec.2020 Red
+    green_xy=(0.170, 0.797),  # Rec.2020 Green
+    blue_xy=(0.131, 0.046),   # Rec.2020 Blue
+    white_xy=(0.3127, 0.3290) # D65 White Point
+)
+
+CHROMATICITYCOORDINATES_DCI_P3 = ChromaticityCoordinates(
+    red_xy=(0.680, 0.320),    # DCI-P3 Red
+    green_xy=(0.265, 0.690),  # DCI-P3 Green
+    blue_xy=(0.150, 0.060),   # DCI-P3 Blue
+    white_xy=(0.3127, 0.3290) # D65 White Point (P3-D65)
+)
+
+CHROMATICITYCOORDINATES_REC601 = ChromaticityCoordinates(
+    red_xy=(0.630, 0.340),    # Rec.601 Red
+    green_xy=(0.310, 0.595),  # Rec.601 Green
+    blue_xy=(0.155, 0.070),   # Rec.601 Blue
+    white_xy=(0.3127, 0.3290) # D65 White Point
+)
+
 
 class HDRMetadata(ctypes.Structure):
-    """Complete HDR metadata structure."""
+    """Complete HDR metadata structure for DeckLink output.
+
+    This structure defines HDR metadata including EOTF (Electro-Optical Transfer Function),
+    display primaries, mastering display luminance, and content light levels.
+
+    Args:
+        eotf: EOTF type (0=Reserved, 1=SDR, 2=PQ, 3=HLG). Default is 3 (HLG).
+        max_display_luminance: Maximum display mastering luminance in cd/m². Default is 1000.0.
+        min_display_luminance: Minimum display mastering luminance in cd/m². Default is 0.0001.
+        max_cll: Maximum Content Light Level in cd/m². Default is 1000.0.
+        max_fall: Maximum Frame Average Light Level in cd/m². Default is 50.0.
+
+    The structure automatically sets Rec2020 color primaries as defaults, matching
+    the SignalGenHDR sample implementation.
+    """
 
     _fields_ = [
         ("EOTF", ctypes.c_int64),
@@ -84,15 +145,33 @@ class HDRMetadata(ctypes.Structure):
         ("maxFALL", ctypes.c_double),
     ]
 
+    def __init__(
+        self,
+        eotf: int = 3,  # PQ
+        max_display_luminance: float = 1000.0,
+        min_display_luminance: float = 0.0001,
+        max_cll: float = 1000.0,
+        max_fall: float = 50.0,
+    ):
+        super().__init__()
+        self.EOTF = eotf
+        self.maxDisplayMasteringLuminance = max_display_luminance
+        self.minDisplayMasteringLuminance = min_display_luminance
+        self.maxCLL = max_cll
+        self.maxFALL = max_fall
+
+        # Set default Rec2020 primaries
+        self.referencePrimaries = CHROMATICITYCOORDINATES_REC2020
+
 
 def _configure_function_signatures(lib):
     """Configure ctypes function signatures for all DeckLink SDK functions."""
-    
+
     # Device enumeration functions
     if hasattr(lib, "decklink_get_device_count"):
         lib.decklink_get_device_count.argtypes = []
         lib.decklink_get_device_count.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_get_device_name_by_index"):
         lib.decklink_get_device_name_by_index.argtypes = [
             ctypes.c_int,
@@ -100,30 +179,30 @@ def _configure_function_signatures(lib):
             ctypes.c_int,
         ]
         lib.decklink_get_device_name_by_index.restype = ctypes.c_int
-    
+
     # Device management functions
     if hasattr(lib, "decklink_open_output_by_index"):
         lib.decklink_open_output_by_index.argtypes = [ctypes.c_int]
         lib.decklink_open_output_by_index.restype = ctypes.c_void_p
-    
+
     if hasattr(lib, "decklink_close"):
         lib.decklink_close.argtypes = [ctypes.c_void_p]
         lib.decklink_close.restype = None
-    
+
     # Output control functions
     if hasattr(lib, "decklink_start_output"):
         lib.decklink_start_output.argtypes = [ctypes.c_void_p]
         lib.decklink_start_output.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_stop_output"):
         lib.decklink_stop_output.argtypes = [ctypes.c_void_p]
         lib.decklink_stop_output.restype = ctypes.c_int
-    
+
     # Pixel format functions
     if hasattr(lib, "decklink_get_supported_pixel_format_count"):
         lib.decklink_get_supported_pixel_format_count.argtypes = [ctypes.c_void_p]
         lib.decklink_get_supported_pixel_format_count.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_get_supported_pixel_format_name"):
         lib.decklink_get_supported_pixel_format_name.argtypes = [
             ctypes.c_void_p,
@@ -132,18 +211,18 @@ def _configure_function_signatures(lib):
             ctypes.c_int,
         ]
         lib.decklink_get_supported_pixel_format_name.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_set_pixel_format"):
         lib.decklink_set_pixel_format.argtypes = [
             ctypes.c_void_p,
             ctypes.c_int,
         ]
         lib.decklink_set_pixel_format.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_get_pixel_format"):
         lib.decklink_get_pixel_format.argtypes = [ctypes.c_void_p]
         lib.decklink_get_pixel_format.restype = ctypes.c_int
-    
+
     # HDR metadata functions
     if hasattr(lib, "decklink_set_eotf_metadata"):
         lib.decklink_set_eotf_metadata.argtypes = [
@@ -153,14 +232,14 @@ def _configure_function_signatures(lib):
             ctypes.c_uint16,
         ]
         lib.decklink_set_eotf_metadata.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_set_hdr_metadata"):
         lib.decklink_set_hdr_metadata.argtypes = [
             ctypes.c_void_p,
             ctypes.POINTER(HDRMetadata),
         ]
         lib.decklink_set_hdr_metadata.restype = ctypes.c_int
-    
+
     # Frame data management functions
     if hasattr(lib, "decklink_set_frame_data"):
         lib.decklink_set_frame_data.argtypes = [
@@ -170,25 +249,25 @@ def _configure_function_signatures(lib):
             ctypes.c_int,
         ]
         lib.decklink_set_frame_data.restype = ctypes.c_int
-    
+
     # Frame management functions
     if hasattr(lib, "decklink_create_frame_from_data"):
         lib.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
         lib.decklink_create_frame_from_data.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_schedule_frame_for_output"):
         lib.decklink_schedule_frame_for_output.argtypes = [ctypes.c_void_p]
         lib.decklink_schedule_frame_for_output.restype = ctypes.c_int
-    
+
     if hasattr(lib, "decklink_start_scheduled_playback"):
         lib.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
         lib.decklink_start_scheduled_playback.restype = ctypes.c_int
-    
+
     # Version info functions
     if hasattr(lib, "decklink_get_driver_version"):
         lib.decklink_get_driver_version.argtypes = []
         lib.decklink_get_driver_version.restype = ctypes.c_char_p
-    
+
     if hasattr(lib, "decklink_get_sdk_version"):
         lib.decklink_get_sdk_version.argtypes = []
         lib.decklink_get_sdk_version.restype = ctypes.c_char_p
@@ -212,7 +291,7 @@ def _try_load_decklink_sdk() -> "DecklinkSDKProtocol":
 
     # Configure all function signatures
     _configure_function_signatures(decklink_lib)
-    
+
     return decklink_lib  # type: ignore[return-value]
 
 
@@ -225,6 +304,17 @@ def get_decklink_driver_version():
 
 def get_decklink_sdk_version():
     return DecklinkSDKWrapper.decklink_get_sdk_version().decode("utf-8")
+
+
+def get_decklink_devices():
+    """Get list of available DeckLink device names."""
+    count = DecklinkSDKWrapper.decklink_get_device_count()
+    devices = []
+    for i in range(count):
+        name = ctypes.create_string_buffer(256)
+        if DecklinkSDKWrapper.decklink_get_device_name_by_index(i, name, 256) == 0:
+            devices.append(name.value.decode("utf-8"))
+    return devices
 
 
 class BMDDeckLink:
@@ -385,33 +475,3 @@ class BMDDeckLink:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-
-def get_decklink_devices():
-    """Get list of available DeckLink device names."""
-    count = DecklinkSDKWrapper.decklink_get_device_count()
-    devices = []
-    for i in range(count):
-        name = ctypes.create_string_buffer(256)
-        if DecklinkSDKWrapper.decklink_get_device_name_by_index(i, name, 256) == 0:
-            devices.append(name.value.decode("utf-8"))
-    return devices
-
-
-def create_default_hdr_metadata():
-    """Create default HDR metadata with Rec2020 primaries (matching SignalGenHDR sample)."""
-    metadata = HDRMetadata()
-    metadata.EOTF = 3  # PQ
-    metadata.referencePrimaries.RedX = 0.708
-    metadata.referencePrimaries.RedY = 0.292
-    metadata.referencePrimaries.GreenX = 0.170
-    metadata.referencePrimaries.GreenY = 0.797
-    metadata.referencePrimaries.BlueX = 0.131
-    metadata.referencePrimaries.BlueY = 0.046
-    metadata.referencePrimaries.WhiteX = 0.3127
-    metadata.referencePrimaries.WhiteY = 0.3290
-    metadata.maxDisplayMasteringLuminance = 1000.0
-    metadata.minDisplayMasteringLuminance = 0.0001
-    metadata.maxCLL = 1000.0
-    metadata.maxFALL = 50.0
-    return metadata

@@ -13,7 +13,6 @@ from bmd_sg.decklink.bmd_decklink import (
     EOTFType,
     PixelFormatType,
     get_decklink_devices,
-    create_default_hdr_metadata,
     HDRMetadata,
 )
 
@@ -249,7 +248,7 @@ def generate_and_display_image(args, decklink, bit_depth):
         # Set complete HDR metadata if not disabled
         if not args.no_hdr:
             # Create complete HDR metadata with default Rec2020 values
-            hdr_metadata = create_default_hdr_metadata()
+            hdr_metadata = HDRMetadata()
 
             # Update with user-provided values
             hdr_metadata.EOTF = args.eotf.value
