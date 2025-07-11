@@ -32,7 +32,7 @@ class SignalSettings:
     # HDR Metadata
     no_hdr: bool = False
     eotf: EOTFType = EOTFType.PQ
-    max_cll: float = 10000.0  # Note: This is different from DEFAULT_MAX_CLL (1000.0) - keeping as is
+    max_cll: float = DEFAULT_MAX_CLL
     max_fall: float = DEFAULT_MAX_FALL
     max_display_mastering_luminance: float = DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE
     min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
