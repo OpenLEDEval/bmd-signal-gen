@@ -110,13 +110,13 @@ def add_decklink_setup_arguments(parser):
     parser.add_argument(
         "--max-cll",
         type=float,
-        default=1000.0,
+        default=10000.0,
         help="Maximum Content Light Level in cd/m² (default: 1000.0)",
     )
     parser.add_argument(
         "--max-fall",
         type=float,
-        default=50.0,
+        default=400.0, # use a diffuse white of 400 for now
         help="Maximum Frame Average Light Level in cd/m² (default: 50.0)",
     )
     
