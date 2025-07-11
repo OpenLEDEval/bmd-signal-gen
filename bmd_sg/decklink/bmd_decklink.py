@@ -52,26 +52,6 @@ class EOTFType(Enum):
             raise ValueError(f"Invalid EOTF value: {value}. Use one of: {valid}")
 
 
-def _try_load_decklink_sdk():
-    lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
-    try:
-        # Try to load from the lib directory relative to this script
-        if lib_path.exists() and lib_path.is_file():
-            decklink = ctypes.CDLL(str(lib_path))
-        else:
-            raise FileNotFoundError(
-                f"Could not find libdecklink.dylib in Python project: {lib_path.absolute()}"
-            )
-        return decklink
-    except OSError as error:
-        raise OSError(
-            f"Failed to load DeckLink library from {lib_path.absolute()}"
-        ) from error
-
-
-DecklinkSDKWrapper = _try_load_decklink_sdk()
-
-
 # Complete HDR metadata structures (matching C++ implementation)
 class ChromaticityCoordinates(ctypes.Structure):
     """Chromaticity coordinates for display primaries and white point."""
@@ -101,107 +81,124 @@ class HDRMetadata(ctypes.Structure):
     ]
 
 
-# Define function signatures
-DecklinkSDKWrapper.decklink_get_device_count.argtypes = []
-DecklinkSDKWrapper.decklink_get_device_count.restype = ctypes.c_int
+def _try_load_decklink_sdk():
+    lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
+    try:
+        # Try to load from the lib directory relative to this script
+        if lib_path.exists() and lib_path.is_file():
+            decklink_tmp = ctypes.CDLL(lib_path)
+        else:
+            raise FileNotFoundError(
+                f"Could not find libdecklink.dylib in Python project: {lib_path.absolute()}"
+            )
+    except OSError as error:
+        raise OSError(
+            f"Failed to load DeckLink library from {lib_path.absolute()}"
+        ) from error
 
-DecklinkSDKWrapper.decklink_get_device_name_by_index.argtypes = [
-    ctypes.c_int,
-    ctypes.c_char_p,
-    ctypes.c_int,
-]
-DecklinkSDKWrapper.decklink_get_device_name_by_index.restype = ctypes.c_int
+    # Define function signatures
+    decklink_tmp.decklink_get_device_count.argtypes = []
+    decklink_tmp.decklink_get_device_count.restype = ctypes.c_int
 
-DecklinkSDKWrapper.decklink_open_output_by_index.argtypes = [ctypes.c_int]
-DecklinkSDKWrapper.decklink_open_output_by_index.restype = ctypes.c_void_p
-
-DecklinkSDKWrapper.decklink_close.argtypes = [ctypes.c_void_p]
-DecklinkSDKWrapper.decklink_close.restype = None
-
-DecklinkSDKWrapper.decklink_start_output.argtypes = [ctypes.c_void_p]
-DecklinkSDKWrapper.decklink_start_output.restype = ctypes.c_int
-
-DecklinkSDKWrapper.decklink_stop_output.argtypes = [ctypes.c_void_p]
-DecklinkSDKWrapper.decklink_stop_output.restype = ctypes.c_int
-
-DecklinkSDKWrapper.decklink_get_supported_pixel_format_count.argtypes = [
-    ctypes.c_void_p
-]
-DecklinkSDKWrapper.decklink_get_supported_pixel_format_count.restype = ctypes.c_int
-
-DecklinkSDKWrapper.decklink_get_supported_pixel_format_name.argtypes = [
-    ctypes.c_void_p,
-    ctypes.c_int,
-    ctypes.c_char_p,
-    ctypes.c_int,
-]
-DecklinkSDKWrapper.decklink_get_supported_pixel_format_name.restype = ctypes.c_int
-
-# Add the new function signatures
-if hasattr(DecklinkSDKWrapper, "decklink_set_pixel_format"):
-    DecklinkSDKWrapper.decklink_set_pixel_format.argtypes = [
-        ctypes.c_void_p,
+    decklink_tmp.decklink_get_device_name_by_index.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
         ctypes.c_int,
     ]
-    DecklinkSDKWrapper.decklink_set_pixel_format.restype = ctypes.c_int
+    decklink_tmp.decklink_get_device_name_by_index.restype = ctypes.c_int
 
-if hasattr(DecklinkSDKWrapper, "decklink_get_pixel_format"):
-    DecklinkSDKWrapper.decklink_get_pixel_format.argtypes = [ctypes.c_void_p]
-    DecklinkSDKWrapper.decklink_get_pixel_format.restype = ctypes.c_int
+    decklink_tmp.decklink_open_output_by_index.argtypes = [ctypes.c_int]
+    decklink_tmp.decklink_open_output_by_index.restype = ctypes.c_void_p
 
-if hasattr(DecklinkSDKWrapper, "decklink_set_eotf_metadata"):
-    DecklinkSDKWrapper.decklink_set_eotf_metadata.argtypes = [
+    decklink_tmp.decklink_close.argtypes = [ctypes.c_void_p]
+    decklink_tmp.decklink_close.restype = None
+
+    decklink_tmp.decklink_start_output.argtypes = [ctypes.c_void_p]
+    decklink_tmp.decklink_start_output.restype = ctypes.c_int
+
+    decklink_tmp.decklink_stop_output.argtypes = [ctypes.c_void_p]
+    decklink_tmp.decklink_stop_output.restype = ctypes.c_int
+
+    decklink_tmp.decklink_get_supported_pixel_format_count.argtypes = [ctypes.c_void_p]
+    decklink_tmp.decklink_get_supported_pixel_format_count.restype = ctypes.c_int
+
+    decklink_tmp.decklink_get_supported_pixel_format_name.argtypes = [
         ctypes.c_void_p,
         ctypes.c_int,
-        ctypes.c_uint16,
-        ctypes.c_uint16,
-    ]
-    DecklinkSDKWrapper.decklink_set_eotf_metadata.restype = ctypes.c_int
-
-# Complete HDR metadata function
-if hasattr(DecklinkSDKWrapper, "decklink_set_hdr_metadata"):
-    DecklinkSDKWrapper.decklink_set_hdr_metadata.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(HDRMetadata),
-    ]
-    DecklinkSDKWrapper.decklink_set_hdr_metadata.restype = ctypes.c_int
-
-# Frame data management
-if hasattr(DecklinkSDKWrapper, "decklink_set_frame_data"):
-    DecklinkSDKWrapper.decklink_set_frame_data.argtypes = [
-        ctypes.c_void_p,
-        ctypes.POINTER(ctypes.c_uint16),
-        ctypes.c_int,
+        ctypes.c_char_p,
         ctypes.c_int,
     ]
-    DecklinkSDKWrapper.decklink_set_frame_data.restype = ctypes.c_int
+    decklink_tmp.decklink_get_supported_pixel_format_name.restype = ctypes.c_int
 
-# Frame management
-if hasattr(DecklinkSDKWrapper, "decklink_create_frame_from_data"):
-    DecklinkSDKWrapper.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
-    DecklinkSDKWrapper.decklink_create_frame_from_data.restype = ctypes.c_int
+    # Add the new function signatures
+    if hasattr(decklink_tmp, "decklink_set_pixel_format"):
+        decklink_tmp.decklink_set_pixel_format.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        decklink_tmp.decklink_set_pixel_format.restype = ctypes.c_int
 
-if hasattr(DecklinkSDKWrapper, "decklink_schedule_frame_for_output"):
-    DecklinkSDKWrapper.decklink_schedule_frame_for_output.argtypes = [ctypes.c_void_p]
-    DecklinkSDKWrapper.decklink_schedule_frame_for_output.restype = ctypes.c_int
+    if hasattr(decklink_tmp, "decklink_get_pixel_format"):
+        decklink_tmp.decklink_get_pixel_format.argtypes = [ctypes.c_void_p]
+        decklink_tmp.decklink_get_pixel_format.restype = ctypes.c_int
 
-if hasattr(DecklinkSDKWrapper, "decklink_start_scheduled_playback"):
-    DecklinkSDKWrapper.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
-    DecklinkSDKWrapper.decklink_start_scheduled_playback.restype = ctypes.c_int
+    if hasattr(decklink_tmp, "decklink_set_eotf_metadata"):
+        decklink_tmp.decklink_set_eotf_metadata.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_uint16,
+            ctypes.c_uint16,
+        ]
+        decklink_tmp.decklink_set_eotf_metadata.restype = ctypes.c_int
 
-# Version info
-if hasattr(DecklinkSDKWrapper, "decklink_get_driver_version"):
-    DecklinkSDKWrapper.decklink_get_driver_version.argtypes = []
-    DecklinkSDKWrapper.decklink_get_driver_version.restype = ctypes.c_char_p
+    # Complete HDR metadata function
+    if hasattr(decklink_tmp, "decklink_set_hdr_metadata"):
+        decklink_tmp.decklink_set_hdr_metadata.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(HDRMetadata),
+        ]
+        decklink_tmp.decklink_set_hdr_metadata.restype = ctypes.c_int
+
+    # Frame data management
+    if hasattr(decklink_tmp, "decklink_set_frame_data"):
+        decklink_tmp.decklink_set_frame_data.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint16),
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        decklink_tmp.decklink_set_frame_data.restype = ctypes.c_int
+
+    # Frame management
+    if hasattr(decklink_tmp, "decklink_create_frame_from_data"):
+        decklink_tmp.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
+        decklink_tmp.decklink_create_frame_from_data.restype = ctypes.c_int
+
+    if hasattr(decklink_tmp, "decklink_schedule_frame_for_output"):
+        decklink_tmp.decklink_schedule_frame_for_output.argtypes = [ctypes.c_void_p]
+        decklink_tmp.decklink_schedule_frame_for_output.restype = ctypes.c_int
+
+    if hasattr(decklink_tmp, "decklink_start_scheduled_playback"):
+        decklink_tmp.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
+        decklink_tmp.decklink_start_scheduled_playback.restype = ctypes.c_int
+
+    # Version info
+    if hasattr(decklink_tmp, "decklink_get_driver_version"):
+        decklink_tmp.decklink_get_driver_version.argtypes = []
+        decklink_tmp.decklink_get_driver_version.restype = ctypes.c_char_p
+
+    if hasattr(decklink_tmp, "decklink_get_sdk_version"):
+        decklink_tmp.decklink_get_sdk_version.argtypes = []
+        decklink_tmp.decklink_get_sdk_version.restype = ctypes.c_char_p
+
+    return decklink_tmp
+
+
+DecklinkSDKWrapper = _try_load_decklink_sdk()
 
 
 def get_decklink_driver_version():
     return DecklinkSDKWrapper.decklink_get_driver_version().decode("utf-8")
-
-
-if hasattr(DecklinkSDKWrapper, "decklink_get_sdk_version"):
-    DecklinkSDKWrapper.decklink_get_sdk_version.argtypes = []
-    DecklinkSDKWrapper.decklink_get_sdk_version.restype = ctypes.c_char_p
 
 
 def get_decklink_sdk_version():
