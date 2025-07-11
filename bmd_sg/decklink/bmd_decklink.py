@@ -112,7 +112,7 @@ class PixelFormatType(Enum):
         return f"{self.name[8:]}"
 
 
-class EOTFType(Enum):
+class EOTFType(str, Enum):
     """
     Enumeration of Electro-Optical Transfer Function (EOTF) types.
 
@@ -140,10 +140,24 @@ class EOTFType(Enum):
     3
     """
 
-    RESERVED = 0
-    SDR = 1
-    PQ = 2
-    HLG = 3
+    RESERVED = ("RESERVED", 0)
+    SDR = ("SDR", 1)
+    PQ = ("PQ", 2)
+    HLG = ("HLG", 3)
+
+    def __new__(cls, value, *args):
+        self = str.__new__(cls, value)
+        self._value_ = value
+        for a in args:
+            self._add_value_alias_(a)
+        return self
+
+    def __init__(
+        self,
+        _: str,
+        int_value: int,
+    ):
+        self.int_value = int_value
 
     def __str__(self):
         """
@@ -154,7 +168,7 @@ class EOTFType(Enum):
         str
             Format: "value=name" (e.g., "2=PQ")
         """
-        return f"{self.value}={self.name}"
+        return f'{self.value}="{self.value}"={self.int_value}'
 
     @classmethod
     def parse(cls, value):
@@ -184,17 +198,28 @@ class EOTFType(Enum):
         >>> EOTFType.parse("hlg")
         <EOTFType.HLG: 3>
         """
-        # Try integer value
-        try:
-            return cls(int(value))
-        except (ValueError, KeyError):
-            pass
-        # Try by name (case-insensitive)
-        try:
-            return cls[value.upper()]
-        except KeyError:
-            valid = ", ".join(f"{e.value} ({e.name})" for e in cls)
-            raise ValueError(f"Invalid EOTF value: {value}. Use one of: {valid}")
+        # Try integer value - match by int_value
+        if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+            int_val = int(value)
+            for member in cls:
+                if member.int_value == int_val:
+                    return member
+
+        # Try string value - match by str_value (case-insensitive)
+        if isinstance(value, str):
+            str_val = value.upper()
+            for member in cls:
+                if member.value.upper() == str_val:
+                    return member
+            # Also try by enum name
+            try:
+                return cls[str_val]
+            except KeyError:
+                pass
+
+        # Build error message with valid options
+        valid = ", ".join(f"{e.int_value} ({e.value})" for e in cls)
+        raise ValueError(f"Invalid EOTF value: {value}. Use one of: {valid}")
 
 
 # Complete HDR metadata structures (matching C++ implementation)

@@ -10,10 +10,14 @@ dependencies = [
     "pydantic>=2.7.1",
     "pyyaml>=6.0.1",
     "uvicorn>=0.35.0",
+    "typer>=0.16,<0.17",
+    "rich>=14.0.0",
+    "aenum>=3.1.16",
 ]
 
 [project.scripts]
 bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:main"
+bmd_signal_gen2 = "bmd_sg.scripts.bmd_signal_gen2:app"
 
 [build-system]
 requires = ["hatchling"]

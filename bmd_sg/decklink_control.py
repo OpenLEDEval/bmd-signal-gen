@@ -5,15 +5,14 @@ It can be executed directly from the command line as a script, or used as part
 of the HTTP API.
 """
 
-import time
 from typing import Optional
 
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
     EOTFType,
+    HDRMetadata,
     PixelFormatType,
     get_decklink_devices,
-    HDRMetadata,
 )
 
 from .patterns import PatternGenerator, PatternType
@@ -217,7 +216,7 @@ def generate_and_display_image(args, decklink, bit_depth):
     try:
         # Start the DeckLink output first
         decklink.start()
-        
+
         # Create pattern generator
         generator = PatternGenerator(
             width=args.width,
@@ -234,7 +233,9 @@ def generate_and_display_image(args, decklink, bit_depth):
         if args.pattern == PatternType.SOLID:
             image = generator.generate((args.r, args.g, args.b))
         elif args.pattern == PatternType.TWO_COLOR:
-            image = generator.generate((args.r, args.g, args.b), (args.r2, args.g2, args.b2))
+            image = generator.generate(
+                (args.r, args.g, args.b), (args.r2, args.g2, args.b2)
+            )
         elif args.pattern == PatternType.FOUR_COLOR:
             image = generator.generate(
                 (args.r, args.g, args.b),
@@ -251,12 +252,16 @@ def generate_and_display_image(args, decklink, bit_depth):
             hdr_metadata = HDRMetadata()
 
             # Update with user-provided values
-            hdr_metadata.EOTF = args.eotf.value
+            hdr_metadata.EOTF = args.eotf.int_value
             hdr_metadata.maxCLL = float(args.max_cll)
             hdr_metadata.maxFALL = float(args.max_fall)
             # Set mastering display luminance
-            hdr_metadata.maxDisplayMasteringLuminance = float(args.max_display_mastering_luminance)
-            hdr_metadata.minDisplayMasteringLuminance = float(args.min_display_mastering_luminance)
+            hdr_metadata.maxDisplayMasteringLuminance = float(
+                args.max_display_mastering_luminance
+            )
+            hdr_metadata.minDisplayMasteringLuminance = float(
+                args.min_display_mastering_luminance
+            )
             # Set display primaries and white point chromaticity coordinates
             hdr_metadata.referencePrimaries.RedX = float(args.red[0])
             hdr_metadata.referencePrimaries.RedY = float(args.red[1])
@@ -271,8 +276,10 @@ def generate_and_display_image(args, decklink, bit_depth):
             decklink.set_hdr_metadata(hdr_metadata)
         else:
             # Use legacy EOTF method for SDR
-            decklink.set_frame_eotf(args.eotf.value, args.max_cll, args.max_fall)
-            print(f"Set basic EOTF metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}")
+            decklink.set_frame_eotf(args.eotf.int_value, args.max_cll, args.max_fall)
+            print(
+                f"Set basic EOTF metadata: EOTF={args.eotf}, MaxCLL={args.max_cll}, MaxFALL={args.max_fall}"
+            )
 
         # Set frame data and create frame
         decklink.set_frame_data(image)
@@ -281,7 +288,7 @@ def generate_and_display_image(args, decklink, bit_depth):
         decklink.start_playback()
 
         print(f"Generated {args.pattern.value} pattern: {args.width}x{args.height}")
-        
+
         return True
 
     except Exception as e:
