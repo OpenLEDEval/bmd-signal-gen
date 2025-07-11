@@ -2,6 +2,21 @@ from typing import Tuple, List, Optional
 from enum import Enum
 import numpy as np
 
+# Pattern generation constants
+DEFAULT_BIT_DEPTH = 12
+DEFAULT_PATTERN_TYPE = "solid"
+
+# Bit depth ranges
+BIT_DEPTH_8_MIN = 0
+BIT_DEPTH_8_MAX = 255
+BIT_DEPTH_10_MIN = 0
+BIT_DEPTH_10_MAX = 1023
+BIT_DEPTH_12_MIN = 0
+BIT_DEPTH_12_MAX = 4095
+
+# Default colors (12-bit red)
+DEFAULT_COLOR_12BIT = (4095, 0, 0)
+
 class PatternType(Enum):
     """Enumeration of supported pattern types."""
     SOLID = "solid"
@@ -13,11 +28,11 @@ class ColorValidator:
     def __init__(self, bit_depth: int) -> None:
         self.bit_depth = bit_depth
         if bit_depth == 8:
-            self.min_val, self.max_val = 0, 255
+            self.min_val, self.max_val = BIT_DEPTH_8_MIN, BIT_DEPTH_8_MAX
         elif bit_depth == 10:
-            self.min_val, self.max_val = 0, 1023
+            self.min_val, self.max_val = BIT_DEPTH_10_MIN, BIT_DEPTH_10_MAX
         else:  # 12-bit
-            self.min_val, self.max_val = 0, 4095
+            self.min_val, self.max_val = BIT_DEPTH_12_MIN, BIT_DEPTH_12_MAX
 
     def validate_color(self, r: int, g: int, b: int, color_name: str = "Color") -> None:
         """Validate RGB color values."""
@@ -31,7 +46,7 @@ class ColorValidator:
 
 class PatternGenerator:
     """Generates image patterns with validation and ROI support."""
-    def __init__(self, width: int, height: int, bit_depth: int = 12, pattern_type: PatternType = PatternType.SOLID,
+    def __init__(self, width: int, height: int, bit_depth: int = DEFAULT_BIT_DEPTH, pattern_type: PatternType = PatternType.SOLID,
                  roi_x: int = 0, roi_y: int = 0, roi_width: Optional[int] = None, roi_height: Optional[int] = None) -> None:
         self.width = width
         self.height = height

@@ -2,7 +2,12 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 from bmd_sg.decklink.bmd_decklink import EOTFType
-from bmd_sg.pattern_generator import PatternType
+from bmd_sg.pattern_generator import PatternType, DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT
+from bmd_sg.signal_generator import (
+    DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_MAX_CLL, DEFAULT_MAX_FALL,
+    DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE, DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
+    REC2020_RED_PRIMARY, REC2020_GREEN_PRIMARY, REC2020_BLUE_PRIMARY, D65_WHITE_POINT
+)
 
 
 @dataclass
@@ -10,13 +15,13 @@ class SignalSettings:
     """Dataclass to hold all signal generation settings."""
 
     # Video settings
-    width: int = 1920
-    height: int = 1080
-    bit_depth: int = 12
+    width: int = DEFAULT_WIDTH
+    height: int = DEFAULT_HEIGHT
+    bit_depth: int = DEFAULT_BIT_DEPTH
 
     # Pattern settings
     pattern: PatternType = PatternType.SOLID
-    colors: List[Tuple[int, int, int]] = field(default_factory=lambda: [(4095, 0, 0)])
+    colors: List[Tuple[int, int, int]] = field(default_factory=lambda: [DEFAULT_COLOR_12BIT])
 
     # Region of Interest
     roi_x: int = 0
@@ -27,11 +32,11 @@ class SignalSettings:
     # HDR Metadata
     no_hdr: bool = False
     eotf: EOTFType = EOTFType.PQ
-    max_cll: float = 10000.0
-    max_fall: float = 400.0
-    max_display_mastering_luminance: float = 1000.0
-    min_display_mastering_luminance: float = 0.0001
-    red_primary: Tuple[float, float] = (0.708, 0.292)
-    green_primary: Tuple[float, float] = (0.170, 0.797)
-    blue_primary: Tuple[float, float] = (0.131, 0.046)
-    white_point: Tuple[float, float] = (0.3127, 0.3290)
+    max_cll: float = 10000.0  # Note: This is different from DEFAULT_MAX_CLL (1000.0) - keeping as is
+    max_fall: float = DEFAULT_MAX_FALL
+    max_display_mastering_luminance: float = DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE
+    min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
+    red_primary: Tuple[float, float] = REC2020_RED_PRIMARY
+    green_primary: Tuple[float, float] = REC2020_GREEN_PRIMARY
+    blue_primary: Tuple[float, float] = REC2020_BLUE_PRIMARY
+    white_point: Tuple[float, float] = D65_WHITE_POINT

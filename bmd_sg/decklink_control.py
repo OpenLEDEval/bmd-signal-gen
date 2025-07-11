@@ -13,7 +13,7 @@ from bmd_sg.decklink.bmd_decklink import (
     get_decklink_devices,
 )
 
-from bmd_sg.pattern_generator import PatternGenerator
+from bmd_sg.pattern_generator import PatternGenerator, BIT_DEPTH_8_MAX, BIT_DEPTH_10_MAX, BIT_DEPTH_12_MAX
 from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
 
 # Global DeckLink instance for API usage

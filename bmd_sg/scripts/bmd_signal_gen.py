@@ -21,8 +21,21 @@ from bmd_sg.decklink_control import (
     initialize_decklink_for_api,
     setup_decklink_device,
 )
-from bmd_sg.pattern_generator import PatternType
-from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
+from bmd_sg.pattern_generator import PatternType, DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT, BIT_DEPTH_12_MAX, BIT_DEPTH_10_MAX, BIT_DEPTH_8_MAX
+from bmd_sg.signal_generator import (
+    DeckLinkSettings, 
+    PatternSettings,
+    DEFAULT_WIDTH,
+    DEFAULT_HEIGHT,
+    DEFAULT_MAX_CLL,
+    DEFAULT_MAX_FALL,
+    DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE,
+    DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
+    REC2020_RED_PRIMARY,
+    REC2020_GREEN_PRIMARY,
+    REC2020_BLUE_PRIMARY,
+    D65_WHITE_POINT
+)
 
 pat_server = FastAPI()
 pat_server.include_router(bmd_router)
@@ -78,9 +91,9 @@ def main() -> int:
         "device with HDR metadata support. The pattern can be configured by "
         "an http API for remote automation"
         "\n\nColor value ranges by pixel format:"
-        "\n  12-bit:  0-4095 (default, recommended)"
-        "\n  10-bit:  0-1023"
-        "\n  8-bit:   0-255 (fallback mode)"
+        f"\n  12-bit:  0-{BIT_DEPTH_12_MAX} (default, recommended)"
+        f"\n  10-bit:  0-{BIT_DEPTH_10_MAX}"
+        f"\n  8-bit:   0-{BIT_DEPTH_8_MAX} (fallback mode)"
         "\n\nPattern types:"
         "\n  solid: Single color (default)"
         "\n  2color: Two-color checkerboard"
@@ -101,10 +114,10 @@ def main() -> int:
         help="Pixel format index (leave blank for auto-select)",
     )
     parser.add_argument(
-        "--width", type=int, default=1920, help="Image width (default: 1920)"
+        "--width", type=int, default=DEFAULT_WIDTH, help=f"Image width (default: {DEFAULT_WIDTH})"
     )
     parser.add_argument(
-        "--height", type=int, default=1080, help="Image height (default: 1080)"
+        "--height", type=int, default=DEFAULT_HEIGHT, help=f"Image height (default: {DEFAULT_HEIGHT})"
     )
     parser.add_argument(
         "--pattern",
@@ -117,8 +130,8 @@ def main() -> int:
         "--colors",
         nargs='+',
         type=int,
-        default=[4095, 0, 0],
-        help="List of colors as R G B values. E.g., --colors 4095 0 0 0 4095 0",
+        default=list(DEFAULT_COLOR_12BIT),
+        help=f"List of colors as R G B values. E.g., --colors {DEFAULT_COLOR_12BIT[0]} {DEFAULT_COLOR_12BIT[1]} {DEFAULT_COLOR_12BIT[2]} 0 {BIT_DEPTH_12_MAX} 0",
     )
     parser.add_argument(
         "--roi-x", type=int, default=0, help="Region of interest X offset (default: 0)"
@@ -149,62 +162,62 @@ def main() -> int:
     parser.add_argument(
         "--max-cll",
         type=float,
-        default=1000.0,
-        help="Maximum Content Light Level in cd/m² (default: 1000.0)",
+        default=DEFAULT_MAX_CLL,
+        help=f"Maximum Content Light Level in cd/m² (default: {DEFAULT_MAX_CLL})",
     )
     parser.add_argument(
         "--max-fall",
         type=float,
-        default=400.0,
-        help="Maximum Frame Average Light Level in cd/m² (default: 400.0)",
+        default=DEFAULT_MAX_FALL,
+        help=f"Maximum Frame Average Light Level in cd/m² (default: {DEFAULT_MAX_FALL})",
     )
     parser.add_argument(
         "--max-display-mastering-luminance",
         type=float,
-        default=1000.0,
-        help="Maximum display mastering luminance in cd/m² (default: 1000.0)",
+        default=DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE,
+        help=f"Maximum display mastering luminance in cd/m² (default: {DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE})",
     )
     parser.add_argument(
         "--min-display-mastering-luminance",
         type=float,
-        default=0.0001,
-        help="Minimum display mastering luminance in cd/m² (default: 0.0001)",
+        default=DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
+        help=f"Minimum display mastering luminance in cd/m² (default: {DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE})",
     )
     parser.add_argument(
         "--red-primary",
         nargs=2,
         type=float,
-        default=(0.708, 0.292),
+        default=REC2020_RED_PRIMARY,
         action=ChromaticityAction,
         metavar=('X', 'Y'),
-        help="Red primary coordinates (default: 0.708 0.292 for Rec2020)",
+        help=f"Red primary coordinates (default: {REC2020_RED_PRIMARY[0]} {REC2020_RED_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
         "--green-primary",
         nargs=2,
         type=float,
-        default=(0.170, 0.797),
+        default=REC2020_GREEN_PRIMARY,
         action=ChromaticityAction,
         metavar=('X', 'Y'),
-        help="Green primary coordinates (default: 0.170 0.797 for Rec2020)",
+        help=f"Green primary coordinates (default: {REC2020_GREEN_PRIMARY[0]} {REC2020_GREEN_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
         "--blue-primary",
         nargs=2,
         type=float,
-        default=(0.131, 0.046),
+        default=REC2020_BLUE_PRIMARY,
         action=ChromaticityAction,
         metavar=('X', 'Y'),
-        help="Blue primary coordinates (default: 0.131 0.046 for Rec2020)",
+        help=f"Blue primary coordinates (default: {REC2020_BLUE_PRIMARY[0]} {REC2020_BLUE_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
         "--white-point",
         nargs=2,
         type=float,
-        default=(0.3127, 0.3290),
+        default=D65_WHITE_POINT,
         action=ChromaticityAction,
         metavar=('X', 'Y'),
-        help="White point coordinates (default: 0.3127 0.3290 for D65)",
+        help=f"White point coordinates (default: {D65_WHITE_POINT[0]} {D65_WHITE_POINT[1]} for D65)",
     )
     parser.add_argument(
         "--duration",
@@ -249,7 +262,7 @@ def main() -> int:
         roi_y=args.roi_y,
         roi_width=args.roi_width,
         roi_height=args.roi_height,
-        bit_depth=bit_depth if bit_depth is not None else 12,
+        bit_depth=bit_depth if bit_depth is not None else DEFAULT_BIT_DEPTH,
     )
 
     success = display_pattern(pattern_settings, decklink)

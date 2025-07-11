@@ -7,7 +7,12 @@ from pydantic import BaseModel, Field, validator
 
 import bmd_sg.decklink_control as decklink_control
 from bmd_sg.pattern_generator import PatternType
-from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
+from bmd_sg.signal_generator import (
+    DeckLinkSettings, 
+    PatternSettings,
+    DEFAULT_WIDTH,
+    DEFAULT_HEIGHT
+)
 
 
 router = APIRouter()
@@ -119,8 +124,8 @@ async def display_pattern(request: Request, body: Any = Body(...)):
         roi_width=pattern_request.roi_width,
         roi_height=pattern_request.roi_height,
         bit_depth=decklink_control.decklink_bit_depth,
-        width=decklink_control.decklink_width or 1920,
-        height=decklink_control.decklink_height or 1080,
+        width=decklink_control.decklink_width or DEFAULT_WIDTH,
+        height=decklink_control.decklink_height or DEFAULT_HEIGHT,
     )
 
     # Display the pattern
