@@ -9,11 +9,11 @@ from typing import Optional
 
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
+    HDRMetadata,
     PixelFormatType,
     get_decklink_devices,
 )
-
-from bmd_sg.pattern_generator import PatternGenerator, BIT_DEPTH_8_MAX, BIT_DEPTH_10_MAX, BIT_DEPTH_12_MAX
+from bmd_sg.pattern_generator import PatternGenerator
 from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
 
 # Global DeckLink instance for API usage
@@ -163,9 +163,6 @@ def initialize_decklink_for_api(
     return success, error
 
 
-
-
-
 def display_pattern(settings: PatternSettings, decklink: BMDDeckLink):
     """Generate and display a pattern on the DeckLink device."""
     try:
@@ -190,7 +187,9 @@ def display_pattern(settings: PatternSettings, decklink: BMDDeckLink):
         decklink.schedule_frame()
         decklink.start_playback()
 
-        print(f"Generated {settings.pattern.value} pattern: {settings.width}x{settings.height}")
+        print(
+            f"Generated {settings.pattern.value} pattern: {settings.width}x{settings.height}"
+        )
 
         return True
 
@@ -204,7 +203,9 @@ def cleanup_decklink_device(decklink):
     decklink.close()
 
 
-def setup_decklink_device(settings: DeckLinkSettings, device_index: int, pixel_format_index: Optional[int]):
+def setup_decklink_device(
+    settings: DeckLinkSettings, device_index: int, pixel_format_index: Optional[int]
+):
     """Setup DeckLink for CLI usage. Returns (decklink, bit_depth, devices)."""
     success, decklink, bit_depth, devices, error = _initialize_decklink_device(
         device_index, pixel_format_index, show_logs=True, use_global=False
@@ -220,10 +221,10 @@ def setup_decklink_device(settings: DeckLinkSettings, device_index: int, pixel_f
     # Set complete HDR metadata if not disabled
     if not settings.no_hdr:
         # Create complete HDR metadata with default Rec2020 values
-        hdr_metadata = create_default_hdr_metadata()
+        hdr_metadata = HDRMetadata()
 
         # Update with user-provided values
-        hdr_metadata.EOTF = settings.eotf.value
+        hdr_metadata.EOTF = settings.eotf.int_value
         hdr_metadata.maxCLL = float(settings.max_cll)
         hdr_metadata.maxFALL = float(settings.max_fall)
         # Set mastering display luminance

@@ -164,6 +164,7 @@ The project supports complete HDR metadata with:
 - Display primaries (Rec2020 by default)
 - Mastering display luminance values
 - MaxCLL/MaxFALL content light levels
+- **MaxCLL default value for this project is 10,000 nits**
 
 ### Device Management
 

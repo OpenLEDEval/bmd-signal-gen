@@ -15,10 +15,11 @@ from typer import Argument, Option
 from bmd_sg.decklink.bmd_decklink import EOTFType
 from bmd_sg.decklink_control import (
     cleanup_decklink_device,
-    generate_and_display_image,
+    display_pattern,
     setup_decklink_device,
 )
-from bmd_sg.patterns import PatternType
+from bmd_sg.pattern_generator import PatternType
+from bmd_sg.signal_generator import DeckLinkSettings, PatternSettings
 
 app = typer.Typer(
     add_completion=False,
@@ -416,14 +417,44 @@ def pat2(
     args.r3, args.g3, args.b3 = cfg.color3
     args.r4, args.g4, args.b4 = cfg.color4
 
+    # Create DeckLink settings
+    decklink_settings = DeckLinkSettings(
+        width=cfg.width,
+        height=cfg.height,
+        no_hdr=cfg.no_hdr,
+        eotf=cfg.eotf,
+        max_cll=cfg.max_cll,
+        max_fall=cfg.max_fall,
+        max_display_mastering_luminance=cfg.max_display_mastering_luminance,
+        min_display_mastering_luminance=cfg.min_display_mastering_luminance,
+        red_primary=cfg.red_primary,
+        green_primary=cfg.green_primary,
+        blue_primary=cfg.blue_primary,
+        white_point=cfg.white_primary,
+    )
+    
     # Setup DeckLink device
-    decklink, bit_depth, _ = setup_decklink_device(args)
+    decklink, bit_depth, _ = setup_decklink_device(decklink_settings, cfg.device, cfg.pixel_format)
     if decklink is None:
         typer.echo("Failed to setup DeckLink device", err=True)
         raise typer.Exit(1)
 
+    # Create pattern settings
+    pattern_settings = PatternSettings(
+        pattern=cfg.pattern,
+        colors=[(cfg.color1[0], cfg.color1[1], cfg.color1[2]),
+                (cfg.color2[0], cfg.color2[1], cfg.color2[2])],
+        bit_depth=bit_depth or 12,  # Default to 12-bit if None
+        width=cfg.width,
+        height=cfg.height,
+        roi_x=cfg.roi_x,
+        roi_y=cfg.roi_y,
+        roi_width=cfg.roi_width,
+        roi_height=cfg.roi_height,
+    )
+    
     # Generate and display image
-    success = generate_and_display_image(args, decklink, bit_depth)
+    success = display_pattern(pattern_settings, decklink)
     if success:
         typer.echo(f"Displaying for {cfg.duration} seconds...")
         time.sleep(cfg.duration)
