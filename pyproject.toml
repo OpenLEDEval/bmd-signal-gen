@@ -16,8 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:main"
-bmd_signal_gen2 = "bmd_sg.scripts.bmd_signal_gen2:app"
+bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:app"
 
 [build-system]
 requires = ["hatchling"]

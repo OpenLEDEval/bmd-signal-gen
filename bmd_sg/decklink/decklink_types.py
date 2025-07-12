@@ -67,16 +67,14 @@ class DecklinkSDKProtocol(Protocol):
         ...
 
     # HDR metadata functions
-    def decklink_set_eotf_metadata(
-        self, handle: ctypes.c_void_p, eotf: int, max_cll: int, max_fall: int
-    ) -> int:
-        """Set EOTF metadata (legacy method)."""
-        ...
-
     def decklink_set_hdr_metadata(
         self, handle: ctypes.c_void_p, metadata: ctypes.POINTER(HDRMetadata)
     ) -> int:
         """Set complete HDR metadata."""
+        ...
+
+    def decklink_device_supports_hdr(self, handle: ctypes.c_void_p) -> bool:
+        """Check if device supports HDR metadata."""
         ...
 
     # Frame data management functions

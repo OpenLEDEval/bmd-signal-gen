@@ -60,8 +60,7 @@ public:
     
     // Frame management
     int createFrame();
-    int scheduleFrame();
-    int startPlayback();
+    int displayFrameSync();
     
     // Pixel format management
     int setPixelFormat(int pixelFormatIndex);
@@ -127,8 +126,6 @@ int decklink_stop_output(DeckLinkHandle handle);
 
 // Frame management
 int decklink_create_frame_from_data(DeckLinkHandle handle);
-int decklink_schedule_frame_for_output(DeckLinkHandle handle);
-int decklink_start_scheduled_playback(DeckLinkHandle handle);
 
 // Pixel format management
 int decklink_get_supported_pixel_format_count(DeckLinkHandle handle);
@@ -141,6 +138,12 @@ int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata* metadata
 
 // Frame data management
 int decklink_set_frame_data(DeckLinkHandle handle, const uint16_t* data, int width, int height);
+
+// Synchronous display
+int decklink_display_frame_sync(DeckLinkHandle handle);
+
+// HDR capability detection
+bool decklink_device_supports_hdr(DeckLinkHandle handle);
 
 // Version info
 const char* decklink_get_driver_version();

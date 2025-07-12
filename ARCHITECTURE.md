@@ -46,7 +46,7 @@ These settings are encapsulated in the `PatternSettings` dataclass. Patterns can
 *   `bmd_sg/signal_generator.py`: Defines the `DeckLinkSettings` and `PatternSettings` dataclasses.
 *   `bmd_sg/decklink_control.py`: Contains core functions for DeckLink device initialization (`setup_decklink_device`) and pattern display (`display_pattern`).
 *   `bmd_sg/api.py`: Implements the HTTP API endpoints for setting up the DeckLink device and displaying patterns.
-*   `bmd_sg/scripts/bmd_signal_gen.py`: The main CLI entry point, responsible for parsing arguments and orchestrating the setup and display process.
+*   `bmd_sg/scripts/bmd_signal_gen.py`: The main CLI entry point using Typer, responsible for parsing arguments and orchestrating the setup and display process.
 *   `bmd_sg/patterns.py`: Contains the `PatternGenerator` class and `PatternType` enum for creating various visual patterns.
 
 This separation ensures that the DeckLink device configuration is independent of the pattern being displayed, allowing for greater flexibility and reusability, especially in the context of an API that needs to display multiple patterns dynamically.

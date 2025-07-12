@@ -114,7 +114,6 @@ int DeckLinkSignalGen::startOutput() {
 int DeckLinkSignalGen::stopOutput() {
     if (!m_outputEnabled) return 0;
     
-    m_output->StopScheduledPlayback(0, nullptr, 0);
     m_output->DisableVideoOutput();
     m_outputEnabled = false;
     
@@ -204,36 +203,17 @@ int DeckLinkSignalGen::createFrame() {
     return 0;
 }
 
-int DeckLinkSignalGen::scheduleFrame() {
+
+int DeckLinkSignalGen::displayFrameSync() {
     if (!m_output || !m_frame) return -1;
     
-    // Schedule the frame for output
-    HRESULT result = m_output->ScheduleVideoFrame(
-        m_frame,
-        0,    // displayTime - start time
-        1000, // displayDuration in units (1/30s at 30fps)
-        30000 // timeScale (30000 units per second)
-    );
+    HRESULT result = m_output->DisplayVideoFrameSync(m_frame);
     if (result != S_OK) {
-        std::cerr << "[DeckLink] ScheduleVideoFrame failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
+        std::cerr << "[DeckLink] DisplayVideoFrameSync failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
         return -1;
     }
     
-    logFrameInfo("scheduled");
-    return 0;
-}
-
-int DeckLinkSignalGen::startPlayback() {
-    if (!m_output) return -1;
-    
-    // Start scheduled playback
-    HRESULT result = m_output->StartScheduledPlayback(0, 30000, 1.0);
-    if (result != S_OK) {
-        std::cerr << "[DeckLink] StartScheduledPlayback failed. HRESULT: 0x" << std::hex << result << std::dec << std::endl;
-        return -1;
-    }
-    
-    std::cerr << "[DeckLink] Playback started successfully" << std::endl;
+    logFrameInfo("displayed synchronously");
     return 0;
 }
 
@@ -550,17 +530,6 @@ int decklink_create_frame_from_data(DeckLinkHandle handle) {
     return signalGen->createFrame();
 }
 
-int decklink_schedule_frame_for_output(DeckLinkHandle handle) {
-    if (!handle) return -1;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->scheduleFrame();
-}
-
-int decklink_start_scheduled_playback(DeckLinkHandle handle) {
-    if (!handle) return -1;
-    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->startPlayback();
-}
 
 int decklink_get_pixel_format(DeckLinkHandle handle) {
     if (!handle) return -1;
@@ -649,6 +618,39 @@ int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata* metadata
     if (!handle || !metadata) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
     return signalGen->setHDRMetadata(*metadata);
+}
+
+// HDR capability detection
+bool decklink_device_supports_hdr(DeckLinkHandle handle) {
+    if (!handle) return false;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    
+    if (!signalGen->m_device) return false;
+    
+    // Query device attributes interface
+    IDeckLinkProfileAttributes* attributes = nullptr;
+    HRESULT result = signalGen->m_device->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&attributes);
+    if (result != S_OK || !attributes) {
+        return false; // No attributes interface, assume no HDR support
+    }
+    
+    // Check for HDR metadata support
+    bool supportsHDR = false;
+    result = attributes->GetFlag(BMDDeckLinkSupportsHDRMetadata, &supportsHDR);
+    
+    attributes->Release();
+    
+    if (result != S_OK) {
+        return false; // Failed to query, assume no HDR support
+    }
+    
+    return supportsHDR;
+}
+
+int decklink_display_frame_sync(DeckLinkHandle handle) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->displayFrameSync();
 }
 
 } // extern "C" 
