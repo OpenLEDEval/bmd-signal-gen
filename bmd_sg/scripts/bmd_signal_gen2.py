@@ -4,7 +4,6 @@ Typer-based CLI for BMD Signal Generator with optional config file support.
 Supports HDR metadata configuration including EOTF settings and pixel format selection.
 """
 
-import sys
 import time
 from pathlib import Path
 from typing import Annotated, Optional, Tuple
@@ -58,10 +57,10 @@ class Config:
         self.max_fall = 400.0
 
         # Color primaries (Rec2020 defaults)
-        self.red = (0.708, 0.292)
-        self.green = (0.170, 0.797)
-        self.blue = (0.131, 0.046)
-        self.white = (0.3127, 0.3290)
+        self.red_primary = (0.708, 0.292)
+        self.green_primary = (0.170, 0.797)
+        self.blue_primary = (0.131, 0.046)
+        self.white_primary = (0.3127, 0.3290)
 
         self.no_hdr = False
 
@@ -100,7 +99,7 @@ class Config:
                             typer.echo(
                                 f"Invalid pattern value in config: {value}", err=True
                             )
-                    elif key in ["red", "green", "blue", "white"] and isinstance(
+                    elif key in ["red_primary", "green_primary", "blue_primary", "white_primary"] and isinstance(
                         value, list
                     ):
                         if len(value) == 2:
@@ -131,24 +130,6 @@ class Config:
             typer.echo(f"Error loading config file: {e}", err=True)
 
 
-def validate_chromaticity(value: str) -> Tuple[float, float]:
-    """Validate chromaticity coordinates."""
-    try:
-        parts = value.split(",")
-        if len(parts) != 2:
-            raise typer.BadParameter("Chromaticity coordinates must be in format 'x,y'")
-
-        x, y = float(parts[0]), float(parts[1])
-        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-            raise typer.BadParameter(
-                "Chromaticity coordinates must be between 0.0 and 1.0"
-            )
-
-        return (x, y)
-    except ValueError:
-        raise typer.BadParameter("Chromaticity coordinates must be valid numbers")
-
-
 def validate_color(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
     """Validate RGB color values."""
     r, g, b = value
@@ -159,54 +140,122 @@ def validate_color(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
 
 @app.command()
 def pat2(
-    # Basic color arguments
+    # Colors
     color1: Annotated[
         Tuple[int, int, int],
         Argument(help="First color RGB values (r,g,b) - each 0-4095 for 12-bit"),
     ] = (4095, 4095, 4095),
-    # Second color for 2-color pattern
     color2: Annotated[
         Tuple[int, int, int],
         Option(
-            "--color2", help="Second color RGB values (r,g,b) - each 0-4095 for 12-bit"
+            "--color2", 
+            help="Second color RGB values (r,g,b) - each 0-4095 for 12-bit",
+            rich_help_panel="Colors"
         ),
     ] = (0, 0, 0),
-    # Config file
+    
+    # Basic Settings
     config: Annotated[
-        Optional[Path], Option("--config", "-c", help="Path to YAML config file")
+        Optional[Path], 
+        Option(
+            "--config", "-c", 
+            help="Path to YAML config file",
+            rich_help_panel="Basic Settings"
+        )
     ] = None,
-    # Duration
     duration: Annotated[
-        float, Option("--duration", "-t", help="Duration in seconds")
+        float, 
+        Option(
+            "--duration", "-t", 
+            help="Duration in seconds",
+            rich_help_panel="Basic Settings"
+        )
+    ] = 5,
+    
+    # Device / Pixel Format
+    device: Annotated[
+        int, 
+        Option(
+            "--device", "-d", 
+            help="Device index",
+            rich_help_panel="Device / Pixel Format"
+        )
     ] = 0,
-    # Device settings
-    device: Annotated[int, Option("--device", "-d", help="Device index")] = 0,
-    # Pattern settings
-    width: Annotated[int, Option("--width", help="Image width")] = 1920,
-    height: Annotated[int, Option("--height", help="Image height")] = 1080,
-    # ROI settings
-    roi_x: Annotated[int, Option("--roi-x", help="ROI X offset")] = 0,
-    roi_y: Annotated[int, Option("--roi-y", help="ROI Y offset")] = 0,
-    roi_width: Annotated[int, Option("--roi-width", help="ROI width")] = 1920,
-    roi_height: Annotated[int, Option("--roi-height", help="ROI height")] = 1080,
-    # HDR settings
     pixel_format: Annotated[
         Optional[int],
         Option(
             "--pixel-format",
             "-p",
             help="Pixel format index (auto-select if not specified)",
+            rich_help_panel="Device / Pixel Format",
         ),
     ] = None,
+    width: Annotated[
+        int, 
+        Option(
+            "--width", 
+            help="Image width",
+            rich_help_panel="Device / Pixel Format"
+        )
+    ] = 1920,
+    height: Annotated[
+        int, 
+        Option(
+            "--height", 
+            help="Image height",
+            rich_help_panel="Device / Pixel Format"
+        )
+    ] = 1080,
+    
+    # ROI
+    roi_x: Annotated[
+        int, 
+        Option(
+            "--roi-x", 
+            help="ROI X offset",
+            rich_help_panel="ROI"
+        )
+    ] = 0,
+    roi_y: Annotated[
+        int, 
+        Option(
+            "--roi-y", 
+            help="ROI Y offset",
+            rich_help_panel="ROI"
+        )
+    ] = 0,
+    roi_width: Annotated[
+        int, 
+        Option(
+            "--roi-width", 
+            help="ROI width",
+            rich_help_panel="ROI"
+        )
+    ] = 1920,
+    roi_height: Annotated[
+        int, 
+        Option(
+            "--roi-height", 
+            help="ROI height",
+            rich_help_panel="ROI"
+        )
+    ] = 1080,
+    
+    # HDR Metadata
     eotf: Annotated[
         EOTFType,
-        Option("--eotf", help="EOTF type (CEA 861.3)"),
+        Option(
+            "--eotf", 
+            help="EOTF type (CEA 861.3)",
+            rich_help_panel="HDR Metadata"
+        ),
     ] = EOTFType.PQ,
     max_display_mastering_luminance: Annotated[
         float,
         Option(
             "--max-display-mastering-luminance",
             help="Max display mastering luminance in cd/m²",
+            rich_help_panel="HDR Metadata",
         ),
     ] = 1000.0,
     min_display_mastering_luminance: Annotated[
@@ -214,29 +263,65 @@ def pat2(
         Option(
             "--min-display-mastering-luminance",
             help="Min display mastering luminance in cd/m²",
+            rich_help_panel="HDR Metadata",
         ),
     ] = 0.0001,
     max_cll: Annotated[
-        float, Option("--max-cll", help="Maximum Content Light Level in cd/m²")
+        float, 
+        Option(
+            "--max-cll", 
+            help="Maximum Content Light Level in cd/m²",
+            rich_help_panel="HDR Metadata"
+        )
     ] = 10000.0,
     max_fall: Annotated[
-        float, Option("--max-fall", help="Maximum Frame Average Light Level in cd/m²")
+        float, 
+        Option(
+            "--max-fall", 
+            help="Maximum Frame Average Light Level in cd/m²",
+            rich_help_panel="HDR Metadata"
+        )
     ] = 400.0,
-    # Color primaries
-    red: Annotated[
-        str, Option("--red", help="Red primary coordinates 'x,y'")
-    ] = "0.708,0.292",
-    green: Annotated[
-        str, Option("--green", help="Green primary coordinates 'x,y'")
-    ] = "0.170,0.797",
-    blue: Annotated[
-        str, Option("--blue", help="Blue primary coordinates 'x,y'")
-    ] = "0.131,0.046",
-    white: Annotated[
-        str, Option("--white", help="White point coordinates 'x,y'")
-    ] = "0.3127,0.3290",
-    # Flags
-    no_hdr: Annotated[bool, Option("--no-hdr", help="Disable HDR metadata")] = False,
+    red_primary: Annotated[
+        Tuple[float, float], 
+        Option(
+            "--red-primary", 
+            help="Red primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata"
+        )
+    ] = (0.708, 0.292),
+    green_primary: Annotated[
+        Tuple[float, float], 
+        Option(
+            "--green-primary", 
+            help="Green primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata"
+        )
+    ] = (0.170, 0.797),
+    blue_primary: Annotated[
+        Tuple[float, float], 
+        Option(
+            "--blue-primary", 
+            help="Blue primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata"
+        )
+    ] = (0.131, 0.046),
+    white_primary: Annotated[
+        Tuple[float, float], 
+        Option(
+            "--white-primary", 
+            help="White point coordinates (x,y)",
+            rich_help_panel="HDR Metadata"
+        )
+    ] = (0.3127, 0.3290),
+    no_hdr: Annotated[
+        bool, 
+        Option(
+            "--no-hdr", 
+            help="Disable HDR metadata",
+            rich_help_panel="HDR Metadata"
+        )
+    ] = False,
 ) -> None:
     """
     Generate and display test patterns on BMD DeckLink devices.
@@ -305,14 +390,14 @@ def pat2(
         cfg.max_cll = max_cll
     if max_fall != 400.0:
         cfg.max_fall = max_fall
-    if red != "0.708,0.292":
-        cfg.red = validate_chromaticity(red)
-    if green != "0.170,0.797":
-        cfg.green = validate_chromaticity(green)
-    if blue != "0.131,0.046":
-        cfg.blue = validate_chromaticity(blue)
-    if white != "0.3127,0.3290":
-        cfg.white = validate_chromaticity(white)
+    if red_primary != (0.708, 0.292):
+        cfg.red_primary = red_primary
+    if green_primary != (0.170, 0.797):
+        cfg.green_primary = green_primary
+    if blue_primary != (0.131, 0.046):
+        cfg.blue_primary = blue_primary
+    if white_primary != (0.3127, 0.3290):
+        cfg.white_primary = white_primary
     if no_hdr:
         cfg.no_hdr = no_hdr
 
@@ -367,10 +452,10 @@ def list_formats(
             self.min_display_mastering_luminance = 0.0001
             self.max_cll = 10000.0
             self.max_fall = 400.0
-            self.red = (0.708, 0.292)
-            self.green = (0.170, 0.797)
-            self.blue = (0.131, 0.046)
-            self.white = (0.3127, 0.3290)
+            self.red_primary = (0.708, 0.292)
+            self.green_primary = (0.170, 0.797)
+            self.blue_primary = (0.131, 0.046)
+            self.white_primary = (0.3127, 0.3290)
             self.no_hdr = False
 
     args = Args()
@@ -423,10 +508,10 @@ max_cll: 10000.0
 max_fall: 400.0
 
 # Color primaries (Rec2020 defaults)
-red: [0.708, 0.292]
-green: [0.170, 0.797]
-blue: [0.131, 0.046]
-white: [0.3127, 0.3290]
+red_primary: [0.708, 0.292]
+green_primary: [0.170, 0.797]
+blue_primary: [0.131, 0.046]
+white_primary: [0.3127, 0.3290]
 
 # Flags
 no_hdr: false
@@ -448,5 +533,4 @@ no_hdr: false
 
 
 if __name__ == "__main__":
-    sys.argv = ["bmd_signal_gen2.py", "pat2", "--help"]
     app()
