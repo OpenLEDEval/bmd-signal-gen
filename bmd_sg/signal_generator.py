@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 
 from bmd_sg.decklink.bmd_decklink import EOTFType
-from bmd_sg.pattern_generator import DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT, PatternType
 
 # Video resolution constants
 DEFAULT_WIDTH = 1920
@@ -46,11 +45,8 @@ class DeckLinkSettings:
 class PatternSettings:
     """Dataclass to hold pattern generation settings."""
 
-    pattern: PatternType = PatternType.SOLID
-    colors: list[tuple[int, int, int]] = field(
-        default_factory=lambda: [DEFAULT_COLOR_12BIT]
-    )
-    bit_depth: int = DEFAULT_BIT_DEPTH
+    colors: list[tuple[int, int, int]] = field(default_factory=lambda: [(4095, 0, 0)])
+    bit_depth: int = 12
     width: int = DEFAULT_WIDTH
     height: int = DEFAULT_HEIGHT
 

@@ -19,7 +19,7 @@ from bmd_sg.decklink.bmd_decklink import (
     get_decklink_driver_version,
     get_decklink_sdk_version,
 )
-from bmd_sg.pattern_generator import PatternGenerator, PatternType
+from bmd_sg.pattern_generator import PatternGenerator, ROI
 from bmd_sg.signal_generator import DeckLinkSettings
 
 app = typer.Typer(
@@ -213,16 +213,15 @@ def pat2(
         decklink_settings, device, pixel_format
     )
 
-    # Generate TWO_COLOR pattern and store in img variable
+    # Create ROI for pattern generation
+    roi = ROI(x=roi_x, y=roi_y, width=roi_width, height=roi_height)
+    
+    # Generate two-color checkerboard pattern
     generator = PatternGenerator(
+        bit_depth=bit_depth or 12,
         width=width,
         height=height,
-        bit_depth=bit_depth or 12,
-        pattern_type=PatternType.TWO_COLOR,
-        roi_x=roi_x,
-        roi_y=roi_y,
-        roi_width=roi_width,
-        roi_height=roi_height,
+        roi=roi,
     )
 
     img = generator.generate([color1, color2])
@@ -442,16 +441,15 @@ def setup_decklink_device(
         setattr(hdr_metadata.referencePrimaries, f"{color}X", float(x))
         setattr(hdr_metadata.referencePrimaries, f"{color}Y", float(y))
 
-    # Set the complete HDR metadata
-    decklink.set_hdr_metadata(hdr_metadata)
-
-    if settings.no_hdr:
+    # Set the complete HDR metadata (unless disabled)
+    if not settings.no_hdr:
+        decklink.set_hdr_metadata(hdr_metadata)
         print(
-            f"Set basic HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+            f"Set complete HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
         )
     else:
         print(
-            f"Set complete HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+            f"HDR metadata disabled. EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
         )
 
     decklink.start()
