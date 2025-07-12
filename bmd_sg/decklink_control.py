@@ -249,7 +249,7 @@ def setup_decklink_device(
     else:
         # Use legacy EOTF method for SDR
         decklink.set_frame_eotf(
-            settings.eotf.value, settings.max_cll, settings.max_fall
+            settings.eotf.int_value, settings.max_cll, settings.max_fall
         )
         print(
             f"Set basic EOTF metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
