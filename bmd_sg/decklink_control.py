@@ -5,8 +5,6 @@ It can be executed directly from the command line as a script, or used as part
 of the HTTP API.
 """
 
-from typing import Optional
-
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
     HDRMetadata,
@@ -34,7 +32,7 @@ def determine_bit_depth(format_name: str) -> int:
 
 def _initialize_decklink_device(
     device_index: int = 0,
-    pixel_format_index: Optional[int] = None,
+    pixel_format_index: int | None = None,
     show_logs: bool = True,
     use_global: bool = False,
 ):
@@ -150,11 +148,11 @@ def _initialize_decklink_device(
         return True, decklink, bit_depth, devices, None
 
     except Exception as e:
-        return False, None, None, None, f"Failed to initialize DeckLink: {str(e)}"
+        return False, None, None, None, f"Failed to initialize DeckLink: {e!s}"
 
 
 def initialize_decklink_for_api(
-    device_index: int = 0, pixel_format_index: Optional[int] = None
+    device_index: int = 0, pixel_format_index: int | None = None
 ):
     """Initialize DeckLink for API usage. Returns (success, error_message)."""
     success, decklink, bit_depth, devices, error = _initialize_decklink_device(
@@ -204,7 +202,7 @@ def cleanup_decklink_device(decklink):
 
 
 def setup_decklink_device(
-    settings: DeckLinkSettings, device_index: int, pixel_format_index: Optional[int]
+    settings: DeckLinkSettings, device_index: int, pixel_format_index: int | None
 ):
     """Setup DeckLink for CLI usage. Returns (decklink, bit_depth, devices)."""
     success, decklink, bit_depth, devices, error = _initialize_decklink_device(

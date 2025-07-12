@@ -1,12 +1,15 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
 ## Project Overview
 
-This project is a cross-platform BMD (Blackmagic Design) signal generator that outputs test patterns via DeckLink devices. It consists of:
+This project is a cross-platform BMD (Blackmagic Design) signal generator that
+outputs test patterns via DeckLink devices. It consists of:
 
-- **C++ core**: Low-level DeckLink SDK wrapper with pixel format conversion (`cpp/`)
+- **C++ core**: Low-level DeckLink SDK wrapper with pixel format conversion
+  (`cpp/`)
 - **Python wrapper**: High-level interface via ctypes (`bmd_sg/`)
 - **REST API**: FastAPI-based HTTP interface for pattern generation
 - **CLI tool**: Command-line interface for direct pattern output
@@ -14,12 +17,15 @@ This project is a cross-platform BMD (Blackmagic Design) signal generator that o
 ## Build Commands
 
 ### C++ Library
+
 ```bash
 cd cpp && make clean && make && cd ..
 ```
+
 This builds `bmd_sg/decklink/libdecklink.dylib` - the core dynamic library.
 
 ### Python Environment
+
 ```bash
 # Install dependencies
 uv sync
@@ -28,84 +34,37 @@ uv sync
 source .venv/bin/activate
 ```
 
-### Running the Application
-
-**CLI Usage:**
-```bash
-bmd_signal_gen <r> <g> <b> [--duration 5] [--device 0]
-```
-
-**REST API:**
-```bash
-uvicorn bmd_sg.api:app
-```
-
-**Tests:**
-```bash
-python -m pytest tests/
-```
-
-## Code Architecture
-
-### Core Components
-
-1. **DeckLink C++ Wrapper** (`cpp/decklink_wrapper.cpp`):
-   - Direct interface to BMD SDK
-   - Handles device enumeration, pixel format management
-   - Frame scheduling and HDR metadata injection
-
-2. **Pixel Format Handling** (`cpp/pixel_packing.cpp`):
-   - Converts RGB data to DeckLink-specific pixel formats
-   - Supports 8/10/12-bit depths and various color spaces
-   - Handles endianness and packing requirements
-
-3. **Python Interface** (`bmd_sg/decklink/bmd_decklink.py`):
-   - ctypes wrapper for C++ library
-   - Provides `BMDDeckLink` class for high-level operations
-   - Manages HDR metadata structures
-
-4. **Pattern Generation** (`bmd_sg/patterns.py`):
-   - Creates test patterns (solid, two-color, four-color)
-   - Handles ROI (Region of Interest) specification
-   - Supports various bit depths and color spaces
-
-5. **Device Control** (`bmd_sg/decklink_control.py`):
-   - Orchestrates pattern generation and device output
-   - Manages global device state for API usage
-   - Handles HDR metadata application
-
-### Key Data Flow
-
-1. Pattern generation creates numpy arrays with RGB values
-2. Arrays are passed to DeckLink wrapper via ctypes
-3. C++ code converts to appropriate pixel format
-4. DeckLink SDK handles hardware output with HDR metadata
-
 ## Development Guidelines
 
 ### Critical Standards (from .cursor/rules/coding-standards.mdc)
 
-- **DRY Principle**: Eliminate duplicate logic, especially switch/case statements for pixel formats
-- **Centralized Logic**: Use helpers/utilities rather than repeating validation/conversion code
+- **DRY Principle**: Eliminate duplicate logic, especially switch/case
+  statements for pixel formats
+- **Centralized Logic**: Use helpers/utilities rather than repeating
+  validation/conversion code
 - **Refactor Immediately**: Don't defer deduplication - fix patterns when found
 - **All Languages**: Apply DRY to C++, Python, and build scripts
 
 ### Documentation Standards
 
-All Python code must use **Sphinx-compatible docstrings** following **NumPy documentation standards**.
+All Python code must use **Sphinx-compatible docstrings** following **NumPy
+documentation standards**.
 
 #### Required Documentation
 
 1. **All public modules** must have comprehensive module-level docstrings
-2. **All public classes** must have detailed class docstrings with Parameters, Attributes, Examples, and Notes sections
-3. **All public functions and methods** must have complete docstrings with Parameters, Returns, Raises, and Examples sections
+2. **All public classes** must have detailed class docstrings with Parameters,
+   Attributes, Examples, and Notes sections
+3. **All public functions and methods** must have complete docstrings with
+   Parameters, Returns, Raises, and Examples sections
 4. **All public constants and enums** must be documented with brief descriptions
 
 #### NumPy Docstring Format
 
 Use these sections in docstrings:
+
 - **Parameters** - Document all parameters with types and descriptions
-- **Returns** - Document return values with types and descriptions  
+- **Returns** - Document return values with types and descriptions
 - **Raises** - Document all exceptions that can be raised
 - **Examples** - Include practical usage examples with expected output
 - **Notes** - Important implementation details or performance considerations
@@ -117,32 +76,32 @@ Use these sections in docstrings:
 class HDRMetadata(ctypes.Structure):
     """
     Complete HDR metadata structure for DeckLink output.
-    
+
     This structure defines comprehensive HDR metadata including EOTF
     (Electro-Optical Transfer Function), display primaries, and luminance values.
-    
+
     Parameters
     ----------
     eotf : int, optional
         EOTF type (0=Reserved, 1=SDR, 2=PQ, 3=HLG). Default is 3.
     max_display_luminance : float, optional
         Maximum display mastering luminance in cd/m². Default is 1000.0.
-    
+
     Attributes
     ----------
     EOTF : int
         Electro-Optical Transfer Function type
     referencePrimaries : ChromaticityCoordinates
         Display color primaries and white point
-    
+
     Examples
     --------
     Create HDR metadata with default values:
-    
+
     >>> metadata = HDRMetadata()
     >>> print(f"EOTF: {metadata.EOTF}")
     EOTF: 3
-    
+
     Notes
     -----
     The structure automatically sets Rec.2020 color primaries as defaults.
@@ -151,7 +110,8 @@ class HDRMetadata(ctypes.Structure):
 
 #### Documentation Quality Requirements
 
-- **Complete parameter documentation** - All parameters must be documented with types and descriptions
+- **Complete parameter documentation** - All parameters must be documented with
+  types and descriptions
 - **Practical examples required** - Include real-world usage examples
 - **Exception documentation** - Document all exceptions that can be raised
 - **Cross-references** - Use See Also sections to link related functionality
@@ -160,6 +120,7 @@ class HDRMetadata(ctypes.Structure):
 ### HDR Metadata Handling
 
 The project supports complete HDR metadata with:
+
 - EOTF (Electro-Optical Transfer Function) specification
 - Display primaries (Rec2020 by default)
 - Mastering display luminance values
@@ -181,8 +142,10 @@ The project supports complete HDR metadata with:
 
 ## Common Issues
 
-- **Library Loading**: Ensure `libdecklink.dylib` is built and in correct location
-- **Device Access**: Requires BMD Desktop Video drivers and proper device connection
+- **Library Loading**: Ensure `libdecklink.dylib` is built and in correct
+  location
+- **Device Access**: Requires BMD Desktop Video drivers and proper device
+  connection
 - **Pixel Format**: Some formats may not be supported by all devices
 - **HDR Metadata**: Complete metadata structure required for proper HDR output
 
@@ -197,7 +160,11 @@ The project supports complete HDR metadata with:
 ## Claude Code Guidelines
 
 - **Refactoring Workflow**:
-  - Always make refactor suggestions using edit or multi edit tools so I can see the changes in my diff browser
-  - Only use code snippets in the chat when I ask for an example or a clarifying question
-  - When asked for refactor suggestions, first describe suggestions briefly with minimal code in the chat
-  - Wait for explicit confirmation before using edit or multi edit tools to implement refactoring
+  - Always make refactor suggestions using edit or multi edit tools so I can see
+    the changes in my diff browser
+  - Only use code snippets in the chat when I ask for an example or a clarifying
+    question
+  - When asked for refactor suggestions, first describe suggestions briefly with
+    minimal code in the chat
+  - Wait for explicit confirmation before using edit or multi edit tools to
+    implement refactoring

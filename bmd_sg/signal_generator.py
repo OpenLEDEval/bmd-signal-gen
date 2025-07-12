@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 from bmd_sg.decklink.bmd_decklink import EOTFType
-from bmd_sg.pattern_generator import PatternType, DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT
+from bmd_sg.pattern_generator import DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT, PatternType
 
 # Video resolution constants
 DEFAULT_WIDTH = 1920
@@ -37,10 +36,10 @@ class DeckLinkSettings:
     max_fall: float = DEFAULT_MAX_FALL
     max_display_mastering_luminance: float = DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE
     min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
-    red_primary: Tuple[float, float] = REC2020_RED_PRIMARY
-    green_primary: Tuple[float, float] = REC2020_GREEN_PRIMARY
-    blue_primary: Tuple[float, float] = REC2020_BLUE_PRIMARY
-    white_point: Tuple[float, float] = D65_WHITE_POINT
+    red_primary: tuple[float, float] = REC2020_RED_PRIMARY
+    green_primary: tuple[float, float] = REC2020_GREEN_PRIMARY
+    blue_primary: tuple[float, float] = REC2020_BLUE_PRIMARY
+    white_point: tuple[float, float] = D65_WHITE_POINT
 
 
 @dataclass
@@ -48,7 +47,9 @@ class PatternSettings:
     """Dataclass to hold pattern generation settings."""
 
     pattern: PatternType = PatternType.SOLID
-    colors: List[Tuple[int, int, int]] = field(default_factory=lambda: [DEFAULT_COLOR_12BIT])
+    colors: list[tuple[int, int, int]] = field(
+        default_factory=lambda: [DEFAULT_COLOR_12BIT]
+    )
     bit_depth: int = DEFAULT_BIT_DEPTH
     width: int = DEFAULT_WIDTH
     height: int = DEFAULT_HEIGHT
@@ -56,5 +57,5 @@ class PatternSettings:
     # Region of Interest
     roi_x: int = 0
     roi_y: int = 0
-    roi_width: Optional[int] = None
-    roi_height: Optional[int] = None
+    roi_width: int | None = None
+    roi_height: int | None = None

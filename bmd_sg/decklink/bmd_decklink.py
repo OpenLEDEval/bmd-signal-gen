@@ -851,13 +851,13 @@ class BMDDeckLink:
         """
         if not self.handle:
             raise RuntimeError("Device not open")
-        
+
         # Use defaults if not provided
         if maxCLL is None:
             maxCLL = DEFAULT_MAX_CLL
         if maxFALL is None:
             maxFALL = DEFAULT_MAX_FALL
-            
+
         res = DecklinkSDKWrapper.decklink_set_eotf_metadata(
             self.handle, eotf, maxCLL, maxFALL
         )

@@ -6,7 +6,7 @@ Supports HDR metadata configuration including EOTF settings and pixel format sel
 
 import time
 from pathlib import Path
-from typing import Annotated, Optional, Tuple
+from typing import Annotated
 
 import typer
 import yaml
@@ -31,7 +31,7 @@ app = typer.Typer(
 class Config:
     """Configuration container for CLI arguments."""
 
-    def __init__(self, config_file: Optional[Path] = None):
+    def __init__(self, config_file: Path | None = None):
         # Default values
         self.color1 = (4095, 0, 0)
         self.color2 = (0, 0, 0)
@@ -39,7 +39,7 @@ class Config:
         self.color4 = (0, 0, 0)
         self.duration = 5.0
         self.device = 0
-        self.pixel_format: Optional[int] = None
+        self.pixel_format: int | None = None
         self.eotf = EOTFType.PQ
         self.pattern = PatternType.TWO_COLOR
         self.width = 1920
@@ -76,7 +76,7 @@ class Config:
             return
 
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 config_data = yaml.safe_load(f)
 
             if not config_data:
@@ -100,9 +100,12 @@ class Config:
                             typer.echo(
                                 f"Invalid pattern value in config: {value}", err=True
                             )
-                    elif key in ["red_primary", "green_primary", "blue_primary", "white_primary"] and isinstance(
-                        value, list
-                    ):
+                    elif key in [
+                        "red_primary",
+                        "green_primary",
+                        "blue_primary",
+                        "white_primary",
+                    ] and isinstance(value, list):
                         if len(value) == 2:
                             setattr(self, key, tuple(value))
                         else:
@@ -131,7 +134,7 @@ class Config:
             typer.echo(f"Error loading config file: {e}", err=True)
 
 
-def validate_color(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
+def validate_color(value: tuple[int, int, int]) -> tuple[int, int, int]:
     """Validate RGB color values."""
     r, g, b = value
     if not all(0 <= val <= 4095 for val in [r, g, b]):
@@ -143,47 +146,48 @@ def validate_color(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
 def pat2(
     # Colors
     color1: Annotated[
-        Tuple[int, int, int],
+        tuple[int, int, int],
         Argument(help="First color RGB values (r,g,b) - each 0-4095 for 12-bit"),
     ] = (4095, 4095, 4095),
     color2: Annotated[
-        Tuple[int, int, int],
+        tuple[int, int, int],
         Option(
-            "--color2", 
+            "--color2",
             help="Second color RGB values (r,g,b) - each 0-4095 for 12-bit",
-            rich_help_panel="Colors"
+            rich_help_panel="Colors",
         ),
     ] = (0, 0, 0),
-    
     # Basic Settings
     config: Annotated[
-        Optional[Path], 
+        Path | None,
         Option(
-            "--config", "-c", 
+            "--config",
+            "-c",
             help="Path to YAML config file",
-            rich_help_panel="Basic Settings"
-        )
+            rich_help_panel="Basic Settings",
+        ),
     ] = None,
     duration: Annotated[
-        float, 
+        float,
         Option(
-            "--duration", "-t", 
+            "--duration",
+            "-t",
             help="Duration in seconds",
-            rich_help_panel="Basic Settings"
-        )
+            rich_help_panel="Basic Settings",
+        ),
     ] = 5,
-    
     # Device / Pixel Format
     device: Annotated[
-        int, 
+        int,
         Option(
-            "--device", "-d", 
+            "--device",
+            "-d",
             help="Device index",
-            rich_help_panel="Device / Pixel Format"
-        )
+            rich_help_panel="Device / Pixel Format",
+        ),
     ] = 0,
     pixel_format: Annotated[
-        Optional[int],
+        int | None,
         Option(
             "--pixel-format",
             "-p",
@@ -192,64 +196,32 @@ def pat2(
         ),
     ] = None,
     width: Annotated[
-        int, 
-        Option(
-            "--width", 
-            help="Image width",
-            rich_help_panel="Device / Pixel Format"
-        )
+        int,
+        Option("--width", help="Image width", rich_help_panel="Device / Pixel Format"),
     ] = 1920,
     height: Annotated[
-        int, 
+        int,
         Option(
-            "--height", 
-            help="Image height",
-            rich_help_panel="Device / Pixel Format"
-        )
+            "--height", help="Image height", rich_help_panel="Device / Pixel Format"
+        ),
     ] = 1080,
-    
     # ROI
     roi_x: Annotated[
-        int, 
-        Option(
-            "--roi-x", 
-            help="ROI X offset",
-            rich_help_panel="ROI"
-        )
+        int, Option("--roi-x", help="ROI X offset", rich_help_panel="ROI")
     ] = 0,
     roi_y: Annotated[
-        int, 
-        Option(
-            "--roi-y", 
-            help="ROI Y offset",
-            rich_help_panel="ROI"
-        )
+        int, Option("--roi-y", help="ROI Y offset", rich_help_panel="ROI")
     ] = 0,
     roi_width: Annotated[
-        int, 
-        Option(
-            "--roi-width", 
-            help="ROI width",
-            rich_help_panel="ROI"
-        )
+        int, Option("--roi-width", help="ROI width", rich_help_panel="ROI")
     ] = 1920,
     roi_height: Annotated[
-        int, 
-        Option(
-            "--roi-height", 
-            help="ROI height",
-            rich_help_panel="ROI"
-        )
+        int, Option("--roi-height", help="ROI height", rich_help_panel="ROI")
     ] = 1080,
-    
     # HDR Metadata
     eotf: Annotated[
         EOTFType,
-        Option(
-            "--eotf", 
-            help="EOTF type (CEA 861.3)",
-            rich_help_panel="HDR Metadata"
-        ),
+        Option("--eotf", help="EOTF type (CEA 861.3)", rich_help_panel="HDR Metadata"),
     ] = EOTFType.PQ,
     max_display_mastering_luminance: Annotated[
         float,
@@ -268,60 +240,56 @@ def pat2(
         ),
     ] = 0.0001,
     max_cll: Annotated[
-        float, 
+        float,
         Option(
-            "--max-cll", 
+            "--max-cll",
             help="Maximum Content Light Level in cd/m²",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = 10000.0,
     max_fall: Annotated[
-        float, 
+        float,
         Option(
-            "--max-fall", 
+            "--max-fall",
             help="Maximum Frame Average Light Level in cd/m²",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = 400.0,
     red_primary: Annotated[
-        Tuple[float, float], 
+        tuple[float, float],
         Option(
-            "--red-primary", 
+            "--red-primary",
             help="Red primary coordinates (x,y)",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = (0.708, 0.292),
     green_primary: Annotated[
-        Tuple[float, float], 
+        tuple[float, float],
         Option(
-            "--green-primary", 
+            "--green-primary",
             help="Green primary coordinates (x,y)",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = (0.170, 0.797),
     blue_primary: Annotated[
-        Tuple[float, float], 
+        tuple[float, float],
         Option(
-            "--blue-primary", 
+            "--blue-primary",
             help="Blue primary coordinates (x,y)",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = (0.131, 0.046),
     white_primary: Annotated[
-        Tuple[float, float], 
+        tuple[float, float],
         Option(
-            "--white-primary", 
+            "--white-primary",
             help="White point coordinates (x,y)",
-            rich_help_panel="HDR Metadata"
-        )
+            rich_help_panel="HDR Metadata",
+        ),
     ] = (0.3127, 0.3290),
     no_hdr: Annotated[
-        bool, 
-        Option(
-            "--no-hdr", 
-            help="Disable HDR metadata",
-            rich_help_panel="HDR Metadata"
-        )
+        bool,
+        Option("--no-hdr", help="Disable HDR metadata", rich_help_panel="HDR Metadata"),
     ] = False,
 ) -> None:
     """
@@ -432,9 +400,11 @@ def pat2(
         blue_primary=cfg.blue_primary,
         white_point=cfg.white_primary,
     )
-    
+
     # Setup DeckLink device
-    decklink, bit_depth, _ = setup_decklink_device(decklink_settings, cfg.device, cfg.pixel_format)
+    decklink, bit_depth, _ = setup_decklink_device(
+        decklink_settings, cfg.device, cfg.pixel_format
+    )
     if decklink is None:
         typer.echo("Failed to setup DeckLink device", err=True)
         raise typer.Exit(1)
@@ -442,8 +412,10 @@ def pat2(
     # Create pattern settings
     pattern_settings = PatternSettings(
         pattern=cfg.pattern,
-        colors=[(cfg.color1[0], cfg.color1[1], cfg.color1[2]),
-                (cfg.color2[0], cfg.color2[1], cfg.color2[2])],
+        colors=[
+            (cfg.color1[0], cfg.color1[1], cfg.color1[2]),
+            (cfg.color2[0], cfg.color2[1], cfg.color2[2]),
+        ],
         bit_depth=bit_depth or 12,  # Default to 12-bit if None
         width=cfg.width,
         height=cfg.height,
@@ -452,7 +424,7 @@ def pat2(
         roi_width=cfg.roi_width,
         roi_height=cfg.roi_height,
     )
-    
+
     # Generate and display image
     success = display_pattern(pattern_settings, decklink)
     if success:

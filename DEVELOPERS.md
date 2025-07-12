@@ -11,6 +11,84 @@ The BMD Signal Generator is a cross-platform tool for generating test patterns v
 - **REST API**: FastAPI-based HTTP interface
 - **CLI Tool**: Command-line interface for direct usage
 
+## Code Quality Management with Invoke
+
+This project uses [Invoke](https://www.pyinvoke.org/) for task automation and code quality maintenance. Invoke provides a simple way to run common development tasks like linting, formatting, and testing.
+
+### Available Tasks
+
+Run `invoke --list` to see all available tasks:
+
+```bash
+invoke --list
+```
+
+### Core Quality Commands
+
+**Main workflow commands:**
+```bash
+invoke check           # Run all checks (lint, format check, typecheck)
+invoke fix             # Auto-fix linting issues and format code
+```
+
+**Individual quality tools:**
+```bash
+invoke lint            # Run ruff linting (read-only)
+invoke lint --fix      # Run ruff linting with auto-fix
+invoke format          # Format code with ruff
+invoke format --check  # Check formatting without making changes
+invoke typecheck       # Run pyright type checking
+```
+
+**Development workflow:**
+```bash
+invoke dev             # Quick development cycle: fix issues + run tests
+invoke test            # Run pytest test suite
+invoke clean           # Clean up cache files and build artifacts
+invoke build           # Build C++ library and Python package (runs clean first)
+```
+
+### Typical Development Workflow
+
+**Before starting work:**
+```bash
+invoke clean           # Clean up any stale files
+invoke build           # Ensure fresh build
+```
+
+**During development:**
+```bash
+invoke fix             # Auto-fix issues and format code
+invoke test            # Run tests to verify changes
+```
+
+**Before committing:**
+```bash
+invoke dev             # Runs fix + test in sequence
+```
+
+**For CI/CD validation:**
+```bash
+invoke check           # Read-only checks (matches CI pipeline)
+```
+
+### Task Details
+
+- **`invoke check`**: Runs linting (read-only), format checking, and type checking
+- **`invoke fix`**: Auto-fixes linting issues, formats code, then runs type checking
+- **`invoke dev`**: Complete development cycle (fix + test)
+- **`invoke build`**: Cleans first, then builds C++ library and Python package
+- **`invoke clean`**: Removes cache files and the compiled library
+
+### Tool Configuration
+
+Code quality tools are configured in `pyproject.toml`:
+- **Ruff**: Modern Python linter and formatter (replaces flake8, isort, black)
+- **Pyright**: TypeScript-based Python type checker
+- **Pytest**: Testing framework
+
+All tools use consistent settings (line length: 88, Python 3.13+) and are optimized for the project's structure.
+
 ## Development Setup
 
 ### Prerequisites

@@ -7,7 +7,6 @@ Supports HDR metadata configuration including EOTF settings and pixel format sel
 import argparse
 import sys
 import time
-from typing import Tuple
 
 from fastapi import FastAPI
 
@@ -21,20 +20,27 @@ from bmd_sg.decklink_control import (
     initialize_decklink_for_api,
     setup_decklink_device,
 )
-from bmd_sg.pattern_generator import PatternType, DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT, BIT_DEPTH_12_MAX, BIT_DEPTH_10_MAX, BIT_DEPTH_8_MAX
+from bmd_sg.pattern_generator import (
+    BIT_DEPTH_8_MAX,
+    BIT_DEPTH_10_MAX,
+    BIT_DEPTH_12_MAX,
+    DEFAULT_BIT_DEPTH,
+    DEFAULT_COLOR_12BIT,
+    PatternType,
+)
 from bmd_sg.signal_generator import (
-    DeckLinkSettings, 
-    PatternSettings,
-    DEFAULT_WIDTH,
+    D65_WHITE_POINT,
     DEFAULT_HEIGHT,
     DEFAULT_MAX_CLL,
-    DEFAULT_MAX_FALL,
     DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE,
+    DEFAULT_MAX_FALL,
     DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
-    REC2020_RED_PRIMARY,
-    REC2020_GREEN_PRIMARY,
+    DEFAULT_WIDTH,
     REC2020_BLUE_PRIMARY,
-    D65_WHITE_POINT
+    REC2020_GREEN_PRIMARY,
+    REC2020_RED_PRIMARY,
+    DeckLinkSettings,
+    PatternSettings,
 )
 
 pat_server = FastAPI()
@@ -47,18 +53,18 @@ decklink_bit_depth = None
 
 class ChromaticityAction(argparse.Action):
     """Custom action for chromaticity coordinate pairs (x, y)."""
-    
+
     def __call__(self, parser, namespace, values, option_string=None):
         if values is None or len(values) != 2:
             parser.error(f"{option_string} requires exactly 2 values (x y)")
-        
+
         try:
             x, y = float(values[0]), float(values[1])
             if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
                 parser.error(f"{option_string} coordinates must be between 0.0 and 1.0")
         except ValueError:
             parser.error(f"{option_string} coordinates must be valid numbers")
-        
+
         setattr(namespace, self.dest, (x, y))
 
 
@@ -81,8 +87,6 @@ async def shutdown_event():
     """Clean up DeckLink when FastAPI shuts down."""
     if decklink_control.decklink_instance:
         cleanup_decklink_device(decklink_control.decklink_instance)
-
-
 
 
 def main() -> int:
@@ -114,10 +118,16 @@ def main() -> int:
         help="Pixel format index (leave blank for auto-select)",
     )
     parser.add_argument(
-        "--width", type=int, default=DEFAULT_WIDTH, help=f"Image width (default: {DEFAULT_WIDTH})"
+        "--width",
+        type=int,
+        default=DEFAULT_WIDTH,
+        help=f"Image width (default: {DEFAULT_WIDTH})",
     )
     parser.add_argument(
-        "--height", type=int, default=DEFAULT_HEIGHT, help=f"Image height (default: {DEFAULT_HEIGHT})"
+        "--height",
+        type=int,
+        default=DEFAULT_HEIGHT,
+        help=f"Image height (default: {DEFAULT_HEIGHT})",
     )
     parser.add_argument(
         "--pattern",
@@ -128,7 +138,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--colors",
-        nargs='+',
+        nargs="+",
         type=int,
         default=list(DEFAULT_COLOR_12BIT),
         help=f"List of colors as R G B values. E.g., --colors {DEFAULT_COLOR_12BIT[0]} {DEFAULT_COLOR_12BIT[1]} {DEFAULT_COLOR_12BIT[2]} 0 {BIT_DEPTH_12_MAX} 0",
@@ -189,7 +199,7 @@ def main() -> int:
         type=float,
         default=REC2020_RED_PRIMARY,
         action=ChromaticityAction,
-        metavar=('X', 'Y'),
+        metavar=("X", "Y"),
         help=f"Red primary coordinates (default: {REC2020_RED_PRIMARY[0]} {REC2020_RED_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
@@ -198,7 +208,7 @@ def main() -> int:
         type=float,
         default=REC2020_GREEN_PRIMARY,
         action=ChromaticityAction,
-        metavar=('X', 'Y'),
+        metavar=("X", "Y"),
         help=f"Green primary coordinates (default: {REC2020_GREEN_PRIMARY[0]} {REC2020_GREEN_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
@@ -207,7 +217,7 @@ def main() -> int:
         type=float,
         default=REC2020_BLUE_PRIMARY,
         action=ChromaticityAction,
-        metavar=('X', 'Y'),
+        metavar=("X", "Y"),
         help=f"Blue primary coordinates (default: {REC2020_BLUE_PRIMARY[0]} {REC2020_BLUE_PRIMARY[1]} for Rec2020)",
     )
     parser.add_argument(
@@ -216,7 +226,7 @@ def main() -> int:
         type=float,
         default=D65_WHITE_POINT,
         action=ChromaticityAction,
-        metavar=('X', 'Y'),
+        metavar=("X", "Y"),
         help=f"White point coordinates (default: {D65_WHITE_POINT[0]} {D65_WHITE_POINT[1]} for D65)",
     )
     parser.add_argument(
@@ -232,7 +242,7 @@ def main() -> int:
     # Group colors into tuples
     if len(args.colors) % 3 != 0:
         parser.error("Colors must be provided in groups of three (R G B)")
-    colors = [tuple(args.colors[i:i+3]) for i in range(0, len(args.colors), 3)]
+    colors = [tuple(args.colors[i : i + 3]) for i in range(0, len(args.colors), 3)]
 
     # Create DeckLinkSettings object from parsed arguments
     decklink_settings = DeckLinkSettings(
@@ -250,7 +260,9 @@ def main() -> int:
         white_point=args.white_point,
     )
 
-    decklink, bit_depth, devices = setup_decklink_device(decklink_settings, args.device, args.pixel_format)
+    decklink, bit_depth, devices = setup_decklink_device(
+        decklink_settings, args.device, args.pixel_format
+    )
     if decklink is None:
         return 1
 
@@ -273,7 +285,6 @@ def main() -> int:
 
     cleanup_decklink_device(decklink)
     return 0 if success else 1
-
 
 
 if __name__ == "__main__":
