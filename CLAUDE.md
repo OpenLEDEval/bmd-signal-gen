@@ -168,3 +168,8 @@ The project supports complete HDR metadata with:
     minimal code in the chat
   - Wait for explicit confirmation before using edit or multi edit tools to
     implement refactoring
+
+### Code Quality Guidelines
+
+- Always try to add a return type and type annotations to all functions
+- Do not write functions that return `Optional` types or types that are sometimes None unless doing so adds functionality to the program. If a function cannot compelte correctly, it should raise an error rather than returning None. 
