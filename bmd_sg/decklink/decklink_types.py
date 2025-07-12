@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Type definitions for DeckLink SDK wrapper.
+
+This module provides Protocol definitions and type aliases for the DeckLink SDK
+wrapper, ensuring type safety and providing clear interfaces for the ctypes-based
+DeckLink library integration.
 """
 
 import ctypes
@@ -10,7 +14,13 @@ from .bmd_decklink import HDRMetadata
 
 
 class DecklinkSDKProtocol(Protocol):
-    """Protocol defining the interface for the DeckLink SDK wrapper."""
+    """
+    Protocol defining the interface for the DeckLink SDK wrapper.
+
+    This protocol provides type definitions for all DeckLink SDK functions
+    accessible through the ctypes wrapper, ensuring proper type checking
+    and IDE support for the C library interface.
+    """
 
     # Device enumeration functions
     def decklink_get_device_count(self) -> int:
@@ -112,4 +122,5 @@ class DecklinkSDKProtocol(Protocol):
 
 
 # Type alias for the actual wrapper instance
+# This will be assigned the actual ctypes.CDLL instance in bmd_decklink.py
 DecklinkSDKWrapper: DecklinkSDKProtocol
