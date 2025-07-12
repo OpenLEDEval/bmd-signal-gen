@@ -44,12 +44,8 @@ bmd_sg.decklink_control : High-level device control interface
 import ctypes
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from .decklink_types import DecklinkSDKProtocol
 
 
 class PixelFormatType(Enum):
@@ -413,14 +409,14 @@ class HDRMetadata(ctypes.Structure):
 
     def __init__(
         self,
-        eotf: int = 3,  # PQ
+        eotf: EOTFType = EOTFType.PQ,
         max_display_luminance: float = 1000.0,
         min_display_luminance: float = 0.0001,
         max_cll: float = 1000.0,
         max_fall: float = 50.0,
     ):
         super().__init__()
-        self.EOTF = eotf
+        self.EOTF = eotf.int_value
         self.maxDisplayMasteringLuminance = max_display_luminance
         self.minDisplayMasteringLuminance = min_display_luminance
         self.maxCLL = max_cll
@@ -490,15 +486,6 @@ def _configure_function_signatures(lib):
         lib.decklink_get_pixel_format.restype = ctypes.c_int
 
     # HDR metadata functions
-    if hasattr(lib, "decklink_set_eotf_metadata"):
-        lib.decklink_set_eotf_metadata.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_int,
-            ctypes.c_uint16,
-            ctypes.c_uint16,
-        ]
-        lib.decklink_set_eotf_metadata.restype = ctypes.c_int
-
     if hasattr(lib, "decklink_set_hdr_metadata"):
         lib.decklink_set_hdr_metadata.argtypes = [
             ctypes.c_void_p,
@@ -521,13 +508,15 @@ def _configure_function_signatures(lib):
         lib.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
         lib.decklink_create_frame_from_data.restype = ctypes.c_int
 
-    if hasattr(lib, "decklink_schedule_frame_for_output"):
-        lib.decklink_schedule_frame_for_output.argtypes = [ctypes.c_void_p]
-        lib.decklink_schedule_frame_for_output.restype = ctypes.c_int
+    # Synchronous display function
+    if hasattr(lib, "decklink_display_frame_sync"):
+        lib.decklink_display_frame_sync.argtypes = [ctypes.c_void_p]
+        lib.decklink_display_frame_sync.restype = ctypes.c_int
 
-    if hasattr(lib, "decklink_start_scheduled_playback"):
-        lib.decklink_start_scheduled_playback.argtypes = [ctypes.c_void_p]
-        lib.decklink_start_scheduled_playback.restype = ctypes.c_int
+    # HDR capability detection functions
+    if hasattr(lib, "decklink_device_supports_hdr"):
+        lib.decklink_device_supports_hdr.argtypes = [ctypes.c_void_p]
+        lib.decklink_device_supports_hdr.restype = ctypes.c_bool
 
     # Version info functions
     if hasattr(lib, "decklink_get_driver_version"):
@@ -539,7 +528,7 @@ def _configure_function_signatures(lib):
         lib.decklink_get_sdk_version.restype = ctypes.c_char_p
 
 
-def _try_load_decklink_sdk() -> "DecklinkSDKProtocol":
+def _try_load_decklink_sdk() -> ctypes.CDLL:
     """Load the DeckLink SDK library and configure function signatures."""
     lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
     try:
@@ -558,10 +547,10 @@ def _try_load_decklink_sdk() -> "DecklinkSDKProtocol":
     # Configure all function signatures
     _configure_function_signatures(decklink_lib)
 
-    return decklink_lib  # type: ignore[return-value]
+    return decklink_lib
 
 
-DecklinkSDKWrapper: "DecklinkSDKProtocol" = _try_load_decklink_sdk()
+DecklinkSDKWrapper: ctypes.CDLL = _try_load_decklink_sdk()
 
 
 def get_decklink_driver_version():
@@ -606,6 +595,49 @@ def get_decklink_sdk_version():
     This returns the version of the compiled libdecklink.dylib library.
     """
     return DecklinkSDKWrapper.decklink_get_sdk_version().decode("utf-8")
+
+
+def ndarray_to_bmd_frame_buffer(
+    frame_data: np.ndarray,
+) -> tuple[ctypes.POINTER(ctypes.c_uint16), int, int]:
+    """
+    Convert numpy array to BMD-compatible frame buffer.
+
+    Parameters
+    ----------
+    frame_data : numpy.ndarray
+        Frame data with shape (height, width, channels) or (height, width)
+
+    Returns
+    -------
+    tuple[ctypes.POINTER(ctypes.c_uint16), int, int]
+        Tuple containing (data_ptr, width, height)
+
+    Raises
+    ------
+    ValueError
+        If frame_data is not a valid numpy array or has invalid dimensions
+    """
+    if not isinstance(frame_data, np.ndarray):
+        raise ValueError("frame_data must be a numpy array")
+
+    # Get dimensions
+    if frame_data.ndim == 2:
+        height, width = frame_data.shape
+        channels = 1
+    elif frame_data.ndim == 3:
+        height, width, channels = frame_data.shape
+    else:
+        raise ValueError("frame_data must be 2D or 3D array")
+
+    # Ensure data is uint16 and contiguous
+    if frame_data.dtype != np.uint16:
+        frame_data = frame_data.astype(np.uint16)
+    frame_data = np.ascontiguousarray(frame_data)
+
+    # Get pointer to data
+    data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
+    return data_ptr, width, height
 
 
 def get_decklink_devices():
@@ -793,7 +825,31 @@ class BMDDeckLink:
                 formats.append(name.value.decode("utf-8"))
         return formats
 
-    def set_pixel_format(self, format_index):
+    @property
+    def supports_hdr(self) -> bool:
+        return DecklinkSDKWrapper.decklink_device_supports_hdr(self.handle)
+
+    @property
+    def pixel_format(self):
+        """
+        Get the current pixel format index.
+
+        Returns
+        -------
+        int
+            Current pixel format index
+
+        Raises
+        ------
+        RuntimeError
+            If the device is not open
+        """
+        if not self.handle:
+            raise RuntimeError("Device not open")
+        return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
+
+    @pixel_format.setter
+    def pixel_format(self, format_index: PixelFormatType):
         """
         Set the pixel format by index.
 
@@ -813,58 +869,7 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set pixel format (error {res})")
 
-    def get_pixel_format(self):
-        """
-        Get the current pixel format index.
-
-        Returns
-        -------
-        int
-            Current pixel format index
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
-
-    def set_frame_eotf(self, eotf=0, maxCLL=0, maxFALL=0):
-        """
-        Set EOTF metadata for all future frames (legacy method).
-
-        Parameters
-        ----------
-        eotf : int, optional
-            EOTF type. Default is 0.
-        maxCLL : int, optional
-            Maximum Content Light Level. Default is 0.
-        maxFALL : int, optional
-            Maximum Frame Average Light Level. Default is 0.
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open or setting metadata fails
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        
-        # Use defaults if not provided
-        if maxCLL is None:
-            maxCLL = DEFAULT_MAX_CLL
-        if maxFALL is None:
-            maxFALL = DEFAULT_MAX_FALL
-            
-        res = DecklinkSDKWrapper.decklink_set_eotf_metadata(
-            self.handle, eotf, maxCLL, maxFALL
-        )
-        if res != 0:
-            raise RuntimeError(f"Failed to set EOTF metadata (error {res})")
-
-    def set_hdr_metadata(self, metadata):
+    def set_hdr_metadata(self, metadata: HDRMetadata):
         """
         Set complete HDR metadata for all future frames.
 
@@ -886,9 +891,9 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set HDR metadata (error {res})")
 
-    def set_frame_data(self, frame_data):
+    def display_frame(self, frame_data: np.ndarray):
         """
-        Set frame data from numpy array.
+        Display a single frame synchronously.
 
         Parameters
         ----------
@@ -898,79 +903,27 @@ class BMDDeckLink:
         Raises
         ------
         RuntimeError
-            If the device is not open or setting frame data fails
+            If the device is not open or any frame operation fails
         ValueError
             If frame_data is not a valid numpy array
         """
         if not self.handle:
             raise RuntimeError("Device not open")
 
-        if not isinstance(frame_data, np.ndarray):
-            raise ValueError("frame_data must be a numpy array")
-
-        # Get dimensions
-        if frame_data.ndim == 2:
-            height, width = frame_data.shape
-            channels = 1
-        elif frame_data.ndim == 3:
-            height, width, channels = frame_data.shape
-        else:
-            raise ValueError("frame_data must be 2D or 3D array")
-
-        # Ensure data is uint16 and contiguous
-        if frame_data.dtype != np.uint16:
-            frame_data = frame_data.astype(np.uint16)
-        frame_data = np.ascontiguousarray(frame_data)
-
-        # Get pointer to data
-        data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
+        # Set frame data
+        data_ptr, width, height = ndarray_to_bmd_frame_buffer(frame_data)
         res = DecklinkSDKWrapper.decklink_set_frame_data(
             self.handle, data_ptr, width, height
         )
         if res != 0:
             raise RuntimeError(f"Failed to set frame data (error {res})")
 
-    def create_frame(self):
-        """
-        Create a video frame from pending frame data.
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open or frame creation fails
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
+        # Create frame
         res = DecklinkSDKWrapper.decklink_create_frame_from_data(self.handle)
         if res != 0:
             raise RuntimeError(f"Failed to create frame (error {res})")
 
-    def schedule_frame(self):
-        """
-        Schedule the current frame for output.
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open or frame scheduling fails
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        res = DecklinkSDKWrapper.decklink_schedule_frame_for_output(self.handle)
+        # Display frame synchronously
+        res = DecklinkSDKWrapper.decklink_display_frame_sync(self.handle)
         if res != 0:
-            raise RuntimeError(f"Failed to schedule frame (error {res})")
-
-    def start_playback(self):
-        """
-        Start scheduled playback.
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open or starting playback fails
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        res = DecklinkSDKWrapper.decklink_start_scheduled_playback(self.handle)
-        if res != 0:
-            raise RuntimeError(f"Failed to start playback (error {res})")
+            raise RuntimeError(f"Failed to display frame synchronously (error {res})")

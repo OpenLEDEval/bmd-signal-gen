@@ -1,287 +1,460 @@
 #!/usr/bin/env python3
 """
-Application to output a solid RGB color to a DeckLink device using the DeckLinkSignalGen wrapper.
+Typer-based CLI for BMD Signal Generator.
 Supports HDR metadata configuration including EOTF settings and pixel format selection.
 """
 
-import argparse
-import sys
 import time
-from typing import Tuple
+from typing import Annotated
 
-from fastapi import FastAPI
+import typer
+from typer import Argument, Option
 
-import bmd_sg.decklink_control as decklink_control
-from bmd_sg.api import router as bmd_router
-from bmd_sg.decklink.bmd_decklink import EOTFType
-from bmd_sg.decklink_control import (
-    cleanup_decklink_device,
-    decklink_instance,
-    display_pattern,
-    initialize_decklink_for_api,
-    setup_decklink_device,
+from bmd_sg.decklink.bmd_decklink import (
+    BMDDeckLink,
+    EOTFType,
+    HDRMetadata,
+    PixelFormatType,
+    get_decklink_devices,
+    get_decklink_driver_version,
+    get_decklink_sdk_version,
 )
-from bmd_sg.pattern_generator import PatternType, DEFAULT_BIT_DEPTH, DEFAULT_COLOR_12BIT, BIT_DEPTH_12_MAX, BIT_DEPTH_10_MAX, BIT_DEPTH_8_MAX
-from bmd_sg.signal_generator import (
-    DeckLinkSettings, 
-    PatternSettings,
-    DEFAULT_WIDTH,
-    DEFAULT_HEIGHT,
-    DEFAULT_MAX_CLL,
-    DEFAULT_MAX_FALL,
-    DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE,
-    DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
-    REC2020_RED_PRIMARY,
-    REC2020_GREEN_PRIMARY,
-    REC2020_BLUE_PRIMARY,
-    D65_WHITE_POINT
+from bmd_sg.pattern_generator import PatternGenerator, ROI
+from bmd_sg.signal_generator import DeckLinkSettings
+
+app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="BMD Signal Generator - Output test patterns to Blackmagic Design DeckLink devices",
 )
 
-pat_server = FastAPI()
-pat_server.include_router(bmd_router)
 
-# Global DeckLink instance for API usage
-decklink_instance = None
-decklink_bit_depth = None
+def validate_color(value: tuple[int, int, int]) -> tuple[int, int, int]:
+    """Validate RGB color values."""
+    r, g, b = value
+    if not all(0 <= val <= 4095 for val in [r, g, b]):
+        raise typer.BadParameter("RGB values must be between 0 and 4095 for 12-bit")
+    return (r, g, b)
 
 
-class ChromaticityAction(argparse.Action):
-    """Custom action for chromaticity coordinate pairs (x, y)."""
+@app.command()
+def pat2(
+    # Colors
+    color1: Annotated[
+        tuple[int, int, int],
+        Argument(help="First color RGB values (r,g,b) - each 0-4095 for 12-bit"),
+    ] = (4095, 4095, 4095),
+    color2: Annotated[
+        tuple[int, int, int],
+        Option(
+            "--color2",
+            help="Second color RGB values (r,g,b) - each 0-4095 for 12-bit",
+            rich_help_panel="Colors",
+        ),
+    ] = (0, 0, 0),
+    duration: Annotated[
+        float,
+        Option(
+            "--duration",
+            "-t",
+            help="Duration in seconds",
+            rich_help_panel="Basic Settings",
+        ),
+    ] = 5,
+    # Device / Pixel Format
+    device: Annotated[
+        int,
+        Option(
+            "--device",
+            "-d",
+            help="Device index",
+            rich_help_panel="Device / Pixel Format",
+        ),
+    ] = 0,
+    pixel_format: Annotated[
+        int | None,
+        Option(
+            "--pixel-format",
+            "-p",
+            help="Pixel format index (auto-select if not specified)",
+            rich_help_panel="Device / Pixel Format",
+        ),
+    ] = None,
+    width: Annotated[
+        int,
+        Option("--width", help="Image width", rich_help_panel="Device / Pixel Format"),
+    ] = 1920,
+    height: Annotated[
+        int,
+        Option(
+            "--height", help="Image height", rich_help_panel="Device / Pixel Format"
+        ),
+    ] = 1080,
+    # ROI
+    roi_x: Annotated[
+        int, Option("--roi-x", help="ROI X offset", rich_help_panel="ROI")
+    ] = 0,
+    roi_y: Annotated[
+        int, Option("--roi-y", help="ROI Y offset", rich_help_panel="ROI")
+    ] = 0,
+    roi_width: Annotated[
+        int, Option("--roi-width", help="ROI width", rich_help_panel="ROI")
+    ] = 1920,
+    roi_height: Annotated[
+        int, Option("--roi-height", help="ROI height", rich_help_panel="ROI")
+    ] = 1080,
+    # HDR Metadata
+    eotf: Annotated[
+        EOTFType,
+        Option("--eotf", help="EOTF type (CEA 861.3)", rich_help_panel="HDR Metadata"),
+    ] = EOTFType.PQ,
+    max_display_mastering_luminance: Annotated[
+        float,
+        Option(
+            "--max-display-mastering-luminance",
+            help="Max display mastering luminance in cd/m²",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = 1000.0,
+    min_display_mastering_luminance: Annotated[
+        float,
+        Option(
+            "--min-display-mastering-luminance",
+            help="Min display mastering luminance in cd/m²",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = 0.0001,
+    max_cll: Annotated[
+        float,
+        Option(
+            "--max-cll",
+            help="Maximum Content Light Level in cd/m²",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = 10000.0,
+    max_fall: Annotated[
+        float,
+        Option(
+            "--max-fall",
+            help="Maximum Frame Average Light Level in cd/m²",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = 80.0,
+    red_primary: Annotated[
+        tuple[float, float],
+        Option(
+            "--red-primary",
+            help="Red primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = (0.708, 0.292),
+    green_primary: Annotated[
+        tuple[float, float],
+        Option(
+            "--green-primary",
+            help="Green primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = (0.170, 0.797),
+    blue_primary: Annotated[
+        tuple[float, float],
+        Option(
+            "--blue-primary",
+            help="Blue primary coordinates (x,y)",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = (0.131, 0.046),
+    white_primary: Annotated[
+        tuple[float, float],
+        Option(
+            "--white-primary",
+            help="White point coordinates (x,y)",
+            rich_help_panel="HDR Metadata",
+        ),
+    ] = (0.3127, 0.3290),
+    no_hdr: Annotated[
+        bool,
+        Option("--no-hdr", help="Disable HDR metadata", rich_help_panel="HDR Metadata"),
+    ] = False,
+) -> None:
+    """
+    Generate and display test patterns on BMD DeckLink devices.
+
+    Color value ranges by pixel format:
+    - 12-bit: 0-4095 (default, recommended)
+    - 10-bit: 0-1023
+    - 8-bit:  0-255 (fallback mode)
+
+    Pattern type: Two-color checkerboard
+    """
+
+    # Validate colors
+    color1 = validate_color(color1)
+    color2 = validate_color(color2)
+
+    # Create DeckLink settings
+    decklink_settings = DeckLinkSettings(
+        width=width,
+        height=height,
+        no_hdr=no_hdr,
+        eotf=eotf,
+        max_cll=max_cll,
+        max_fall=max_fall,
+        max_display_mastering_luminance=max_display_mastering_luminance,
+        min_display_mastering_luminance=min_display_mastering_luminance,
+        red_primary=red_primary,
+        green_primary=green_primary,
+        blue_primary=blue_primary,
+        white_point=white_primary,
+    )
+
+    # Setup DeckLink device
+    decklink, bit_depth, _ = setup_decklink_device(
+        decklink_settings, device, pixel_format
+    )
+
+    # Create ROI for pattern generation
+    roi = ROI(x=roi_x, y=roi_y, width=roi_width, height=roi_height)
     
-    def __call__(self, parser, namespace, values, option_string=None):
-        if values is None or len(values) != 2:
-            parser.error(f"{option_string} requires exactly 2 values (x y)")
-        
-        try:
-            x, y = float(values[0]), float(values[1])
-            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-                parser.error(f"{option_string} coordinates must be between 0.0 and 1.0")
-        except ValueError:
-            parser.error(f"{option_string} coordinates must be valid numbers")
-        
-        setattr(namespace, self.dest, (x, y))
+    # Generate two-color checkerboard pattern
+    generator = PatternGenerator(
+        bit_depth=bit_depth or 12,
+        width=width,
+        height=height,
+        roi=roi,
+    )
+
+    img = generator.generate([color1, color2])
+
+    # Display the pattern
+    decklink.display_frame(img)
+
+    typer.echo(f"Displaying for {duration} seconds...")
+    time.sleep(duration)
+
+    # Cleanup
+    cleanup_decklink_device(decklink)
 
 
-@pat_server.on_event("startup")
-async def startup_event():
-    """Initialize DeckLink when FastAPI starts."""
-    print("DEBUG: FastAPI startup event called")
-    success, error = initialize_decklink_for_api()
-    print(
-        f"DEBUG: initialize_decklink_for_api returned: success={success}, error={error}"
+@app.command()
+def device_details() -> None:
+    """Show details for all connected DeckLink devices."""
+
+    try:
+        # Print SDK and driver version information first
+        typer.echo("DeckLink System Information:")
+        typer.echo(f"  SDK Version: {get_decklink_sdk_version()}")
+        typer.echo(f"  Driver Version: {get_decklink_driver_version()}")
+        typer.echo()
+
+        # Get all available devices
+        devices = get_decklink_devices()
+
+        if not devices:
+            typer.echo("No DeckLink devices found.")
+            return
+
+        typer.echo(f"Found {len(devices)} DeckLink device(s):\n")
+
+        # Iterate through each device
+        for idx, device_name in enumerate(devices):
+            typer.echo(f"Device {idx}: {device_name}")
+
+            try:
+                # Open the device to get its details
+                decklink = BMDDeckLink(device_index=idx)
+
+                # Get supported pixel formats
+                formats = decklink.get_supported_pixel_formats()
+                typer.echo(f"  Supported pixel formats ({len(formats)}):")
+                for format_idx, format_name in enumerate(formats):
+                    typer.echo(f"    {format_idx}: {format_name}")
+
+                # Check HDR support
+                hdr_support = decklink.supports_hdr
+                typer.echo(f"  HDR Support: {'Yes' if hdr_support else 'No'}")
+
+                # Cleanup
+                decklink.close()
+
+            except RuntimeError as e:
+                typer.echo(f"  Error accessing device: {e}")
+
+            typer.echo()  # Empty line between devices
+
+    except Exception as e:
+        typer.echo(f"Error enumerating devices: {e}", err=True)
+        raise typer.Exit(1)
+
+
+def determine_bit_depth(format_name: str) -> int:
+    """Determine bit depth from pixel format name."""
+    if "8" in format_name:
+        return 8
+    elif "10" in format_name:
+        return 10
+    else:
+        return 12
+
+
+def _initialize_decklink_device(
+    device_index: int = 0,
+    pixel_format_index: int | None = None,
+    show_logs: bool = True,
+):
+    """Common DeckLink initialization logic. Returns (success, decklink, bit_depth, devices, error_msg)."""
+    try:
+        if show_logs:
+            print(
+                f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}"
+            )
+            print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
+
+        devices = get_decklink_devices()
+        if show_logs:
+            print("Available DeckLink devices:")
+            for idx, name in enumerate(devices):
+                print(f"  {idx}: {name}")
+
+        if not devices:
+            return False, None, None, None, "No DeckLink devices found"
+
+        if device_index >= len(devices):
+            return (
+                False,
+                None,
+                None,
+                None,
+                f"Device index {device_index} not found. Available devices: 0-{len(devices) - 1}",
+            )
+
+        decklink = BMDDeckLink(device_index=device_index)
+        all_formats = decklink.get_supported_pixel_formats()
+        filtered_formats = []
+        format_mapping = []
+
+        for idx, fmt in enumerate(all_formats):
+            if "8" not in fmt and "RGBX" not in fmt:
+                filtered_formats.append(fmt)
+                format_mapping.append(idx)
+
+        if show_logs:
+            print(
+                f"\nPixel formats supported by device {device_index} ({devices[device_index]}):"
+            )
+            for idx, fmt in enumerate(filtered_formats):
+                print(f"  {idx}: {fmt}")
+
+        if pixel_format_index is None:
+            preferred_formats = [
+                PixelFormatType.FORMAT_12BIT_RGBLE,
+                PixelFormatType.FORMAT_10BIT_RGB,
+                PixelFormatType.FORMAT_10BIT_YUV,
+                PixelFormatType.FORMAT_8BIT_BGRA,
+                PixelFormatType.FORMAT_8BIT_ARGB,
+            ]
+            selected_format = None
+
+            for preferred in preferred_formats:
+                for idx, fmt in enumerate(filtered_formats):
+                    if preferred.value in fmt:
+                        selected_format = idx
+                        break
+                if selected_format is not None:
+                    break
+
+            if selected_format is None:
+                selected_format = 0
+
+            if show_logs:
+                print(
+                    f"\nAuto-selected pixel format: {filtered_formats[selected_format]} (index {selected_format})"
+                )
+
+            original_index = format_mapping[selected_format]
+        else:
+            if pixel_format_index >= len(filtered_formats):
+                return (
+                    False,
+                    None,
+                    None,
+                    None,
+                    f"Pixel format index {pixel_format_index} not found",
+                )
+
+            original_index = format_mapping[pixel_format_index]
+            selected_format = pixel_format_index
+
+            if show_logs:
+                print(
+                    f"\nUsing pixel format: {filtered_formats[pixel_format_index]} (index {pixel_format_index})"
+                )
+
+        decklink.pixel_format = original_index
+        selected_format_name = filtered_formats[selected_format]
+        bit_depth = determine_bit_depth(selected_format_name)
+
+        return True, decklink, bit_depth, devices, None
+
+    except Exception as e:
+        return False, None, None, None, f"Failed to initialize DeckLink: {e!s}"
+
+
+def cleanup_decklink_device(decklink: BMDDeckLink):
+    """Cleanup DeckLink device."""
+    print("Stopping output and closing device.")
+    decklink.close()
+
+
+def setup_decklink_device(
+    settings: DeckLinkSettings, device_index: int, pixel_format_index: int | None
+) -> tuple[BMDDeckLink, int, list[str]]:
+    """Setup DeckLink for CLI usage. Returns (decklink, bit_depth, devices)."""
+    success, decklink, bit_depth, devices, error = _initialize_decklink_device(
+        device_index, pixel_format_index, show_logs=True
     )
     if not success:
-        print(f"Warning: Failed to initialize DeckLink for API: {error}")
+        raise RuntimeError(f"Failed to setup DeckLink device: {error}")
+
+    # Store width and height for later use
+    decklink.width = settings.width
+    decklink.height = settings.height
+
+    # Create HDR metadata using constructor parameters
+    hdr_metadata = HDRMetadata(
+        eotf=settings.eotf,
+        max_display_luminance=settings.max_display_mastering_luminance,
+        min_display_luminance=settings.min_display_mastering_luminance,
+        max_cll=settings.max_cll,
+        max_fall=settings.max_fall,
+    )
+
+    # Set display primaries and white point chromaticity coordinates
+    primary_coords = [
+        ("Red", settings.red_primary),
+        ("Green", settings.green_primary),
+        ("Blue", settings.blue_primary),
+        ("White", settings.white_point),
+    ]
+
+    for color, (x, y) in primary_coords:
+        setattr(hdr_metadata.referencePrimaries, f"{color}X", float(x))
+        setattr(hdr_metadata.referencePrimaries, f"{color}Y", float(y))
+
+    # Set the complete HDR metadata (unless disabled)
+    if not settings.no_hdr:
+        decklink.set_hdr_metadata(hdr_metadata)
+        print(
+            f"Set complete HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+        )
     else:
-        print("DeckLink initialized for API usage")
+        print(
+            f"HDR metadata disabled. EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+        )
 
-
-@pat_server.on_event("shutdown")
-async def shutdown_event():
-    """Clean up DeckLink when FastAPI shuts down."""
-    if decklink_control.decklink_instance:
-        cleanup_decklink_device(decklink_control.decklink_instance)
-
-
-
-
-def main() -> int:
-    description = (
-        "Programatically output signals from a Blackmagic Design DeckLink "
-        "device with HDR metadata support. The pattern can be configured by "
-        "an http API for remote automation"
-        "\n\nColor value ranges by pixel format:"
-        f"\n  12-bit:  0-{BIT_DEPTH_12_MAX} (default, recommended)"
-        f"\n  10-bit:  0-{BIT_DEPTH_10_MAX}"
-        f"\n  8-bit:   0-{BIT_DEPTH_8_MAX} (fallback mode)"
-        "\n\nPattern types:"
-        "\n  solid: Single color (default)"
-        "\n  2color: Two-color checkerboard"
-        "\n  4color: Four-color checkerboard"
-        "\n\nRegion of Interest:"
-        "\n  Use --roi-x, --roi-y, --roi-width, --roi-height to limit pattern to a region"
-    )
-    parser = argparse.ArgumentParser(description=description)
-
-    # Add arguments to the parser, directly mapping to SignalSettings fields
-    parser.add_argument(
-        "--device", "-d", type=int, default=0, help="Device index (default: 0)"
-    )
-    parser.add_argument(
-        "--pixel-format",
-        "-p",
-        type=int,
-        help="Pixel format index (leave blank for auto-select)",
-    )
-    parser.add_argument(
-        "--width", type=int, default=DEFAULT_WIDTH, help=f"Image width (default: {DEFAULT_WIDTH})"
-    )
-    parser.add_argument(
-        "--height", type=int, default=DEFAULT_HEIGHT, help=f"Image height (default: {DEFAULT_HEIGHT})"
-    )
-    parser.add_argument(
-        "--pattern",
-        type=PatternType,
-        choices=list(PatternType),
-        default=PatternType.SOLID,
-        help="Pattern type to generate (default: solid)",
-    )
-    parser.add_argument(
-        "--colors",
-        nargs='+',
-        type=int,
-        default=list(DEFAULT_COLOR_12BIT),
-        help=f"List of colors as R G B values. E.g., --colors {DEFAULT_COLOR_12BIT[0]} {DEFAULT_COLOR_12BIT[1]} {DEFAULT_COLOR_12BIT[2]} 0 {BIT_DEPTH_12_MAX} 0",
-    )
-    parser.add_argument(
-        "--roi-x", type=int, default=0, help="Region of interest X offset (default: 0)"
-    )
-    parser.add_argument(
-        "--roi-y", type=int, default=0, help="Region of interest Y offset (default: 0)"
-    )
-    parser.add_argument(
-        "--roi-width",
-        type=int,
-        help="Region of interest width (default: full image width)",
-    )
-    parser.add_argument(
-        "--roi-height",
-        type=int,
-        help="Region of interest height (default: full image height)",
-    )
-    parser.add_argument(
-        "--no-hdr", action="store_true", help="Disable HDR metadata (use SDR mode)"
-    )
-    parser.add_argument(
-        "--eotf",
-        type=EOTFType.parse,
-        choices=list(EOTFType),
-        default=EOTFType.PQ,
-        help="EOTF type (CEA 861.3): 1=SDR, 2=PQ, 3=HLG, (default: 2=PQ)",
-    )
-    parser.add_argument(
-        "--max-cll",
-        type=float,
-        default=DEFAULT_MAX_CLL,
-        help=f"Maximum Content Light Level in cd/m² (default: {DEFAULT_MAX_CLL})",
-    )
-    parser.add_argument(
-        "--max-fall",
-        type=float,
-        default=DEFAULT_MAX_FALL,
-        help=f"Maximum Frame Average Light Level in cd/m² (default: {DEFAULT_MAX_FALL})",
-    )
-    parser.add_argument(
-        "--max-display-mastering-luminance",
-        type=float,
-        default=DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE,
-        help=f"Maximum display mastering luminance in cd/m² (default: {DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE})",
-    )
-    parser.add_argument(
-        "--min-display-mastering-luminance",
-        type=float,
-        default=DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE,
-        help=f"Minimum display mastering luminance in cd/m² (default: {DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE})",
-    )
-    parser.add_argument(
-        "--red-primary",
-        nargs=2,
-        type=float,
-        default=REC2020_RED_PRIMARY,
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help=f"Red primary coordinates (default: {REC2020_RED_PRIMARY[0]} {REC2020_RED_PRIMARY[1]} for Rec2020)",
-    )
-    parser.add_argument(
-        "--green-primary",
-        nargs=2,
-        type=float,
-        default=REC2020_GREEN_PRIMARY,
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help=f"Green primary coordinates (default: {REC2020_GREEN_PRIMARY[0]} {REC2020_GREEN_PRIMARY[1]} for Rec2020)",
-    )
-    parser.add_argument(
-        "--blue-primary",
-        nargs=2,
-        type=float,
-        default=REC2020_BLUE_PRIMARY,
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help=f"Blue primary coordinates (default: {REC2020_BLUE_PRIMARY[0]} {REC2020_BLUE_PRIMARY[1]} for Rec2020)",
-    )
-    parser.add_argument(
-        "--white-point",
-        nargs=2,
-        type=float,
-        default=D65_WHITE_POINT,
-        action=ChromaticityAction,
-        metavar=('X', 'Y'),
-        help=f"White point coordinates (default: {D65_WHITE_POINT[0]} {D65_WHITE_POINT[1]} for D65)",
-    )
-    parser.add_argument(
-        "--duration",
-        "-t",
-        type=float,
-        default=5.0,
-        help="Duration in seconds (default: 5.0)",
-    )
-
-    args = parser.parse_args()
-
-    # Group colors into tuples
-    if len(args.colors) % 3 != 0:
-        parser.error("Colors must be provided in groups of three (R G B)")
-    colors = [tuple(args.colors[i:i+3]) for i in range(0, len(args.colors), 3)]
-
-    # Create DeckLinkSettings object from parsed arguments
-    decklink_settings = DeckLinkSettings(
-        width=args.width,
-        height=args.height,
-        no_hdr=args.no_hdr,
-        eotf=args.eotf,
-        max_cll=args.max_cll,
-        max_fall=args.max_fall,
-        max_display_mastering_luminance=args.max_display_mastering_luminance,
-        min_display_mastering_luminance=args.min_display_mastering_luminance,
-        red_primary=args.red_primary,
-        green_primary=args.green_primary,
-        blue_primary=args.blue_primary,
-        white_point=args.white_point,
-    )
-
-    decklink, bit_depth, devices = setup_decklink_device(decklink_settings, args.device, args.pixel_format)
-    if decklink is None:
-        return 1
-
-    # Create PatternSettings object from parsed arguments
-    pattern_settings = PatternSettings(
-        pattern=args.pattern,
-        colors=colors,
-        roi_x=args.roi_x,
-        roi_y=args.roi_y,
-        roi_width=args.roi_width,
-        roi_height=args.roi_height,
-        bit_depth=bit_depth if bit_depth is not None else DEFAULT_BIT_DEPTH,
-    )
-
-    success = display_pattern(pattern_settings, decklink)
-    if success:
-        # Wait for the specified duration only in CLI mode
-        print(f"Displaying for {args.duration} seconds...")
-        time.sleep(args.duration)
-
-    cleanup_decklink_device(decklink)
-    return 0 if success else 1
-
+    decklink.start()
+    return decklink, bit_depth, devices
 
 
 if __name__ == "__main__":
-    import sys
-
-    if "--api" in sys.argv:
-        import uvicorn
-
-        uvicorn.run("bmd_signal_gen:app", host="127.0.0.1", port=8000, reload=True)
-    else:
-        sys.exit(main())
+    app()

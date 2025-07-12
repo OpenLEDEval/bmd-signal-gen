@@ -16,8 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:main"
-bmd_signal_gen2 = "bmd_sg.scripts.bmd_signal_gen2:app"
+bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -27,3 +26,74 @@ build-backend = "hatchling.build"
 packages = ["bmd_sg"]
 include = ["LICENSE"]
 exclude = ["data/", "cpp/", "tests/"]
+
+[dependency-groups]
+dev = ["invoke>=2.2.0", "pyright>=1.1.403", "ruff>=0.12.3"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.lint.pydocstyle]
+convention = "numpy"
+
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "C90", # mccabe complexity
+    "T20", # flake8-print
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501", # Line too long (handled by formatter)
+    "B008", # Do not perform function calls in argument defaults
+    "T201", # Print found (allow for debugging)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG", "T20"]
+"scripts/*" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bmd_sg"]
+split-on-trailing-comma = true
+
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+include = ["bmd_sg", "tests"]
+exclude = ["**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportDuplicateImport = true
+reportInconsistentConstructor = true
+reportMissingParameterType = true
+reportMissingReturnType = true
+reportUnnecessaryTypeIgnoreComment = true
+reportMissingModuleSource = false
+reportUnboundVariable = false
+reportUnnecessaryCast = true
+reportUnnecessaryTypeIgnorComment = true
+reportUnsupportedDunderAll = false
+reportUnusedExpression = false

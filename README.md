@@ -33,7 +33,7 @@ This project allows you to:
 
 ```
 bmd-signal-gen/
-├── bmd_signal_gen.py             # Command-line application
+├── bmd_sg/scripts/bmd_signal_gen.py   # Command-line application (Typer-based)
 ├── cpp/                          # BMD DeckLink API C++ wrapper
 │   ├── decklink_wrapper.h        # C API header
 │   ├── decklink_wrapper.cpp      # C API implementation
