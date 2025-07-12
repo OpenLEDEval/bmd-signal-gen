@@ -44,6 +44,7 @@ bmd_sg.decklink_control : High-level device control interface
 import ctypes
 from enum import Enum
 from pathlib import Path
+
 import numpy as np
 
 
@@ -507,7 +508,6 @@ def _configure_function_signatures(lib):
         lib.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
         lib.decklink_create_frame_from_data.restype = ctypes.c_int
 
-
     # Synchronous display function
     if hasattr(lib, "decklink_display_frame_sync"):
         lib.decklink_display_frame_sync.argtypes = [ctypes.c_void_p]
@@ -829,7 +829,27 @@ class BMDDeckLink:
     def supports_hdr(self) -> bool:
         return DecklinkSDKWrapper.decklink_device_supports_hdr(self.handle)
 
-    def set_pixel_format(self, format_index):
+    @property
+    def pixel_format(self):
+        """
+        Get the current pixel format index.
+
+        Returns
+        -------
+        int
+            Current pixel format index
+
+        Raises
+        ------
+        RuntimeError
+            If the device is not open
+        """
+        if not self.handle:
+            raise RuntimeError("Device not open")
+        return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
+
+    @pixel_format.setter
+    def pixel_format(self, format_index: PixelFormatType):
         """
         Set the pixel format by index.
 
@@ -848,24 +868,6 @@ class BMDDeckLink:
         res = DecklinkSDKWrapper.decklink_set_pixel_format(self.handle, format_index)
         if res != 0:
             raise RuntimeError(f"Failed to set pixel format (error {res})")
-
-    def get_pixel_format(self):
-        """
-        Get the current pixel format index.
-
-        Returns
-        -------
-        int
-            Current pixel format index
-
-        Raises
-        ------
-        RuntimeError
-            If the device is not open
-        """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
 
     def set_hdr_metadata(self, metadata: HDRMetadata):
         """

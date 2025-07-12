@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-Typer-based CLI for BMD Signal Generator with optional config file support.
+Typer-based CLI for BMD Signal Generator.
 Supports HDR metadata configuration including EOTF settings and pixel format selection.
 """
 
 import time
-from pathlib import Path
 from typing import Annotated
 
 import typer
-import yaml
 from typer import Argument, Option
 
 from bmd_sg.decklink.bmd_decklink import (
@@ -29,112 +27,6 @@ app = typer.Typer(
     no_args_is_help=True,
     help="BMD Signal Generator - Output test patterns to Blackmagic Design DeckLink devices",
 )
-
-
-class Config:
-    """Configuration container for CLI arguments."""
-
-    def __init__(self, config_file: Path | None = None):
-        # Default values
-        self.color1 = (4095, 0, 0)
-        self.color2 = (0, 0, 0)
-        self.color3 = (0, 0, 0)
-        self.color4 = (0, 0, 0)
-        self.duration = 5.0
-        self.device = 0
-        self.pixel_format: int | None = None
-        self.eotf = EOTFType.PQ
-        self.pattern = PatternType.TWO_COLOR
-        self.width = 1920
-        self.height = 1080
-
-        # ROI settings
-        self.roi_x = 64
-        self.roi_y = 64
-        self.roi_width = 64
-        self.roi_height = 64
-
-        # HDR metadata
-        self.max_display_mastering_luminance = 1000.0
-        self.min_display_mastering_luminance = 0.0001
-        self.max_cll = 10000.0
-        self.max_fall = 400.0
-
-        # Color primaries (Rec2020 defaults)
-        self.red_primary = (0.708, 0.292)
-        self.green_primary = (0.170, 0.797)
-        self.blue_primary = (0.131, 0.046)
-        self.white_primary = (0.3127, 0.3290)
-
-        self.no_hdr = False
-
-        # Load from config file if provided
-        if config_file:
-            self.load_config(config_file)
-
-    def load_config(self, config_file: Path):
-        """Load configuration from YAML file."""
-        if not config_file.exists():
-            typer.echo(f"Config file not found: {config_file}", err=True)
-            return
-
-        try:
-            with open(config_file) as f:
-                config_data = yaml.safe_load(f)
-
-            if not config_data:
-                return
-
-            # Update attributes from config file
-            for key, value in config_data.items():
-                if hasattr(self, key):
-                    # Handle special cases
-                    if key == "eotf" and isinstance(value, str):
-                        try:
-                            self.eotf = EOTFType.parse(value)
-                        except ValueError:
-                            typer.echo(
-                                f"Invalid EOTF value in config: {value}", err=True
-                            )
-                    elif key == "pattern" and isinstance(value, str):
-                        try:
-                            self.pattern = PatternType(value)
-                        except ValueError:
-                            typer.echo(
-                                f"Invalid pattern value in config: {value}", err=True
-                            )
-                    elif key in [
-                        "red_primary",
-                        "green_primary",
-                        "blue_primary",
-                        "white_primary",
-                    ] and isinstance(value, list):
-                        if len(value) == 2:
-                            setattr(self, key, tuple(value))
-                        else:
-                            typer.echo(
-                                f"Invalid chromaticity coordinates in config for {key}: {value}",
-                                err=True,
-                            )
-                    elif key in ["color1", "color2", "color3", "color4"] and isinstance(
-                        value, list
-                    ):
-                        if len(value) == 3:
-                            setattr(self, key, tuple(value))
-                        else:
-                            typer.echo(
-                                f"Invalid color RGB values in config for {key}: {value}",
-                                err=True,
-                            )
-                    else:
-                        setattr(self, key, value)
-                else:
-                    typer.echo(f"Unknown config option: {key}", err=True)
-
-        except yaml.YAMLError as e:
-            typer.echo(f"Error parsing config file: {e}", err=True)
-        except Exception as e:
-            typer.echo(f"Error loading config file: {e}", err=True)
 
 
 def validate_color(value: tuple[int, int, int]) -> tuple[int, int, int]:
@@ -160,16 +52,6 @@ def pat2(
             rich_help_panel="Colors",
         ),
     ] = (0, 0, 0),
-    # Basic Settings
-    config: Annotated[
-        Path | None,
-        Option(
-            "--config",
-            "-c",
-            help="Path to YAML config file",
-            rich_help_panel="Basic Settings",
-        ),
-    ] = None,
     duration: Annotated[
         float,
         Option(
@@ -257,7 +139,7 @@ def pat2(
             help="Maximum Frame Average Light Level in cd/m²",
             rich_help_panel="HDR Metadata",
         ),
-    ] = 400.0,
+    ] = 80.0,
     red_primary: Annotated[
         tuple[float, float],
         Option(
@@ -304,233 +186,106 @@ def pat2(
     - 8-bit:  0-255 (fallback mode)
 
     Pattern type: Two-color checkerboard
-
-    Config file format (YAML):
-    ```yaml
-    r: 4095
-    g: 0
-    b: 0
-    duration: 5.0
-    pattern: "2color"
-    eotf: "PQ"
-    red: [0.708, 0.292]
-    green: [0.170, 0.797]
-    # ... etc
-    ```
     """
 
-    # Load config first, then override with CLI arguments
-    cfg = Config(config)
-
-    # Override config with CLI arguments (only if they differ from defaults)
-    if color1 != (4095, 0, 0):
-        cfg.color1 = validate_color(color1)
-    if color2 != (0, 0, 0):
-        cfg.color2 = validate_color(color2)
-    if cfg.color3 != (0, 0, 0):
-        cfg.color3 = validate_color(cfg.color3)
-    if cfg.color4 != (0, 0, 0):
-        cfg.color4 = validate_color(cfg.color4)
-
-    if duration != 5.0:
-        cfg.duration = duration
-    if device != 0:
-        cfg.device = device
-    if pixel_format is not None:
-        cfg.pixel_format = pixel_format
-    if width != 1920:
-        cfg.width = width
-    if height != 1080:
-        cfg.height = height
-    if roi_x != 64:
-        cfg.roi_x = roi_x
-    if roi_y != 64:
-        cfg.roi_y = roi_y
-    if roi_width != 64:
-        cfg.roi_width = roi_width
-    if roi_height != 64:
-        cfg.roi_height = roi_height
-    if eotf != EOTFType.PQ:
-        cfg.eotf = eotf
-    if max_display_mastering_luminance != 1000.0:
-        cfg.max_display_mastering_luminance = max_display_mastering_luminance
-    if min_display_mastering_luminance != 0.0001:
-        cfg.min_display_mastering_luminance = min_display_mastering_luminance
-    if max_cll != 10000.0:
-        cfg.max_cll = max_cll
-    if max_fall != 400.0:
-        cfg.max_fall = max_fall
-    if red_primary != (0.708, 0.292):
-        cfg.red_primary = red_primary
-    if green_primary != (0.170, 0.797):
-        cfg.green_primary = green_primary
-    if blue_primary != (0.131, 0.046):
-        cfg.blue_primary = blue_primary
-    if white_primary != (0.3127, 0.3290):
-        cfg.white_primary = white_primary
-    if no_hdr:
-        cfg.no_hdr = no_hdr
+    # Validate colors
+    color1 = validate_color(color1)
+    color2 = validate_color(color2)
 
     # Create DeckLink settings
     decklink_settings = DeckLinkSettings(
-        width=cfg.width,
-        height=cfg.height,
-        no_hdr=cfg.no_hdr,
-        eotf=cfg.eotf,
-        max_cll=cfg.max_cll,
-        max_fall=cfg.max_fall,
-        max_display_mastering_luminance=cfg.max_display_mastering_luminance,
-        min_display_mastering_luminance=cfg.min_display_mastering_luminance,
-        red_primary=cfg.red_primary,
-        green_primary=cfg.green_primary,
-        blue_primary=cfg.blue_primary,
-        white_point=cfg.white_primary,
+        width=width,
+        height=height,
+        no_hdr=no_hdr,
+        eotf=eotf,
+        max_cll=max_cll,
+        max_fall=max_fall,
+        max_display_mastering_luminance=max_display_mastering_luminance,
+        min_display_mastering_luminance=min_display_mastering_luminance,
+        red_primary=red_primary,
+        green_primary=green_primary,
+        blue_primary=blue_primary,
+        white_point=white_primary,
     )
 
     # Setup DeckLink device
     decklink, bit_depth, _ = setup_decklink_device(
-        decklink_settings, cfg.device, cfg.pixel_format
+        decklink_settings, device, pixel_format
     )
-    if decklink is None:
-        typer.echo("Failed to setup DeckLink device", err=True)
-        raise typer.Exit(1)
 
     # Generate TWO_COLOR pattern and store in img variable
     generator = PatternGenerator(
-        width=cfg.width,
-        height=cfg.height,
+        width=width,
+        height=height,
         bit_depth=bit_depth or 12,
         pattern_type=PatternType.TWO_COLOR,
-        roi_x=cfg.roi_x,
-        roi_y=cfg.roi_y,
-        roi_width=cfg.roi_width,
-        roi_height=cfg.roi_height,
+        roi_x=roi_x,
+        roi_y=roi_y,
+        roi_width=roi_width,
+        roi_height=roi_height,
     )
 
-    img = generator.generate((cfg.color1, cfg.color2))
+    img = generator.generate([color1, color2])
 
     # Display the pattern
     decklink.display_frame(img)
 
-    typer.echo(f"Displaying for {cfg.duration} seconds...")
-    time.sleep(cfg.duration)
-
-    # Cleanup
-    cleanup_decklink_device(decklink)
-    typer.Exit(0)
-
-
-@app.command()
-def list_formats(
-    device: Annotated[int, Option("--device", "-d", help="Device index")] = 0,
-) -> None:
-    """List all supported pixel formats for the specified device."""
-
-    # Create a minimal config for device setup
-    class Args:
-        def __init__(self):
-            self.device = device
-            self.all = True  # Enable listing all formats
-            self.pixel_format = None
-            self.eotf = EOTFType.PQ
-            self.max_display_mastering_luminance = 1000.0
-            self.min_display_mastering_luminance = 0.0001
-            self.max_cll = 10000.0
-            self.max_fall = 400.0
-            self.red_primary = (0.708, 0.292)
-            self.green_primary = (0.170, 0.797)
-            self.blue_primary = (0.131, 0.046)
-            self.white_primary = (0.3127, 0.3290)
-            self.no_hdr = False
-
-    args = Args()
-
-    # Setup DeckLink device (this will list formats when all=True)
-    decklink_settings = DeckLinkSettings(
-        width=1920,
-        height=1080,
-        no_hdr=args.no_hdr,
-        eotf=args.eotf,
-        max_cll=args.max_cll,
-        max_fall=args.max_fall,
-        max_display_mastering_luminance=args.max_display_mastering_luminance,
-        min_display_mastering_luminance=args.min_display_mastering_luminance,
-        red_primary=args.red_primary,
-        green_primary=args.green_primary,
-        blue_primary=args.blue_primary,
-        white_point=args.white_primary,
-    )
-    decklink, bit_depth, _ = setup_decklink_device(
-        decklink_settings, args.device, args.pixel_format
-    )
-    if decklink is None:
-        typer.echo("Failed to setup DeckLink device", err=True)
-        raise typer.Exit(1)
+    typer.echo(f"Displaying for {duration} seconds...")
+    time.sleep(duration)
 
     # Cleanup
     cleanup_decklink_device(decklink)
 
 
 @app.command()
-def config_template():
-    """Generate a template config file."""
-    template = """# BMD Signal Generator Configuration File
-# All values are optional - CLI arguments will override these settings
+def device_details() -> None:
+    """Show details for all connected DeckLink devices."""
 
-# Color values (RGB tuples, each component 0-4095 for 12-bit)
-color1: [4095, 0, 0]  # Red
-color2: [0, 0, 0]     # Black
-color3: [0, 0, 0]     # Black
-color4: [0, 0, 0]     # Black
+    try:
+        # Print SDK and driver version information first
+        typer.echo("DeckLink System Information:")
+        typer.echo(f"  SDK Version: {get_decklink_sdk_version()}")
+        typer.echo(f"  Driver Version: {get_decklink_driver_version()}")
+        typer.echo()
 
-# Duration in seconds
-duration: 5.0
+        # Get all available devices
+        devices = get_decklink_devices()
 
-# Device settings
-device: 0
-# pixel_format: null  # auto-select if not specified
-
-# Pattern settings
-# pattern is always 2color for pat2 command
-width: 1920
-height: 1080
-
-# Region of Interest
-roi_x: 64
-roi_y: 64
-roi_width: 64
-roi_height: 64
-
-# HDR settings
-eotf: "PQ"  # SDR, PQ, HLG
-max_display_mastering_luminance: 1000.0
-min_display_mastering_luminance: 0.0001
-max_cll: 10000.0
-max_fall: 400.0
-
-# Color primaries (Rec2020 defaults)
-red_primary: [0.708, 0.292]
-green_primary: [0.170, 0.797]
-blue_primary: [0.131, 0.046]
-white_primary: [0.3127, 0.3290]
-
-# Flags
-no_hdr: false
-"""
-
-    config_file = Path("bmd_signal_gen_config.yaml")
-    if config_file.exists():
-        overwrite = typer.confirm(
-            f"Config file {config_file} already exists. Overwrite?"
-        )
-        if not overwrite:
-            typer.echo("Config file generation cancelled.")
+        if not devices:
+            typer.echo("No DeckLink devices found.")
             return
 
-    with open(config_file, "w") as f:
-        f.write(template)
+        typer.echo(f"Found {len(devices)} DeckLink device(s):\n")
 
-    typer.echo(f"Config template written to {config_file}")
+        # Iterate through each device
+        for idx, device_name in enumerate(devices):
+            typer.echo(f"Device {idx}: {device_name}")
+
+            try:
+                # Open the device to get its details
+                decklink = BMDDeckLink(device_index=idx)
+
+                # Get supported pixel formats
+                formats = decklink.get_supported_pixel_formats()
+                typer.echo(f"  Supported pixel formats ({len(formats)}):")
+                for format_idx, format_name in enumerate(formats):
+                    typer.echo(f"    {format_idx}: {format_name}")
+
+                # Check HDR support
+                hdr_support = decklink.supports_hdr
+                typer.echo(f"  HDR Support: {'Yes' if hdr_support else 'No'}")
+
+                # Cleanup
+                decklink.close()
+
+            except RuntimeError as e:
+                typer.echo(f"  Error accessing device: {e}")
+
+            typer.echo()  # Empty line between devices
+
+    except Exception as e:
+        typer.echo(f"Error enumerating devices: {e}", err=True)
+        raise typer.Exit(1)
 
 
 def determine_bit_depth(format_name: str) -> int:
@@ -636,7 +391,7 @@ def _initialize_decklink_device(
                     f"\nUsing pixel format: {filtered_formats[pixel_format_index]} (index {pixel_format_index})"
                 )
 
-        decklink.set_pixel_format(original_index)
+        decklink.pixel_format = original_index
         selected_format_name = filtered_formats[selected_format]
         bit_depth = determine_bit_depth(selected_format_name)
 
@@ -666,41 +421,37 @@ def setup_decklink_device(
     decklink.width = settings.width
     decklink.height = settings.height
 
-    # Set complete HDR metadata if not disabled
-    if not settings.no_hdr:
-        # Create complete HDR metadata with default Rec2020 values
-        hdr_metadata = HDRMetadata()
+    # Create HDR metadata using constructor parameters
+    hdr_metadata = HDRMetadata(
+        eotf=settings.eotf,
+        max_display_luminance=settings.max_display_mastering_luminance,
+        min_display_luminance=settings.min_display_mastering_luminance,
+        max_cll=settings.max_cll,
+        max_fall=settings.max_fall,
+    )
 
-        # Update with user-provided values
-        hdr_metadata.EOTF = settings.eotf.int_value
-        hdr_metadata.maxCLL = float(settings.max_cll)
-        hdr_metadata.maxFALL = float(settings.max_fall)
-        # Set mastering display luminance
-        hdr_metadata.maxDisplayMasteringLuminance = float(
-            settings.max_display_mastering_luminance
-        )
-        hdr_metadata.minDisplayMasteringLuminance = float(
-            settings.min_display_mastering_luminance
-        )
-        # Set display primaries and white point chromaticity coordinates
-        hdr_metadata.referencePrimaries.RedX = float(settings.red_primary[0])
-        hdr_metadata.referencePrimaries.RedY = float(settings.red_primary[1])
-        hdr_metadata.referencePrimaries.GreenX = float(settings.green_primary[0])
-        hdr_metadata.referencePrimaries.GreenY = float(settings.green_primary[1])
-        hdr_metadata.referencePrimaries.BlueX = float(settings.blue_primary[0])
-        hdr_metadata.referencePrimaries.BlueY = float(settings.blue_primary[1])
-        hdr_metadata.referencePrimaries.WhiteX = float(settings.white_point[0])
-        hdr_metadata.referencePrimaries.WhiteY = float(settings.white_point[1])
+    # Set display primaries and white point chromaticity coordinates
+    primary_coords = [
+        ("Red", settings.red_primary),
+        ("Green", settings.green_primary),
+        ("Blue", settings.blue_primary),
+        ("White", settings.white_point),
+    ]
 
-        # Set the complete HDR metadata
-        decklink.set_hdr_metadata(hdr_metadata)
-    else:
-        # Use legacy EOTF method for SDR
-        decklink.set_frame_eotf(
-            settings.eotf.int_value, settings.max_cll, settings.max_fall
-        )
+    for color, (x, y) in primary_coords:
+        setattr(hdr_metadata.referencePrimaries, f"{color}X", float(x))
+        setattr(hdr_metadata.referencePrimaries, f"{color}Y", float(y))
+
+    # Set the complete HDR metadata
+    decklink.set_hdr_metadata(hdr_metadata)
+
+    if settings.no_hdr:
         print(
-            f"Set basic EOTF metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+            f"Set basic HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
+        )
+    else:
+        print(
+            f"Set complete HDR metadata: EOTF={settings.eotf}, MaxCLL={settings.max_cll}, MaxFALL={settings.max_fall}"
         )
 
     decklink.start()
