@@ -20,9 +20,9 @@ Basic device usage:
 
 >>> from bmd_sg.decklink.bmd_decklink import BMDDeckLink, HDRMetadata
 >>> device = BMDDeckLink(device_index=0)
->>> device.start()
+>>> device.start_playback()
 >>> # Set frame data and output
->>> device.stop()
+>>> device.stop_playback()
 >>> device.close()
 
 HDR metadata configuration:
@@ -42,13 +42,15 @@ bmd_sg.decklink_control : High-level device control interface
 """
 
 import ctypes
+import re
 from enum import Enum
 from pathlib import Path
+from typing import Any, Self
 
 import numpy as np
 
 
-class PixelFormatType(Enum):
+class PixelFormatType(str, Enum):
     """
     Enumeration of supported DeckLink pixel format types.
 
@@ -85,18 +87,26 @@ class PixelFormatType(Enum):
     12BIT_RGB
     """
 
-    FORMAT_8BIT_YUV = "2vuy"
-    FORMAT_10BIT_YUV = "v210"
-    FORMAT_10BIT_YUVA = "Ay10"
-    FORMAT_8BIT_ARGB = 32
-    FORMAT_8BIT_BGRA = "BGRA"
-    FORMAT_10BIT_RGB = "r210"
-    FORMAT_12BIT_RGB = "R12B"
-    FORMAT_12BIT_RGBLE = "R12L"
-    FORMAT_10BIT_RGBXLE = "R10l"
-    FORMAT_10BIT_RGBX = "R10b"
+    FORMAT_8BIT_YUV = ("2vuy", 8)
+    FORMAT_10BIT_YUV = ("v210", 10)
+    FORMAT_10BIT_YUVA = ("Ay10", 10)
+    FORMAT_8BIT_ARGB = ("32", 8)
+    FORMAT_8BIT_BGRA = ("BGRA", 8)
+    FORMAT_10BIT_RGB = ("r210", 10)
+    FORMAT_12BIT_RGB = ("R12B", 12)
+    FORMAT_12BIT_RGBLE = ("R12L", 12)
+    FORMAT_10BIT_RGBXLE = ("R10l", 10)
+    FORMAT_10BIT_RGBX = ("R10b", 10)
 
-    def __str__(self):
+    def __new__(cls, value: str, bit_depth: int):  # noqa: ARG004
+        self = str.__new__(cls, value)
+        self._value_ = value
+        return self
+
+    def __init__(self, value: str, bit_depth: int):  # noqa: ARG002
+        self.bit_depth = bit_depth
+
+    def __str__(self) -> str:
         """
         Return a clean string representation of the pixel format.
 
@@ -106,6 +116,86 @@ class PixelFormatType(Enum):
             The pixel format name without the 'FORMAT_' prefix.
         """
         return f"{self.name[8:]}"
+
+    @classmethod
+    def parse(cls, value: str) -> Self:
+        """
+        Parse a pixel format string and return the corresponding enum member.
+
+        This method attempts to match the input string against pixel format values
+        and enum names (case-insensitive). It ignores bit depth information since
+        the string alone cannot determine the exact type without additional context.
+
+        Parameters
+        ----------
+        value : str
+            The pixel format string to parse. Can be the format code (e.g., 'R12L')
+            or the enum name (e.g., 'FORMAT_12BIT_RGBLE' or '12BIT_RGBLE').
+
+        Returns
+        -------
+        PixelFormatType
+            The matching pixel format enum member.
+
+        Raises
+        ------
+        ValueError
+            If the pixel format string cannot be parsed or matched to any
+            known format.
+
+        Examples
+        --------
+        Parse by format code:
+
+        >>> fmt = PixelFormatType.parse('R12L')
+        >>> print(fmt)
+        12BIT_RGBLE
+
+        Parse by enum name:
+
+        >>> fmt = PixelFormatType.parse('FORMAT_10BIT_RGB')
+        >>> print(fmt)
+        10BIT_RGB
+
+        Parse by shortened name:
+
+        >>> fmt = PixelFormatType.parse('10BIT_RGB')
+        >>> print(fmt)
+        10BIT_RGB
+
+        Notes
+        -----
+        This method performs case-insensitive matching and will attempt to
+        match against both the format value and the enum name.
+        """
+        if not isinstance(value, str):
+            raise ValueError(f"Expected string, got {type(value).__name__}: {value}")
+
+        value_upper = value.upper().strip()
+
+        # Try matching by format value (e.g., 'R12L', '2vuy', 'BGRA')
+        for member in cls:
+            if member.value.upper() == value_upper:
+                return member
+
+        # Try matching by enum name with or without FORMAT_ prefix
+        # Handle both 'FORMAT_12BIT_RGB' and '12BIT_RGB'
+        if not value_upper.startswith("FORMAT_"):
+            value_upper = f"FORMAT_{value_upper}"
+
+        try:
+            return cls[value_upper]
+        except KeyError:
+            pass
+
+        # Build error message with valid options
+        format_codes = ", ".join(f"'{member.value}'" for member in cls)
+        enum_names = ", ".join(member.name for member in cls)
+        raise ValueError(
+            f"Invalid pixel format: '{value}'. "
+            f"Valid format codes: {format_codes}. "
+            f"Valid enum names: {enum_names}"
+        )
 
 
 class EOTFType(str, Enum):
@@ -141,7 +231,7 @@ class EOTFType(str, Enum):
     PQ = ("PQ", 2)
     HLG = ("HLG", 3)
 
-    def __new__(cls, value, *args):
+    def __new__(cls, value: str, *args: Any):
         self = str.__new__(cls, value)
         self._value_ = value
         for a in args:
@@ -155,7 +245,7 @@ class EOTFType(str, Enum):
     ):
         self.int_value = int_value
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Return a formatted string representation of the EOTF type.
 
@@ -167,7 +257,7 @@ class EOTFType(str, Enum):
         return f'{self.value}="{self.value}"={self.int_value}'
 
     @classmethod
-    def parse(cls, value):
+    def parse(cls, value: str | int) -> Self:
         """
         Parse an EOTF value from string or integer.
 
@@ -285,7 +375,7 @@ class ChromaticityCoordinates(ctypes.Structure):
         green_xy: tuple[float, float],
         blue_xy: tuple[float, float],
         white_xy: tuple[float, float],
-    ):
+    ) -> None:
         super().__init__()
         self.RedX = red_xy[0]
         self.RedY = red_xy[1]
@@ -414,7 +504,7 @@ class HDRMetadata(ctypes.Structure):
         min_display_luminance: float = 0.0001,
         max_cll: float = 1000.0,
         max_fall: float = 50.0,
-    ):
+    ) -> None:
         super().__init__()
         self.EOTF = eotf.int_value
         self.maxDisplayMasteringLuminance = max_display_luminance
@@ -426,8 +516,28 @@ class HDRMetadata(ctypes.Structure):
         self.referencePrimaries = CHROMATICITYCOORDINATES_REC2020
 
 
-def _configure_function_signatures(lib):
-    """Configure ctypes function signatures for all DeckLink SDK functions."""
+def _configure_function_signatures(lib: ctypes.CDLL) -> None:
+    """Configure ctypes function signatures for all DeckLink SDK functions.
+
+    Sets up argument types and return types for all C functions in the DeckLink
+    SDK library to ensure proper type safety and memory management when calling
+    from Python.
+
+    Parameters
+    ----------
+    lib : ctypes.CDLL
+        The loaded DeckLink SDK library instance.
+
+    Notes
+    -----
+    This function configures signatures for:
+    - Device enumeration (count, names)
+    - Device management (open, close, start, stop)
+    - Pixel format management
+    - HDR metadata handling
+    - Frame data operations
+    - Version information
+    """
 
     # Device enumeration functions
     if hasattr(lib, "decklink_get_device_count"):
@@ -529,7 +639,30 @@ def _configure_function_signatures(lib):
 
 
 def _try_load_decklink_sdk() -> ctypes.CDLL:
-    """Load the DeckLink SDK library and configure function signatures."""
+    """Load the DeckLink SDK library and configure function signatures.
+
+    Attempts to load the compiled libdecklink.dylib from the same directory
+    as this Python module, then configures all ctypes function signatures
+    for type safety.
+
+    Returns
+    -------
+    ctypes.CDLL
+        The loaded and configured DeckLink SDK library instance.
+
+    Raises
+    ------
+    FileNotFoundError
+        If libdecklink.dylib cannot be found in the expected location.
+    OSError
+        If the library exists but cannot be loaded (e.g., architecture mismatch,
+        missing dependencies, or permission issues).
+
+    Notes
+    -----
+    The library file must be built from the C++ source in the cpp/ directory
+    and placed in the same directory as this module.
+    """
     lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
     try:
         # Try to load from the lib directory relative to this script
@@ -553,7 +686,7 @@ def _try_load_decklink_sdk() -> ctypes.CDLL:
 DecklinkSDKWrapper: ctypes.CDLL = _try_load_decklink_sdk()
 
 
-def get_decklink_driver_version():
+def get_decklink_driver_version() -> str:
     """
     Get the DeckLink driver version string.
 
@@ -575,7 +708,7 @@ def get_decklink_driver_version():
     return DecklinkSDKWrapper.decklink_get_driver_version().decode("utf-8")
 
 
-def get_decklink_sdk_version():
+def get_decklink_sdk_version() -> str:
     """
     Get the DeckLink SDK version string.
 
@@ -624,9 +757,8 @@ def ndarray_to_bmd_frame_buffer(
     # Get dimensions
     if frame_data.ndim == 2:
         height, width = frame_data.shape
-        channels = 1
     elif frame_data.ndim == 3:
-        height, width, channels = frame_data.shape
+        height, width, _ = frame_data.shape
     else:
         raise ValueError("frame_data must be 2D or 3D array")
 
@@ -637,10 +769,10 @@ def ndarray_to_bmd_frame_buffer(
 
     # Get pointer to data
     data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
-    return data_ptr, width, height
+    return data_ptr, height, width
 
 
-def get_decklink_devices():
+def get_decklink_devices() -> list[str]:
     """
     Get list of available DeckLink device names.
 
@@ -698,16 +830,22 @@ class BMDDeckLink:
 
     Examples
     --------
+    Context manager usage (recommended):
+
+    >>> with BMDDeckLink(device_index=0) as device:
+    ...     device.start_playback()
+    ...     # Device automatically closed when exiting the with block
+
     Basic usage with automatic cleanup:
 
     >>> device = BMDDeckLink(device_index=0)
-    >>> device.start()
+    >>> device.start_playback()
     >>> # Device automatically closed when object goes out of scope
 
     Manual cleanup if needed:
 
     >>> device = BMDDeckLink(device_index=0)
-    >>> device.start()
+    >>> device.start_playback()
     >>> device.close()  # Explicit cleanup
 
     Raises
@@ -721,7 +859,7 @@ class BMDDeckLink:
     For guaranteed cleanup timing, use the close() method explicitly.
     """
 
-    def __init__(self, device_index: int = 0):
+    def __init__(self, device_index: int = 0) -> None:
         self.device_index = device_index
         self.handle = DecklinkSDKWrapper.decklink_open_output_by_index(device_index)
         if not self.handle:
@@ -730,11 +868,53 @@ class BMDDeckLink:
             )
         self.started = False
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor - automatically close device on object destruction."""
         self.close()
 
-    def close(self):
+    def __enter__(self) -> Self:
+        """
+        Enter the context manager.
+
+        Returns
+        -------
+        Self
+            The BMDDeckLink instance for use in the with statement
+
+        Examples
+        --------
+        >>> with BMDDeckLink(0) as device:
+        ...     device.start_playback()
+        ...     # Device automatically closed when exiting the with block
+        """
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any | None,
+    ) -> None:
+        """
+        Exit the context manager and close the device.
+
+        Parameters
+        ----------
+        exc_type : type[BaseException] | None
+            Exception type if an exception occurred, None otherwise
+        exc_val : BaseException | None
+            Exception value if an exception occurred, None otherwise
+        exc_tb : Any | None
+            Exception traceback if an exception occurred, None otherwise
+
+        Notes
+        -----
+        The device is automatically closed regardless of whether an exception
+        occurred within the with block.
+        """
+        self.close()
+
+    def close(self) -> None:
         """
         Close the device and free resources.
 
@@ -747,8 +927,7 @@ class BMDDeckLink:
         """
         if self.handle:
             if self.started:
-                DecklinkSDKWrapper.decklink_stop_output(self.handle)
-                self.started = False
+                self.stop_playback()
             DecklinkSDKWrapper.decklink_close(self.handle)
             self.handle = None
 
@@ -764,14 +943,14 @@ class BMDDeckLink:
         """
         return self.handle is not None
 
-    def start(self):
+    def start_playback(self) -> None:
         """
-        Start outputting the color patch.
+        Start playback output to the DeckLink device.
 
         Raises
         ------
         RuntimeError
-            If the device is not open or if starting output fails
+            If the device is not open or if starting playback fails
         """
         if not self.handle:
             raise RuntimeError("Device not open")
@@ -779,12 +958,12 @@ class BMDDeckLink:
             return
         res = DecklinkSDKWrapper.decklink_start_output(self.handle)
         if res != 0:
-            raise RuntimeError(f"Failed to start output (error {res})")
+            raise RuntimeError(f"Failed to start playback output (error {res})")
         self.started = True
 
-    def stop(self):
+    def stop_playback(self) -> None:
         """
-        Stop output.
+        Stop playback output from the DeckLink device.
 
         This method is idempotent - it can be called multiple times safely.
         """
@@ -793,19 +972,24 @@ class BMDDeckLink:
         DecklinkSDKWrapper.decklink_stop_output(self.handle)
         self.started = False
 
-    def get_supported_pixel_formats(self):
+    def get_supported_pixel_formats(self) -> list[PixelFormatType]:
         """
-        Get list of supported pixel format names.
+        Get list of supported pixel format enum values.
 
         Returns
         -------
-        list[str]
-            List of supported pixel format names
+        list[PixelFormatType]
+            List of supported pixel format enum values
 
         Raises
         ------
         RuntimeError
             If the device is not open
+
+        Notes
+        -----
+        If a pixel format string cannot be parsed to a known enum value, a warning
+        is printed asking the user to report the unknown format as a GitHub issue.
         """
         if not self.handle:
             raise RuntimeError("Device not open")
@@ -822,7 +1006,42 @@ class BMDDeckLink:
                 )
                 == 0
             ):
-                formats.append(name.value.decode("utf-8"))
+                format_string = name.value.decode("utf-8")
+                try:
+                    # Try to parse the format string to a PixelFormatType enum
+                    # First try direct parsing, then try extracting format codes from parentheses
+                    try:
+                        pixel_format = PixelFormatType.parse(format_string)
+                    except ValueError as e:
+                        # Try to extract format code from strings like "8Bit ARGB (32)" or "12Bit RGB LE ('R12L')"
+                        # Look for format codes in parentheses, both with and without quotes
+                        match = re.search(r"\((?:'([^']+)'|([^)]+))\)", format_string)
+                        if match:
+                            format_code = match.group(1) or match.group(2)
+                            pixel_format = PixelFormatType.parse(format_code)
+                        else:
+                            raise ValueError(
+                                f"Could not extract format code from: {format_string}"
+                            ) from e
+
+                    formats.append(pixel_format)
+                except ValueError:
+                    # Print warning and ask user to report unknown format
+                    print(
+                        f"⚠️  WARNING: Unknown pixel format detected: '{format_string}'"
+                    )
+                    print(
+                        "📝 Please help improve this project by reporting this unknown format:"
+                    )
+                    print(f"   1. Copy this exact string: '{format_string}'")
+                    print(
+                        "   2. Create a new issue at: https://github.com/OpenLEDEval/bmd-signal-gen/issues"
+                    )
+                    print(
+                        "   3. Include your device model and the unknown format string"
+                    )
+                    print("   This format will be skipped for now.")
+                    print()
         return formats
 
     @property
@@ -830,7 +1049,7 @@ class BMDDeckLink:
         return DecklinkSDKWrapper.decklink_device_supports_hdr(self.handle)
 
     @property
-    def pixel_format(self):
+    def pixel_format(self) -> int:
         """
         Get the current pixel format index.
 
@@ -849,7 +1068,7 @@ class BMDDeckLink:
         return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
 
     @pixel_format.setter
-    def pixel_format(self, format_index: PixelFormatType):
+    def pixel_format(self, format_index: PixelFormatType) -> None:
         """
         Set the pixel format by index.
 
@@ -869,7 +1088,7 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set pixel format (error {res})")
 
-    def set_hdr_metadata(self, metadata: HDRMetadata):
+    def set_hdr_metadata(self, metadata: HDRMetadata) -> None:
         """
         Set complete HDR metadata for all future frames.
 
@@ -891,7 +1110,7 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set HDR metadata (error {res})")
 
-    def display_frame(self, frame_data: np.ndarray):
+    def display_frame(self, frame_data: np.ndarray) -> None:
         """
         Display a single frame synchronously.
 
@@ -911,7 +1130,7 @@ class BMDDeckLink:
             raise RuntimeError("Device not open")
 
         # Set frame data
-        data_ptr, width, height = ndarray_to_bmd_frame_buffer(frame_data)
+        data_ptr, height, width = ndarray_to_bmd_frame_buffer(frame_data)
         res = DecklinkSDKWrapper.decklink_set_frame_data(
             self.handle, data_ptr, width, height
         )

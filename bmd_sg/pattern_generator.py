@@ -50,11 +50,11 @@ class ROI:
     height: int = 100
 
     @property
-    def x2(self):
+    def x2(self) -> int:
         return self.x + self.width
 
     @property
-    def y2(self):
+    def y2(self) -> int:
         return self.y + self.height
 
 
@@ -225,7 +225,7 @@ class PatternGenerator:
         # Ensure ROI is within image bounds
         roi_y_end = min(self.roi.y2, self.height)
         roi_x_end = min(self.roi.x2, self.width)
-        
+
         # Set color indices based on coordinate parity
         color_mask[
             np.arange(self.roi.y, roi_y_end, 2).reshape((-1, 1)),
@@ -244,10 +244,10 @@ class PatternGenerator:
             np.arange(self.roi.x + 1, roi_x_end, 2).reshape((1, -1)),
         ] = 3  # Odd row, odd column -> color 3
 
+        # Apply colors using advanced indexing
+        o_image = colors[color_mask]
         # End Numpy advanced indexing.
 
-        # Apply colors using advanced indexing
-        o_image = colors[color_mask].copy()
         return np.ascontiguousarray(o_image.astype(np.uint16))
 
     def generate(self, colors: ArrayLike) -> np.ndarray:
@@ -319,7 +319,7 @@ class PatternGenerator:
             colors = np.broadcast_to(colors, (4, 3))
         elif num_colors == 2:
             # Two colors: tile to create checkerboard of two colors
-            colors = colors[(0, 1, 1, 0), :]
+            colors = colors[(0, 1, 0, 1), :]
         elif num_colors == 3:
             # Three colors: map to [color1, color2, color1, color3]
             # This creates a pattern where color1 appears in top-left and bottom-right
