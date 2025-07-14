@@ -181,3 +181,11 @@ The project supports complete HDR metadata with:
 ### Project Testing
 
 - Claude can run `python -m bmd_sg.cli.main` to test the cli for the project and user interface
+
+### Module Maintenance Guidelines
+
+- Where a module has an __all__ declaration, make sure to keep it up to date by searching for usages of that module's public members. Ensure their usage and documentation are up to date with the latest changes.
+
+### Development Tools
+
+- Use `uv run ruff` for linting and `uv run pyright` for type checking. Check @tasks.py to see other developer tools claude can consider using. 

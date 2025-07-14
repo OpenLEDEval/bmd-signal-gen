@@ -344,3 +344,12 @@ DEFAULT_PATTERN_GENERATOR = PatternGenerator(
 DEFAULT_PATTERN_BUFFER = DEFAULT_PATTERN_GENERATOR.generate(
     ((2000, 2000, 2000), (0, 0, 0))
 )
+
+
+__all__ = [
+    "DEFAULT_PATTERN_BUFFER",
+    "DEFAULT_PATTERN_GENERATOR",
+    "ROI",
+    "ColorRangeError",
+    "PatternGenerator",
+]

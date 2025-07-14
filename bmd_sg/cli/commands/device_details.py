@@ -92,3 +92,6 @@ def device_details_command() -> None:
     except Exception as e:
         typer.echo(f"Error enumerating devices: {e}", err=True)
         raise typer.Exit(1) from e
+
+
+__all__ = ["device_details_command"]

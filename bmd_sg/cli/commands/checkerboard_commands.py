@@ -11,10 +11,12 @@ Available commands:
 - checkerboard4_command: Four-color checkerboard patterns
 """
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
-import numpy as np
 import typer
+
+if TYPE_CHECKING:
+    import numpy as np
 
 from bmd_sg.cli.shared import (
     display_image_for_duration,
@@ -341,3 +343,10 @@ def checkerboard4_command(
 
     # Display the pattern for specified duration
     display_image_for_duration(decklink, pattern, duration)
+
+
+__all__ = [
+    "checkerboard2_command",
+    "checkerboard3_command",
+    "checkerboard4_command",
+]

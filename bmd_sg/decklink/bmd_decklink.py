@@ -52,7 +52,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import numpy as np
 
@@ -395,7 +395,7 @@ class GamutChromaticities(ctypes.Structure):
     and must be within the valid range [0, 1].
     """
 
-    _fields_ = [
+    _fields_: ClassVar = [
         ("RedX", ctypes.c_double),
         ("RedY", ctypes.c_double),
         ("GreenX", ctypes.c_double),
@@ -528,7 +528,7 @@ class HDRMetadata(ctypes.Structure):
     - 3: HLG (ITU-R BT.2100, broadcast HDR)
     """
 
-    _fields_ = [
+    _fields_: ClassVar = [
         ("EOTF", ctypes.c_int64),
         ("referencePrimaries", GamutChromaticities),
         ("maxDisplayMasteringLuminance", ctypes.c_double),
@@ -718,7 +718,7 @@ class DecklinkSettings:
     gamut_chromaticities: GamutChromaticities = GAMUTCHROMATICITIES_REC2020
 
 
-def _configure_function_signatures(lib: ctypes.CDLL) -> None:
+def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
     """Configure ctypes function signatures for all DeckLink SDK functions.
 
     Sets up argument types and return types for all C functions in the DeckLink

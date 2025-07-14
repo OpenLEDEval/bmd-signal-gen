@@ -10,6 +10,13 @@ from typing import Annotated
 
 import typer
 
+from bmd_sg.cli.commands.checkerboard_commands import (
+    checkerboard2_command,
+    checkerboard3_command,
+    checkerboard4_command,
+)
+from bmd_sg.cli.commands.device_details import device_details_command
+from bmd_sg.cli.commands.solid import solid_command
 from bmd_sg.decklink.bmd_decklink import (
     DecklinkSettings,
     EOTFType,
@@ -189,20 +196,16 @@ def main(
     )
 
 
-# Import and register commands
-from bmd_sg.cli.commands.checkerboard_commands import (
-    checkerboard2_command,
-    checkerboard3_command,
-    checkerboard4_command,
-)
-from bmd_sg.cli.commands.device_details import device_details_command
-from bmd_sg.cli.commands.solid import solid_command
+# Register commands
 
 app.command(name="solid")(solid_command)
 app.command(name="pat2")(checkerboard2_command)
 app.command(name="pat3")(checkerboard3_command)
 app.command(name="pat4")(checkerboard4_command)
 app.command(name="device-details")(device_details_command)
+
+
+__all__ = ["app", "main"]
 
 
 if __name__ == "__main__":

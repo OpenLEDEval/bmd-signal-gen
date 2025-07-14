@@ -124,3 +124,6 @@ class DecklinkSDKProtocol(Protocol):
 # Type alias for the actual wrapper instance
 # This will be assigned the actual ctypes.CDLL instance in bmd_decklink.py
 DecklinkSDKWrapper: DecklinkSDKProtocol
+
+
+__all__ = ["DecklinkSDKProtocol", "DecklinkSDKWrapper"]

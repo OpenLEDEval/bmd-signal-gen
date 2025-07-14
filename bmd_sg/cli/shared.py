@@ -126,10 +126,10 @@ def create_decklink_device(device_index: int) -> BMDDeckLink:
     try:
         return BMDDeckLink(device_index=device_index)
     except Exception as e:
-        raise RuntimeError(f"Failed to create DeckLink device: {e!s}")
+        raise RuntimeError(f"Failed to create DeckLink device: {e!s}") from e
 
 
-def configure_pixel_format(
+def configure_pixel_format(  # noqa: C901
     decklink: BMDDeckLink,
     pixel_format: PixelFormatType | None = None,
     show_logs: bool = True,
@@ -214,7 +214,7 @@ def configure_pixel_format(
         decklink.pixel_format = selected_pixel_format
 
     except Exception as e:
-        raise RuntimeError(f"Failed to configure pixel format: {e!s}")
+        raise RuntimeError(f"Failed to configure pixel format: {e!s}") from e
 
 
 def configure_hdr_metadata(decklink: BMDDeckLink, settings: DecklinkSettings) -> None:
@@ -525,3 +525,18 @@ def setup_tools_from_context(
     decklink = initialize_device(settings)
     generator = create_pattern_generator(decklink, settings)
     return decklink, generator
+
+
+__all__ = [
+    "configure_hdr_metadata",
+    "configure_pixel_format",
+    "create_decklink_device",
+    "create_pattern_generator",
+    "display_image_for_duration",
+    "get_device_settings",
+    "initialize_device",
+    "list_available_devices",
+    "setup_tools_from_context",
+    "validate_color",
+    "validate_device_index",
+]
