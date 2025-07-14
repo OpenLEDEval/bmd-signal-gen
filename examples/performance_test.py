@@ -10,7 +10,7 @@ import numpy as np
 from numpy.random import rand
 
 from bmd_sg.decklink.bmd_decklink import BMDDeckLink
-from bmd_sg.pattern_generator import PatternGenerator, PatternType
+from bmd_sg.image_generators.checkerboard import DEFAULT_PATTERN_GENERATOR
 from bmd_sg.utilities import suppress_cpp_output
 
 # ============================================================================
@@ -20,24 +20,14 @@ from bmd_sg.utilities import suppress_cpp_output
 # Initialize BMD DeckLink device (device 0)
 decklink = BMDDeckLink(0)
 
-# Create pattern generator for 1920x1080 12-bit patterns
-generator = PatternGenerator(
-    width=1920,
-    height=1080,
-    bit_depth=12,
-    pattern_type=PatternType.SOLID,
-    roi_x=0,
-    roi_y=0,
-    roi_width=1920,
-    roi_height=1080,
-)
-
 # Start the DeckLink device
-decklink.start()
+decklink.start_playback()
 
 # Generate two test frames: white and black
-img1 = generator.generate([(2081, 2081, 2081)])  # White frame (100 nits)
-img2 = generator.generate([(0, 0, 0)])  # Black frame
+img1 = DEFAULT_PATTERN_GENERATOR.generate(
+    [(2081, 2081, 2081)]
+)  # White frame (100 nits)
+img2 = DEFAULT_PATTERN_GENERATOR.generate([(0, 0, 0)])  # Black frame
 
 # Prime the display with initial frames
 decklink.display_frame(img1)

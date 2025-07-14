@@ -28,7 +28,7 @@ extern "C" {
 #define DECKLINK_ERROR_FRAME_FAILED -4
 
 // Complete HDR metadata structure (matching SignalGenHDR sample)
-struct ChromaticityCoordinates {
+struct GamutChromaticities {
     double RedX;
     double RedY;
     double GreenX;
@@ -41,7 +41,7 @@ struct ChromaticityCoordinates {
 
 struct HDRMetadata {
     int64_t EOTF;
-    ChromaticityCoordinates referencePrimaries;
+    GamutChromaticities referencePrimaries;
     double maxDisplayMasteringLuminance;
     double minDisplayMasteringLuminance;
     double maxCLL;
@@ -63,8 +63,8 @@ public:
     int displayFrameSync();
     
     // Pixel format management
-    int setPixelFormat(int pixelFormatIndex);
-    int getPixelFormat() const;
+    int setPixelFormat(BMDPixelFormat pixelFormat);
+    BMDPixelFormat getPixelFormat() const;
     
     // Complete HDR metadata management
     int setHDRMetadata(const HDRMetadata& metadata);
@@ -130,8 +130,8 @@ int decklink_create_frame_from_data(DeckLinkHandle handle);
 // Pixel format management
 int decklink_get_supported_pixel_format_count(DeckLinkHandle handle);
 int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, char* name, int name_size);
-int decklink_set_pixel_format(DeckLinkHandle handle, int pixel_format_index);
-int decklink_get_pixel_format(DeckLinkHandle handle);
+int decklink_set_pixel_format(DeckLinkHandle handle, uint32_t pixel_format_code);
+uint32_t decklink_get_pixel_format(DeckLinkHandle handle);
 
 // Complete HDR metadata control
 int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata* metadata);

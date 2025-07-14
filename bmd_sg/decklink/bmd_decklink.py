@@ -13,6 +13,7 @@ The module includes:
 - Device enumeration and management
 - Frame data handling with numpy integration
 - Complete type definitions for better IDE support
+- Unified DecklinkSettings configuration class
 
 Examples
 --------
@@ -20,15 +21,20 @@ Basic device usage:
 
 >>> from bmd_sg.decklink.bmd_decklink import BMDDeckLink, HDRMetadata
 >>> device = BMDDeckLink(device_index=0)
->>> device.start()
+>>> device.start_playback()
 >>> # Set frame data and output
->>> device.stop()
+>>> device.stop_playback()
 >>> device.close()
 
 HDR metadata configuration:
 
 >>> metadata = HDRMetadata(eotf=2, max_cll=4000.0, max_fall=400.0)
 >>> device.set_hdr_metadata(metadata)
+
+Unified settings configuration:
+
+>>> settings = DecklinkSettings(device=0, width=1920, height=1080)
+>>> # Use settings to configure device
 
 Notes
 -----
@@ -42,13 +48,16 @@ bmd_sg.decklink_control : High-level device control interface
 """
 
 import ctypes
+import re
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any, ClassVar, Self
 
 import numpy as np
 
 
-class PixelFormatType(Enum):
+class PixelFormatType(str, Enum):
     """
     Enumeration of supported DeckLink pixel format types.
 
@@ -85,18 +94,31 @@ class PixelFormatType(Enum):
     12BIT_RGB
     """
 
-    FORMAT_8BIT_YUV = "2vuy"
-    FORMAT_10BIT_YUV = "v210"
-    FORMAT_10BIT_YUVA = "Ay10"
-    FORMAT_8BIT_ARGB = 32
-    FORMAT_8BIT_BGRA = "BGRA"
-    FORMAT_10BIT_RGB = "r210"
-    FORMAT_12BIT_RGB = "R12B"
-    FORMAT_12BIT_RGBLE = "R12L"
-    FORMAT_10BIT_RGBXLE = "R10l"
-    FORMAT_10BIT_RGBX = "R10b"
+    FORMAT_UNSPECIFIED = ("unkn", 8, 0)
+    FORMAT_8BIT_YUV = ("2vuy", 8, 0x32767579)
+    FORMAT_10BIT_YUV = ("v210", 10, 0x76323130)
+    FORMAT_10BIT_YUVA = ("Ay10", 10, 0x41793130)
+    FORMAT_8BIT_ARGB = ("32", 8, 32)
+    FORMAT_8BIT_BGRA = ("BGRA", 8, 0x42475241)
+    FORMAT_10BIT_RGB = ("r210", 10, 0x72323130)
+    FORMAT_12BIT_RGB = ("R12B", 12, 0x52313242)
+    FORMAT_12BIT_RGBLE = ("R12L", 12, 0x5231324C)
+    FORMAT_10BIT_RGBXLE = ("R10l", 10, 0x5231306C)
+    FORMAT_10BIT_RGBX = ("R10b", 10, 0x52313062)
 
-    def __str__(self):
+    FORMAT_H265 = ("hev1", 8, 0x68657631)
+    FORMAT_DNxHR = ("AVdh", 8, 0x41566468)
+
+    def __new__(cls, value: str, *_: Any):
+        self = str.__new__(cls, value)
+        self._value_ = value
+        return self
+
+    def __init__(self, value: str, bit_depth: int, sdk_format_code: int):  # noqa: ARG002
+        self.bit_depth = bit_depth
+        self.sdk_format_code = sdk_format_code
+
+    def __str__(self) -> str:
         """
         Return a clean string representation of the pixel format.
 
@@ -106,6 +128,111 @@ class PixelFormatType(Enum):
             The pixel format name without the 'FORMAT_' prefix.
         """
         return f"{self.name[8:]}"
+
+    @classmethod
+    def parse(cls, value: str | int) -> Self:
+        """
+        Parse a pixel format string or SDK format code and return the corresponding enum member.
+
+        This method attempts to match the input against pixel format values, enum names
+        (case-insensitive), or SDK format codes. It supports all three identification methods
+        for maximum flexibility.
+
+        Parameters
+        ----------
+        value : str or int
+            The pixel format identifier to parse. Can be:
+            - Format code string (e.g., 'R12L', '2vuy', 'BGRA')
+            - Enum name (e.g., 'FORMAT_12BIT_RGBLE' or '12BIT_RGBLE')
+            - SDK format code integer (e.g., 0x5231324C for R12L)
+
+        Returns
+        -------
+        PixelFormatType
+            The matching pixel format enum member.
+
+        Raises
+        ------
+        ValueError
+            If the pixel format identifier cannot be parsed or matched to any
+            known format.
+
+        Examples
+        --------
+        Parse by format code string:
+
+        >>> fmt = PixelFormatType.parse('R12L')
+        >>> print(fmt)
+        12BIT_RGBLE
+
+        Parse by enum name:
+
+        >>> fmt = PixelFormatType.parse('FORMAT_10BIT_RGB')
+        >>> print(fmt)
+        10BIT_RGB
+
+        Parse by SDK format code:
+
+        >>> fmt = PixelFormatType.parse(0x5231324C)
+        >>> print(fmt)
+        12BIT_RGBLE
+
+        Parse by shortened name:
+
+        >>> fmt = PixelFormatType.parse('10BIT_RGB')
+        >>> print(fmt)
+        10BIT_RGB
+
+        Notes
+        -----
+        This method performs case-insensitive matching for strings and will attempt to
+        match against format values, enum names, and SDK format codes.
+        """
+        # Handle SDK format code (integer)
+        if isinstance(value, int):
+            for member in cls:
+                if member.sdk_format_code == value:
+                    return member
+
+            # Build error message with valid SDK codes
+            sdk_codes = ", ".join(f"0x{member.sdk_format_code:08X}" for member in cls)
+            raise ValueError(
+                f"Invalid SDK format code: 0x{value:08X}. Valid SDK codes: {sdk_codes}"
+            )
+
+        # Handle string values
+        if not isinstance(value, str):
+            raise ValueError(
+                f"Expected string or int, got {type(value).__name__}: {value}"
+            )
+
+        value_upper = value.upper().strip()
+
+        # Try matching by format value (e.g., 'R12L', '2vuy', 'BGRA')
+        for member in cls:
+            if member.value.upper() == value_upper:
+                return member
+
+        # Try matching by enum name with or without FORMAT_ prefix
+        # Handle both 'FORMAT_12BIT_RGB' and '12BIT_RGB'
+        if not value_upper.startswith("FORMAT_"):
+            value_upper = f"FORMAT_{value_upper}"
+
+        try:
+            return cls[value_upper]
+        except KeyError:
+            pass
+
+        # Build error message with valid options
+        format_codes = ", ".join(f"'{member.value}'" for member in cls)
+        enum_names = ", ".join(member.name for member in cls)
+        sdk_codes = ", ".join(f"0x{member.sdk_format_code:08X}" for member in cls)
+        raise ValueError(
+            f"Invalid pixel format: '{value}'. "
+            f"Valid format codes: {format_codes}. "
+            f"Valid enum names: {enum_names}. "
+            f"Valid SDK codes: {sdk_codes}"
+        )
 
 
 class EOTFType(str, Enum):
@@ -141,11 +268,11 @@ class EOTFType(str, Enum):
     PQ = ("PQ", 2)
     HLG = ("HLG", 3)
 
-    def __new__(cls, value, *args):
+    def __new__(cls, value: str, *args: Any):
         self = str.__new__(cls, value)
         self._value_ = value
         for a in args:
-            self._add_value_alias_(a)
+            self._add_value_alias_(a)  # type: ignore Added in python 3.13
         return self
 
     def __init__(
@@ -155,7 +282,7 @@ class EOTFType(str, Enum):
     ):
         self.int_value = int_value
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Return a formatted string representation of the EOTF type.
 
@@ -167,7 +294,7 @@ class EOTFType(str, Enum):
         return f'{self.value}="{self.value}"={self.int_value}'
 
     @classmethod
-    def parse(cls, value):
+    def parse(cls, value: str | int) -> Self:
         """
         Parse an EOTF value from string or integer.
 
@@ -219,7 +346,7 @@ class EOTFType(str, Enum):
 
 
 # Complete HDR metadata structures (matching C++ implementation)
-class ChromaticityCoordinates(ctypes.Structure):
+class GamutChromaticities(ctypes.Structure):
     """
     Chromaticity coordinates for display primaries and white point.
 
@@ -253,11 +380,11 @@ class ChromaticityCoordinates(ctypes.Structure):
     --------
     Create Rec.709 chromaticity coordinates:
 
-    >>> coords = ChromaticityCoordinates(
+    >>> coords = GamutChromaticities(
     ...     red_xy=(0.640, 0.330),
     ...     green_xy=(0.300, 0.600),
     ...     blue_xy=(0.150, 0.060),
-    ...     white_xy=(0.3127, 0.3290)
+    ...     white_xy=D65_WHITE_POINT
     ... )
     >>> print(f"Red: ({coords.RedX}, {coords.RedY})")
     Red: (0.64, 0.33)
@@ -268,7 +395,7 @@ class ChromaticityCoordinates(ctypes.Structure):
     and must be within the valid range [0, 1].
     """
 
-    _fields_ = [
+    _fields_: ClassVar = [
         ("RedX", ctypes.c_double),
         ("RedY", ctypes.c_double),
         ("GreenX", ctypes.c_double),
@@ -285,7 +412,7 @@ class ChromaticityCoordinates(ctypes.Structure):
         green_xy: tuple[float, float],
         blue_xy: tuple[float, float],
         white_xy: tuple[float, float],
-    ):
+    ) -> None:
         super().__init__()
         self.RedX = red_xy[0]
         self.RedY = red_xy[1]
@@ -297,38 +424,41 @@ class ChromaticityCoordinates(ctypes.Structure):
         self.WhiteY = white_xy[1]
 
 
+# D65 white point (CIE 1931) - Standard illuminant
+D65_WHITE_POINT = (0.3127, 0.3290)
+
 # Standard chromaticity coordinates for common color spaces
-CHROMATICITYCOORDINATES_REC709 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC709 = GamutChromaticities(
     red_xy=(0.640, 0.330),  # Rec.709 Red
     green_xy=(0.300, 0.600),  # Rec.709 Green
     blue_xy=(0.150, 0.060),  # Rec.709 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.709 color space primaries (standard HD)."""
+"""GamutChromaticities: ITU-R BT.709 color space primaries (standard HD)."""
 
-CHROMATICITYCOORDINATES_REC2020 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC2020 = GamutChromaticities(
     red_xy=(0.708, 0.292),  # Rec.2020 Red
     green_xy=(0.170, 0.797),  # Rec.2020 Green
     blue_xy=(0.131, 0.046),  # Rec.2020 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
+"""GamutChromaticities: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
 
-CHROMATICITYCOORDINATES_DCI_P3 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_DCI_P3 = GamutChromaticities(
     red_xy=(0.680, 0.320),  # DCI-P3 Red
     green_xy=(0.265, 0.690),  # DCI-P3 Green
     blue_xy=(0.150, 0.060),  # DCI-P3 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point (P3-D65)
+    white_xy=D65_WHITE_POINT,  # D65 White Point (P3-D65)
 )
-"""ChromaticityCoordinates: DCI-P3 color space primaries (digital cinema)."""
+"""GamutChromaticities: DCI-P3 color space primaries (digital cinema)."""
 
-CHROMATICITYCOORDINATES_REC601 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC601 = GamutChromaticities(
     red_xy=(0.630, 0.340),  # Rec.601 Red
     green_xy=(0.310, 0.595),  # Rec.601 Green
     blue_xy=(0.155, 0.070),  # Rec.601 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.601 color space primaries (standard definition)."""
+"""GamutChromaticities: ITU-R BT.601 color space primaries (standard definition)."""
 
 
 class HDRMetadata(ctypes.Structure):
@@ -357,7 +487,7 @@ class HDRMetadata(ctypes.Structure):
     ----------
     EOTF : int
         Electro-Optical Transfer Function type
-    referencePrimaries : ChromaticityCoordinates
+    referencePrimaries : GamutChromaticities
         Display color primaries and white point
     maxDisplayMasteringLuminance : float
         Maximum mastering display luminance (cd/m²)
@@ -398,9 +528,9 @@ class HDRMetadata(ctypes.Structure):
     - 3: HLG (ITU-R BT.2100, broadcast HDR)
     """
 
-    _fields_ = [
+    _fields_: ClassVar = [
         ("EOTF", ctypes.c_int64),
-        ("referencePrimaries", ChromaticityCoordinates),
+        ("referencePrimaries", GamutChromaticities),
         ("maxDisplayMasteringLuminance", ctypes.c_double),
         ("minDisplayMasteringLuminance", ctypes.c_double),
         ("maxCLL", ctypes.c_double),
@@ -414,7 +544,7 @@ class HDRMetadata(ctypes.Structure):
         min_display_luminance: float = 0.0001,
         max_cll: float = 1000.0,
         max_fall: float = 50.0,
-    ):
+    ) -> None:
         super().__init__()
         self.EOTF = eotf.int_value
         self.maxDisplayMasteringLuminance = max_display_luminance
@@ -423,11 +553,193 @@ class HDRMetadata(ctypes.Structure):
         self.maxFALL = max_fall
 
         # Set default Rec2020 primaries
-        self.referencePrimaries = CHROMATICITYCOORDINATES_REC2020
+        self.referencePrimaries = GAMUTCHROMATICITIES_REC2020
 
 
-def _configure_function_signatures(lib):
-    """Configure ctypes function signatures for all DeckLink SDK functions."""
+# Video resolution constants for standard formats
+DEFAULT_WIDTH = 1920  # Full HD/4K width
+DEFAULT_HEIGHT = 1080  # Full HD height
+
+# HDR metadata constants following industry standards
+DEFAULT_MAX_CLL = 10000.0  # Maximum Content Light Level (cd/m²)
+DEFAULT_MAX_FALL = 400.0  # Maximum Frame Average Light Level (cd/m²)
+DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE = 1000.0  # Display mastering luminance (cd/m²)
+DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE = 0.0001  # Minimum display luminance (cd/m²)
+
+
+@dataclass
+class DecklinkSettings:
+    """
+    Comprehensive configuration settings for DeckLink device initialization and operation.
+
+    This dataclass consolidates all settings required for configuring a DeckLink device
+    including device selection, video resolution, pixel format, region of interest,
+    HDR metadata parameters, and color space information. It provides a unified
+    interface for all DeckLink-related configuration.
+
+    Parameters
+    ----------
+    device : int, optional
+        Index of the DeckLink device to use. Default is 0.
+    pixel_format : PixelFormatType | None, optional
+        Pixel format enum, None for auto-selection. Default is None.
+    width : int, optional
+        Frame width in pixels. Default is 1920.
+    height : int, optional
+        Frame height in pixels. Default is 1080.
+    roi_x : int, optional
+        Region of interest X offset. Default is 0.
+    roi_y : int, optional
+        Region of interest Y offset. Default is 0.
+    roi_width : int, optional
+        Region of interest width. Default is 1920.
+    roi_height : int, optional
+        Region of interest height. Default is 1080.
+    no_hdr : bool, optional
+        Whether to disable HDR metadata output. Default is False.
+    eotf : EOTFType, optional
+        Electro-Optical Transfer Function type. Default is PQ (HDR10).
+    max_cll : float, optional
+        Maximum Content Light Level in cd/m². Default is 10000.0.
+    max_fall : float, optional
+        Maximum Frame Average Light Level in cd/m². Default is 400.0.
+    max_display_mastering_luminance : float, optional
+        Maximum display mastering luminance in cd/m². Default is 1000.0.
+    min_display_mastering_luminance : float, optional
+        Minimum display mastering luminance in cd/m². Default is 0.0001.
+    gamut_chromaticities : GamutChromaticities, optional
+        Complete color gamut definition including red, green, blue primaries
+        and white point chromaticity coordinates. Default is Rec.2020.
+
+    Attributes
+    ----------
+    device : int
+        Index of the DeckLink device to use
+    pixel_format : PixelFormatType | None
+        Pixel format enum, None for auto-selection
+    width : int
+        Frame width in pixels
+    height : int
+        Frame height in pixels
+    roi_x : int
+        Region of interest X offset
+    roi_y : int
+        Region of interest Y offset
+    roi_width : int
+        Region of interest width
+    roi_height : int
+        Region of interest height
+    no_hdr : bool
+        Whether to disable HDR metadata output
+    eotf : EOTFType
+        Electro-Optical Transfer Function type
+    max_cll : float
+        Maximum Content Light Level in cd/m²
+    max_fall : float
+        Maximum Frame Average Light Level in cd/m²
+    max_display_mastering_luminance : float
+        Maximum display mastering luminance in cd/m²
+    min_display_mastering_luminance : float
+        Minimum display mastering luminance in cd/m²
+    gamut_chromaticities : GamutChromaticities
+        Complete color gamut definition including red, green, blue primaries
+        and white point chromaticity coordinates
+
+    Examples
+    --------
+    Create settings with defaults:
+
+    >>> settings = DecklinkSettings()
+    >>> print(f"Device: {settings.device}, Resolution: {settings.width}x{settings.height}")
+    Device: 0, Resolution: 1920x1080
+
+    Create settings for specific device with custom HDR:
+
+    >>> settings = DecklinkSettings(
+    ...     device=1,
+    ...     width=3840,
+    ...     height=2160,
+    ...     eotf=EOTFType.HLG,
+    ...     max_cll=4000.0
+    ... )
+    >>> print(f"EOTF: {settings.eotf}, Max CLL: {settings.max_cll}")
+    EOTF: HLG, Max CLL: 4000.0
+
+    Create settings with custom ROI:
+
+    >>> settings = DecklinkSettings(
+    ...     roi_x=100,
+    ...     roi_y=100,
+    ...     roi_width=1720,
+    ...     roi_height=880
+    ... )
+    >>> print(f"ROI: {settings.roi_x},{settings.roi_y} {settings.roi_width}x{settings.roi_height}")
+    ROI: 100,100 1720x880
+
+    Notes
+    -----
+    This class consolidates all DeckLink device configuration into a single
+    interface, eliminating the need for multiple settings classes and conversion
+    functions. It supports complete HDR metadata configuration following
+    industry standards (SMPTE ST 2086, CEA-861.3).
+
+    The default color primaries are set to Rec.2020 (ITU-R BT.2020) which is
+    the standard for Ultra HD and HDR content. The default EOTF is PQ
+    (Perceptual Quantizer) as specified in SMPTE ST 2084 for HDR10.
+
+    See Also
+    --------
+    HDRMetadata : HDR metadata structure for device configuration
+    PixelFormatType : Available pixel format options
+    EOTFType : Electro-Optical Transfer Function types
+    """
+
+    # Device parameters
+    device: int = 0
+    pixel_format: PixelFormatType | None = None
+    width: int = DEFAULT_WIDTH
+    height: int = DEFAULT_HEIGHT
+
+    # ROI parameters
+    roi_x: int = 0
+    roi_y: int = 0
+    roi_width: int = DEFAULT_WIDTH
+    roi_height: int = DEFAULT_HEIGHT
+
+    # HDR metadata settings
+    no_hdr: bool = False
+    eotf: EOTFType = EOTFType.PQ
+    max_cll: float = DEFAULT_MAX_CLL
+    max_fall: float = DEFAULT_MAX_FALL
+    max_display_mastering_luminance: float = DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE
+    min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
+
+    # Color space primaries and white point
+    gamut_chromaticities: GamutChromaticities = GAMUTCHROMATICITIES_REC2020
+
+
+def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
+    """Configure ctypes function signatures for all DeckLink SDK functions.
+
+    Sets up argument types and return types for all C functions in the DeckLink
+    SDK library to ensure proper type safety and memory management when calling
+    from Python.
+
+    Parameters
+    ----------
+    lib : ctypes.CDLL
+        The loaded DeckLink SDK library instance.
+
+    Notes
+    -----
+    This function configures signatures for:
+    - Device enumeration (count, names)
+    - Device management (open, close, start, stop)
+    - Pixel format management
+    - HDR metadata handling
+    - Frame data operations
+    - Version information
+    """
 
     # Device enumeration functions
     if hasattr(lib, "decklink_get_device_count"):
@@ -477,13 +789,13 @@ def _configure_function_signatures(lib):
     if hasattr(lib, "decklink_set_pixel_format"):
         lib.decklink_set_pixel_format.argtypes = [
             ctypes.c_void_p,
-            ctypes.c_int,
+            ctypes.c_uint32,
         ]
         lib.decklink_set_pixel_format.restype = ctypes.c_int
 
     if hasattr(lib, "decklink_get_pixel_format"):
         lib.decklink_get_pixel_format.argtypes = [ctypes.c_void_p]
-        lib.decklink_get_pixel_format.restype = ctypes.c_int
+        lib.decklink_get_pixel_format.restype = ctypes.c_uint32
 
     # HDR metadata functions
     if hasattr(lib, "decklink_set_hdr_metadata"):
@@ -529,7 +841,30 @@ def _configure_function_signatures(lib):
 
 
 def _try_load_decklink_sdk() -> ctypes.CDLL:
-    """Load the DeckLink SDK library and configure function signatures."""
+    """Load the DeckLink SDK library and configure function signatures.
+
+    Attempts to load the compiled libdecklink.dylib from the same directory
+    as this Python module, then configures all ctypes function signatures
+    for type safety.
+
+    Returns
+    -------
+    ctypes.CDLL
+        The loaded and configured DeckLink SDK library instance.
+
+    Raises
+    ------
+    FileNotFoundError
+        If libdecklink.dylib cannot be found in the expected location.
+    OSError
+        If the library exists but cannot be loaded (e.g., architecture mismatch,
+        missing dependencies, or permission issues).
+
+    Notes
+    -----
+    The library file must be built from the C++ source in the cpp/ directory
+    and placed in the same directory as this module.
+    """
     lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
     try:
         # Try to load from the lib directory relative to this script
@@ -553,7 +888,7 @@ def _try_load_decklink_sdk() -> ctypes.CDLL:
 DecklinkSDKWrapper: ctypes.CDLL = _try_load_decklink_sdk()
 
 
-def get_decklink_driver_version():
+def get_decklink_driver_version() -> str:
     """
     Get the DeckLink driver version string.
 
@@ -575,7 +910,7 @@ def get_decklink_driver_version():
     return DecklinkSDKWrapper.decklink_get_driver_version().decode("utf-8")
 
 
-def get_decklink_sdk_version():
+def get_decklink_sdk_version() -> str:
     """
     Get the DeckLink SDK version string.
 
@@ -599,7 +934,7 @@ def get_decklink_sdk_version():
 
 def ndarray_to_bmd_frame_buffer(
     frame_data: np.ndarray,
-) -> tuple[ctypes.POINTER(ctypes.c_uint16), int, int]:
+) -> tuple[Any, int, int]:
     """
     Convert numpy array to BMD-compatible frame buffer.
 
@@ -624,23 +959,20 @@ def ndarray_to_bmd_frame_buffer(
     # Get dimensions
     if frame_data.ndim == 2:
         height, width = frame_data.shape
-        channels = 1
     elif frame_data.ndim == 3:
-        height, width, channels = frame_data.shape
+        height, width, _ = frame_data.shape
     else:
         raise ValueError("frame_data must be 2D or 3D array")
 
-    # Ensure data is uint16 and contiguous
-    if frame_data.dtype != np.uint16:
-        frame_data = frame_data.astype(np.uint16)
-    frame_data = np.ascontiguousarray(frame_data)
+    # Note: frame_data should already be uint16 and contiguous
+    # These conversions are handled in display_frame() before calling this function
 
     # Get pointer to data
     data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
-    return data_ptr, width, height
+    return data_ptr, height, width
 
 
-def get_decklink_devices():
+def get_decklink_devices() -> list[str]:
     """
     Get list of available DeckLink device names.
 
@@ -698,16 +1030,22 @@ class BMDDeckLink:
 
     Examples
     --------
+    Context manager usage (recommended):
+
+    >>> with BMDDeckLink(device_index=0) as device:
+    ...     device.start_playback()
+    ...     # Device automatically closed when exiting the with block
+
     Basic usage with automatic cleanup:
 
     >>> device = BMDDeckLink(device_index=0)
-    >>> device.start()
+    >>> device.start_playback()
     >>> # Device automatically closed when object goes out of scope
 
     Manual cleanup if needed:
 
     >>> device = BMDDeckLink(device_index=0)
-    >>> device.start()
+    >>> device.start_playback()
     >>> device.close()  # Explicit cleanup
 
     Raises
@@ -721,7 +1059,7 @@ class BMDDeckLink:
     For guaranteed cleanup timing, use the close() method explicitly.
     """
 
-    def __init__(self, device_index: int = 0):
+    def __init__(self, device_index: int = 0) -> None:
         self.device_index = device_index
         self.handle = DecklinkSDKWrapper.decklink_open_output_by_index(device_index)
         if not self.handle:
@@ -730,11 +1068,53 @@ class BMDDeckLink:
             )
         self.started = False
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Destructor - automatically close device on object destruction."""
         self.close()
 
-    def close(self):
+    def __enter__(self) -> Self:
+        """
+        Enter the context manager.
+
+        Returns
+        -------
+        Self
+            The BMDDeckLink instance for use in the with statement
+
+        Examples
+        --------
+        >>> with BMDDeckLink(0) as device:
+        ...     device.start_playback()
+        ...     # Device automatically closed when exiting the with block
+        """
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any | None,
+    ) -> None:
+        """
+        Exit the context manager and close the device.
+
+        Parameters
+        ----------
+        exc_type : type[BaseException] | None
+            Exception type if an exception occurred, None otherwise
+        exc_val : BaseException | None
+            Exception value if an exception occurred, None otherwise
+        exc_tb : Any | None
+            Exception traceback if an exception occurred, None otherwise
+
+        Notes
+        -----
+        The device is automatically closed regardless of whether an exception
+        occurred within the with block.
+        """
+        self.close()
+
+    def close(self) -> None:
         """
         Close the device and free resources.
 
@@ -747,8 +1127,7 @@ class BMDDeckLink:
         """
         if self.handle:
             if self.started:
-                DecklinkSDKWrapper.decklink_stop_output(self.handle)
-                self.started = False
+                self.stop_playback()
             DecklinkSDKWrapper.decklink_close(self.handle)
             self.handle = None
 
@@ -764,14 +1143,14 @@ class BMDDeckLink:
         """
         return self.handle is not None
 
-    def start(self):
+    def start_playback(self) -> None:
         """
-        Start outputting the color patch.
+        Start playback output to the DeckLink device.
 
         Raises
         ------
         RuntimeError
-            If the device is not open or if starting output fails
+            If the device is not open or if starting playback fails
         """
         if not self.handle:
             raise RuntimeError("Device not open")
@@ -779,12 +1158,12 @@ class BMDDeckLink:
             return
         res = DecklinkSDKWrapper.decklink_start_output(self.handle)
         if res != 0:
-            raise RuntimeError(f"Failed to start output (error {res})")
+            raise RuntimeError(f"Failed to start playback output (error {res})")
         self.started = True
 
-    def stop(self):
+    def stop_playback(self) -> None:
         """
-        Stop output.
+        Stop playback output from the DeckLink device.
 
         This method is idempotent - it can be called multiple times safely.
         """
@@ -793,19 +1172,24 @@ class BMDDeckLink:
         DecklinkSDKWrapper.decklink_stop_output(self.handle)
         self.started = False
 
-    def get_supported_pixel_formats(self):
+    def get_supported_pixel_formats(self) -> list[PixelFormatType]:
         """
-        Get list of supported pixel format names.
+        Get list of supported pixel format enum values.
 
         Returns
         -------
-        list[str]
-            List of supported pixel format names
+        list[PixelFormatType]
+            List of supported pixel format enum values
 
         Raises
         ------
         RuntimeError
             If the device is not open
+
+        Notes
+        -----
+        If a pixel format string cannot be parsed to a known enum value, a warning
+        is printed asking the user to report the unknown format as a GitHub issue.
         """
         if not self.handle:
             raise RuntimeError("Device not open")
@@ -822,7 +1206,42 @@ class BMDDeckLink:
                 )
                 == 0
             ):
-                formats.append(name.value.decode("utf-8"))
+                format_string = name.value.decode("utf-8")
+                try:
+                    # Try to parse the format string to a PixelFormatType enum
+                    # First try direct parsing, then try extracting format codes from parentheses
+                    try:
+                        pixel_format = PixelFormatType.parse(format_string)
+                    except ValueError as e:
+                        # Try to extract format code from strings like "8Bit ARGB (32)" or "12Bit RGB LE ('R12L')"
+                        # Look for format codes in parentheses, both with and without quotes
+                        match = re.search(r"\((?:'([^']+)'|([^)]+))\)", format_string)
+                        if match:
+                            format_code = match.group(1) or match.group(2)
+                            pixel_format = PixelFormatType.parse(format_code)
+                        else:
+                            raise ValueError(
+                                f"Could not extract format code from: {format_string}"
+                            ) from e
+
+                    formats.append(pixel_format)
+                except ValueError:
+                    # Print warning and ask user to report unknown format
+                    print(
+                        f"⚠️  WARNING: Unknown pixel format detected: '{format_string}'"
+                    )
+                    print(
+                        "📝 Please help improve this project by reporting this unknown format:"
+                    )
+                    print(f"   1. Copy this exact string: '{format_string}'")
+                    print(
+                        "   2. Create a new issue at: https://github.com/OpenLEDEval/bmd-signal-gen/issues"
+                    )
+                    print(
+                        "   3. Include your device model and the unknown format string"
+                    )
+                    print("   This format will be skipped for now.")
+                    print()
         return formats
 
     @property
@@ -830,33 +1249,36 @@ class BMDDeckLink:
         return DecklinkSDKWrapper.decklink_device_supports_hdr(self.handle)
 
     @property
-    def pixel_format(self):
+    def pixel_format(self) -> PixelFormatType:
         """
-        Get the current pixel format index.
+        Get the current pixel format as a PixelFormatType enum.
 
         Returns
         -------
-        int
-            Current pixel format index
+        PixelFormatType
+            Current pixel format enum value
 
         Raises
         ------
         RuntimeError
             If the device is not open
+        ValueError
+            If the SDK format code cannot be matched to a known PixelFormatType
         """
         if not self.handle:
             raise RuntimeError("Device not open")
-        return DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
+        sdk_format_code = DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
+        return PixelFormatType.parse(sdk_format_code)
 
     @pixel_format.setter
-    def pixel_format(self, format_index: PixelFormatType):
+    def pixel_format(self, pixel_format_type: PixelFormatType) -> None:
         """
-        Set the pixel format by index.
+        Set the pixel format using a PixelFormatType enum.
 
         Parameters
         ----------
-        format_index : int
-            Index of the pixel format to set
+        pixel_format_type : PixelFormatType
+            The pixel format enum to set
 
         Raises
         ------
@@ -865,11 +1287,15 @@ class BMDDeckLink:
         """
         if not self.handle:
             raise RuntimeError("Device not open")
-        res = DecklinkSDKWrapper.decklink_set_pixel_format(self.handle, format_index)
+        res = DecklinkSDKWrapper.decklink_set_pixel_format(
+            self.handle, pixel_format_type.sdk_format_code
+        )
         if res != 0:
-            raise RuntimeError(f"Failed to set pixel format (error {res})")
+            raise RuntimeError(
+                f"Failed to set pixel format {pixel_format_type.name} (error {res})"
+            )
 
-    def set_hdr_metadata(self, metadata: HDRMetadata):
+    def set_hdr_metadata(self, metadata: HDRMetadata) -> None:
         """
         Set complete HDR metadata for all future frames.
 
@@ -891,7 +1317,7 @@ class BMDDeckLink:
         if res != 0:
             raise RuntimeError(f"Failed to set HDR metadata (error {res})")
 
-    def display_frame(self, frame_data: np.ndarray):
+    def display_frame(self, frame_data: np.ndarray) -> None:
         """
         Display a single frame synchronously.
 
@@ -910,8 +1336,11 @@ class BMDDeckLink:
         if not self.handle:
             raise RuntimeError("Device not open")
 
+        frame_data = np.astype(frame_data, np.uint16, copy=True)
+        frame_data = np.ascontiguousarray(frame_data)
+
         # Set frame data
-        data_ptr, width, height = ndarray_to_bmd_frame_buffer(frame_data)
+        data_ptr, height, width = ndarray_to_bmd_frame_buffer(frame_data)
         res = DecklinkSDKWrapper.decklink_set_frame_data(
             self.handle, data_ptr, width, height
         )

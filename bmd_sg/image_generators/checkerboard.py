@@ -50,11 +50,11 @@ class ROI:
     height: int = 100
 
     @property
-    def x2(self):
+    def x2(self) -> int:
         return self.x + self.width
 
     @property
-    def y2(self):
+    def y2(self) -> int:
         return self.y + self.height
 
 
@@ -225,7 +225,7 @@ class PatternGenerator:
         # Ensure ROI is within image bounds
         roi_y_end = min(self.roi.y2, self.height)
         roi_x_end = min(self.roi.x2, self.width)
-        
+
         # Set color indices based on coordinate parity
         color_mask[
             np.arange(self.roi.y, roi_y_end, 2).reshape((-1, 1)),
@@ -244,11 +244,11 @@ class PatternGenerator:
             np.arange(self.roi.x + 1, roi_x_end, 2).reshape((1, -1)),
         ] = 3  # Odd row, odd column -> color 3
 
+        # Apply colors using advanced indexing
+        o_image = colors[color_mask]
         # End Numpy advanced indexing.
 
-        # Apply colors using advanced indexing
-        o_image = colors[color_mask].copy()
-        return np.ascontiguousarray(o_image.astype(np.uint16))
+        return o_image.astype(np.uint16)
 
     def generate(self, colors: ArrayLike) -> np.ndarray:
         """Generate a checkerboard pattern with the specified colors.
@@ -344,3 +344,12 @@ DEFAULT_PATTERN_GENERATOR = PatternGenerator(
 DEFAULT_PATTERN_BUFFER = DEFAULT_PATTERN_GENERATOR.generate(
     ((2000, 2000, 2000), (0, 0, 0))
 )
+
+
+__all__ = [
+    "DEFAULT_PATTERN_BUFFER",
+    "DEFAULT_PATTERN_GENERATOR",
+    "ROI",
+    "ColorRangeError",
+    "PatternGenerator",
+]

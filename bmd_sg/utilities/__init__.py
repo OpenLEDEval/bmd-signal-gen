@@ -7,11 +7,11 @@ the BMD signal generator, including output suppression and other utilities.
 
 import contextlib
 import os
-from typing import Generator
+from collections.abc import Generator
 
 
 @contextlib.contextmanager
-def suppress_cpp_output() -> Generator[None, None, None]:
+def suppress_cpp_output() -> Generator[None]:
     """
     Context manager to suppress C++ library output by redirecting file descriptors.
 
@@ -42,11 +42,11 @@ def suppress_cpp_output() -> Generator[None, None, None]:
         # Save original file descriptors
         old_stdout = os.dup(1)
         old_stderr = os.dup(2)
-        
+
         # Redirect stdout and stderr to /dev/null
         os.dup2(devnull.fileno(), 1)
         os.dup2(devnull.fileno(), 2)
-        
+
         try:
             yield
         finally:
@@ -55,3 +55,6 @@ def suppress_cpp_output() -> Generator[None, None, None]:
             os.dup2(old_stderr, 2)
             os.close(old_stdout)
             os.close(old_stderr)
+
+
+__all__ = ["suppress_cpp_output"]

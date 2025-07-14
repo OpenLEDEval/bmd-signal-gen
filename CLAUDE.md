@@ -16,23 +16,13 @@ outputs test patterns via DeckLink devices. It consists of:
 
 ## Build Commands
 
-### C++ Library
+Use the automated build system:
 
 ```bash
-cd cpp && make clean && make && cd ..
+uv run invoke build
 ```
 
-This builds `bmd_sg/decklink/libdecklink.dylib` - the core dynamic library.
-
-### Python Environment
-
-```bash
-# Install dependencies
-uv sync
-
-# Activate environment
-source .venv/bin/activate
-```
+This builds `bmd_sg/decklink/libdecklink.dylib` and the Python package.
 
 ## Development Guidelines
 
@@ -126,6 +116,9 @@ The project supports complete HDR metadata with:
 - Mastering display luminance values
 - MaxCLL/MaxFALL content light levels
 - **MaxCLL default value for this project is 10,000 nits**
+- Default HDR values do not reflect industry standards, but instead particular
+  traits for disabling tone mapping or other automatic conversions in certain
+  displays.
 
 ### Device Management
 
@@ -136,9 +129,7 @@ The project supports complete HDR metadata with:
 
 ## Testing
 
-- Unit tests are in `tests/` directory
-- Focus on pattern generation and pixel format conversion
-- Use pytest framework for test execution
+Use `uv run invoke test` to run the test suite.
 
 ## Common Issues
 
@@ -151,11 +142,8 @@ The project supports complete HDR metadata with:
 
 ## Dependencies
 
-- Python 3.11+ with numpy, FastAPI, pydantic
-- Blackmagic Design Desktop Video drivers
-- Blackmagic Design DeckLink SDK 14.4
-- clang++ with C++20 support (macOS)
-- UV package manager for Python environment
+See DEVELOPERS.md for complete setup instructions including prerequisites and
+SDK installation.
 
 ## Claude Code Guidelines
 
@@ -172,4 +160,46 @@ The project supports complete HDR metadata with:
 ### Code Quality Guidelines
 
 - Always try to add a return type and type annotations to all functions
-- Do not write functions that return `Optional` types or types that are sometimes None unless doing so adds functionality to the program. If a function cannot compelte correctly, it should raise an error rather than returning None. 
+- Do not write functions that return `Optional` types or types that are
+  sometimes None unless doing so adds functionality to the program. If a
+  function cannot compelte correctly, it should raise an error rather than
+  returning None.
+
+### Development Environment Management
+
+- Use uv and uvx instead of using pip directly. This project uses uv to manage
+  the development environment and development dependencies.
+
+### Project Testing
+
+- Claude can run `python -m bmd_sg.cli.main` to test the cli for the project and
+  user interface
+
+### Module Maintenance Guidelines
+
+- Where a module has an **all** declaration, make sure to keep it up to date by
+  searching for usages of that module's public members. Ensure their usage and
+  documentation are up to date with the latest changes.
+
+### Development Tools
+
+- AI Agents should use `uv run ai-developer-quality` to run quality checks while
+  developing. Some of the checks modify files, so claude will need to re-read
+  files.
+- If the `ai-developer-quality` returns errors for code unrelated to the current
+  project, agents may request to put code check comments around the violating
+  code to bypass the check. Agents must always get explicit permission to do
+  this and must remove the bypass after finishing their current project.
+- Use `uv run ruff` for linting and `uv run pyright` for type checking. Check
+  @tasks.py to see other developer tools claude can consider using.
+
+## Developer Guidelines
+
+- Read @DEVELOPERS.md for additional guidance.
+- Check @.memories for additional guidance.
+
+### CLI Development
+
+- If there are more 3 related options, and there are more than 2 logical option
+  groups, then update the CLI to belong in option groups in typer.
+- If there are a small number of options, option groups are not necessary.

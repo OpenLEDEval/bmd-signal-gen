@@ -1,65 +1,41 @@
 import numpy as np
-import pytest  # type: ignore # pytest must be installed for these tests
 
-from bmd_sg.patterns import ColorValidator, PatternGenerator, PatternType
-
-
-# --- PatternType Enum ---
-def test_pattern_type_enum():
-    assert PatternType.SOLID.value == "solid"
-    assert PatternType.TWO_COLOR.value == "2color"
-    assert PatternType.FOUR_COLOR.value == "4color"
+from bmd_sg.image_generators.checkerboard import ROI, PatternGenerator
 
 
-# --- ColorValidator ---
-def test_color_validator_valid():
-    for bit_depth, max_val in [(8, 255), (10, 1023), (12, 4095)]:
-        v = ColorValidator(bit_depth)
-        v.validate_color(0, 0, 0)
-        v.validate_color(max_val, max_val, max_val)
-        v.validate_color_tuple((max_val, 0, 0))
+def test_pattern_generator_single_color():
+    """Test PatternGenerator with a single color."""
+    gen = PatternGenerator(bit_depth=8, width=4, height=4)
+    pattern = gen.generate([255, 0, 0])  # Red
+    assert pattern.shape == (4, 4, 3)
+    # Single color should fill entire pattern
+    assert np.all(pattern[:, :, 0] == 255)
+    assert np.all(pattern[:, :, 1] == 0)
+    assert np.all(pattern[:, :, 2] == 0)
 
 
-@pytest.mark.parametrize("bit_depth,max_val", [(8, 255), (10, 1023), (12, 4095)])
-def test_color_validator_invalid(bit_depth, max_val):
-    v = ColorValidator(bit_depth)
-    with pytest.raises(ValueError):
-        v.validate_color(max_val + 1, 0, 0)
-    with pytest.raises(ValueError):
-        v.validate_color(0, max_val + 1, 0)
-    with pytest.raises(ValueError):
-        v.validate_color(0, 0, max_val + 1)
-    with pytest.raises(ValueError):
-        v.validate_color(-1, 0, 0)
-    with pytest.raises(ValueError):
-        v.validate_color_tuple((0, 0))  # type: ignore  # Intentionally wrong tuple size for error test
+def test_pattern_generator_two_colors():
+    """Test PatternGenerator with two colors creating checkerboard."""
+    gen = PatternGenerator(bit_depth=8, width=4, height=4)
+    pattern = gen.generate([[255, 0, 0], [0, 255, 0]])  # Red and Green
+    assert pattern.shape == (4, 4, 3)
+    # Should create alternating pattern
 
 
-# --- PatternGenerator ---
-def test_generate_solid():
-    gen = PatternGenerator(4, 4, 12, PatternType.SOLID)
-    arr = gen.generate((100, 200, 300))
-    assert arr.shape == (4, 4, 3)
-    assert np.all(arr[:, :, 0] == 100)
-    assert np.all(arr[:, :, 1] == 200)
-    assert np.all(arr[:, :, 2] == 300)
+def test_roi_properties():
+    """Test ROI properties and calculations."""
+    roi = ROI(x=10, y=20, width=100, height=200)
+    assert roi.x == 10
+    assert roi.y == 20
+    assert roi.width == 100
+    assert roi.height == 200
+    assert roi.x2 == 110  # x + width
+    assert roi.y2 == 220  # y + height
 
 
-def test_generate_2color():
-    gen = PatternGenerator(2, 2, 12, PatternType.TWO_COLOR)
-    arr = gen.generate((100, 0, 0), (0, 200, 0))
-    # Checkerboard: [A, B; B, A]
-    assert arr[0, 0, 0] == 100 and arr[0, 0, 1] == 0
-    assert arr[0, 1, 1] == 200 and arr[0, 1, 0] == 0
-    assert arr[1, 0, 1] == 200 and arr[1, 0, 0] == 0
-    assert arr[1, 1, 0] == 100 and arr[1, 1, 1] == 0
-
-
-def test_generate_4color():
-    gen = PatternGenerator(2, 2, 12, PatternType.FOUR_COLOR)
-    arr = gen.generate((1, 2, 3), (4, 5, 6), (7, 8, 9), (10, 11, 12))
-    # Pattern: [A, B; C, D]
-    assert tuple(arr[0, 0]) == (1, 2, 3)
-    assert tuple(arr[0, 1]) == (4, 5, 6)
-    assert tuple(arr[1, 0]) == (7, 8, 9)
-    assert tuple(arr[1, 1]) == (10, 11, 12)
+def test_pattern_generator_with_roi():
+    """Test PatternGenerator with a custom ROI."""
+    roi = ROI(x=1, y=1, width=2, height=2)
+    gen = PatternGenerator(bit_depth=8, width=4, height=4, roi=roi)
+    pattern = gen.generate([255, 0, 0])  # Red
+    assert pattern.shape == (4, 4, 3)

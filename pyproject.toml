@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-bmd_signal_gen = "bmd_sg.scripts.bmd_signal_gen:app"
+bmd_signal_gen = "bmd_sg.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -28,7 +28,12 @@ include = ["LICENSE"]
 exclude = ["data/", "cpp/", "tests/"]
 
 [dependency-groups]
-dev = ["invoke>=2.2.0", "pyright>=1.1.403", "ruff>=0.12.3"]
+dev = [
+    "invoke>=2.2.0",
+ "pre-commit>=4.2.0",
+ "pyright>=1.1.403",
+ "ruff>=0.12.3",
+]
 
 [tool.ruff]
 line-length = 88
