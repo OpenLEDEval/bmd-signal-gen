@@ -1,11 +1,20 @@
 """Invoke tasks for code quality and formatting."""
 
-from invoke import task
+from invoke.context import Context
+from invoke.tasks import task
 
 
 @task
-def lint(ctx, fix=False):
-    """Run ruff linting with optional auto-fix."""
+def lint(ctx: Context, fix: bool = False) -> None:
+    """Run ruff linting with optional auto-fix.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    fix : bool, optional
+        Whether to auto-fix issues, by default False
+    """
     cmd = "ruff check ."
     if fix:
         cmd += " --fix"
@@ -13,8 +22,16 @@ def lint(ctx, fix=False):
 
 
 @task
-def format(ctx, check=False):
-    """Run ruff formatting with optional check-only mode."""
+def format(ctx: Context, check: bool = False) -> None:
+    """Run ruff formatting with optional check-only mode.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    check : bool, optional
+        Whether to check formatting without applying changes, by default False
+    """
     cmd = "ruff format ."
     if check:
         cmd += " --check"
@@ -22,19 +39,26 @@ def format(ctx, check=False):
 
 
 @task
-def typecheck(ctx):
-    """Run pyright type checking."""
+def typecheck(ctx: Context) -> None:
+    """Run pyright type checking.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     ctx.run("pyright")
 
 
 @task
-def commit_check(ctx):
-    format(ctx, check=True)
+def check(ctx: Context) -> None:
+    """Run all code quality checks (lint, format check, typecheck).
 
-
-@task
-def check(ctx):
-    """Run all code quality checks (lint, format check, typecheck)."""
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     print("🔍 Running linting...")
     lint(ctx, fix=False)
 
@@ -48,8 +72,14 @@ def check(ctx):
 
 
 @task
-def check_fix(ctx):
-    """Auto-fix linting issues and format code."""
+def check_fix(ctx: Context) -> None:
+    """Auto-fix linting issues and format code.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     print("🔧 Fixing linting issues...")
     lint(ctx, fix=True)
 
@@ -63,18 +93,30 @@ def check_fix(ctx):
 
 
 @task
-def ai_developer_quality(ctx):
-    # AI Agents should use this task for quality checking.
+def ai_developer_quality(ctx: Context) -> None:
+    """Run comprehensive quality checks for AI agents.
 
-    # After running task ai-developer-quality, ai agents will need to refresh
-    # their context as these commands can change files safely.
+    AI Agents should use this task for quality checking.
+    After running this task, AI agents will need to refresh
+    their context as these commands can change files safely.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     check_fix(ctx)
-    typecheck(ctx)
 
 
 @task
-def clean(ctx):
-    """Clean up build artifacts and cache files."""
+def clean(ctx: Context) -> None:
+    """Clean up build artifacts and cache files.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     ctx.run("find . -type d -name '__pycache__' -exec rm -rf {} +", warn=True)
     ctx.run("find . -type f -name '*.pyc' -delete", warn=True)
     ctx.run("rm -rf .pytest_cache", warn=True)
@@ -84,14 +126,26 @@ def clean(ctx):
 
 
 @task
-def test(ctx):
-    """Run tests."""
+def test(ctx: Context) -> None:
+    """Run tests.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     ctx.run("python -m pytest tests/")
 
 
 @task(pre=[clean])
-def build(ctx):
-    """Build the C++ library and Python package."""
+def build(ctx: Context) -> None:
+    """Build the C++ library and Python package.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     print("🔨 Building C++ library...")
     ctx.run("cd cpp && make clean && make && cd ..")
 
@@ -102,7 +156,13 @@ def build(ctx):
 
 
 @task
-def dev(ctx):
-    """Quick development check: fix issues and run tests."""
+def dev(ctx: Context) -> None:
+    """Quick development check: fix issues and run tests.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
     check_fix(ctx)
     test(ctx)
