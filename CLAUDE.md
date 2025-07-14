@@ -202,6 +202,8 @@ SDK installation.
 
 - Read @DEVELOPERS.md for additional guidance.
 - Check @.memories/PROJECT_SUMMARY.md for additional guidance.
+- You can search the .memories/DesktopVideoSDKManual.md files if needed for BMD
+  SDK documentation during cpp development.
 
 ### CLI Development
 
