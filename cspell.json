@@ -2,12 +2,6 @@
   "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
   "version": "0.2",
   "language": "en",
-  "import": [
-    "@cspell/dict-python/cspell-ext.json",
-    "@cspell/dict-software-terms/cspell-ext.json",
-    "@cspell/dict-cpp/cspell-ext.json",
-    "@cspell/dict-data-science/cspell-ext.json"
-  ],
   "words": [
     "eotf",
     "EOTF",
@@ -40,7 +34,7 @@
     "RGBW",
     "AABBGGRR",
     "AARRGGBB",
-    "Gamut_Chromaticities",
+    "GAMUTCHROMATICITIES",
     "Pyright"
   ],
   "ignorePaths": [
@@ -51,12 +45,12 @@
     "**/dist/**",
     "**/__pycache__/**",
     "**/cpp/Blackmagic DeckLink SDK 14.4/**",
-    "**/.memories/**",
-    "**/docs/**",
-    "**/sandbox/**",
     "**/*.dylib",
     "**/*.so",
     "**/*.dll"
   ],
-  "ignoreRegExpList": ["\\b[A-F0-9]{8}\\b", "\\b0x[A-Fa-f0-9]+\\b"]
+  "ignoreRegExpList": [
+    "\\b[A-F0-9]{8}\\b",
+    "\\b0x[A-Fa-f0-9]+\\b"
+  ]
 }

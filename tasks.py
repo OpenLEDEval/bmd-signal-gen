@@ -238,7 +238,7 @@ def spellcheck(ctx: Context) -> None:
             warn=True,
         )
 
-        if result and result.ok:
+        if result.return_code == 0:
             print("✅ No spelling errors found!")
         else:
             print("⚠️  Spelling errors detected!")
