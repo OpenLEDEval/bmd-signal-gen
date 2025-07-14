@@ -116,6 +116,9 @@ The project supports complete HDR metadata with:
 - Mastering display luminance values
 - MaxCLL/MaxFALL content light levels
 - **MaxCLL default value for this project is 10,000 nits**
+- Default HDR values do not reflect industry standards, but instead particular
+  traits for disabling tone mapping or other automatic conversions in certain
+  displays.
 
 ### Device Management
 
@@ -139,7 +142,8 @@ Use `uv run invoke test` to run the test suite.
 
 ## Dependencies
 
-See DEVELOPERS.md for complete setup instructions including prerequisites and SDK installation.
+See DEVELOPERS.md for complete setup instructions including prerequisites and
+SDK installation.
 
 ## Claude Code Guidelines
 

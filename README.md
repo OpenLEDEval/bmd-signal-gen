@@ -1,133 +1,176 @@
 # BMD Signal Generator
 
-This project enables the generation of test patterns in a cross-platform, highly
-deterministic way that is not perturbed by OS or GPU variability. It does this
-by providing C++ and Python wrappers for the BlackMagic Design Decklink API.
-Recommended output interfaces are the
+A cross-platform BMD signal generator for Blackmagic Design DeckLink devices
+that outputs test patterns with comprehensive HDR metadata support. This project
+enables deterministic test pattern generation that is not affected by OS or GPU
+variability, making it ideal for professional video testing and display
+calibration.
+
+Recommended output interfaces include the
 [UltraStudio Monitor 3G](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-13)
-and the
-[UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11).
-Both interfaces should be able to output full 12-bit RGB at 1080p30.
+and
+[UltraStudio 4K Mini](https://www.blackmagicdesign.com/products/ultrastudio/techspecs/W-DLUS-11),
+both capable of full 12-bit RGB output at 1080p30.
 
-The project includes a basic command-line tool to illustrate how to use the
-wrapper.
+## Features
 
-## Overview
+- **HDR Support**: Complete HDR metadata with SMPTE ST 2086 and CEA-861.3
+  compliance
+- **Multiple Pixel Formats**: Auto-detection and support for 8-bit to 12-bit
+  YUV/RGB formats
+- **Pattern Generation**: Solid colors and multi-color checkerboard patterns
+  with ROI support
+- **Device Management**: Automatic device enumeration and capability detection
+- **Color Spaces**: Rec.709, Rec.2020, DCI-P3, and Rec.601 primaries support
+- **EOTF Support**: SDR, PQ (HDR10), and HLG transfer functions
+- **CLI Interface**: Rich command-line interface with organized help panels
+- **REST API**: FastAPI-based HTTP interface for pattern generation
 
-This project allows you to:
+## Quick Start
 
-- Enumerate and select connected DeckLink devices
-- Query supported pixel formats for each device
-- Output solid and checkerboard RGB color test patterns to DeckLink devices
-- Control output duration and device selection
+### Prerequisites
 
-## Requirements
+- **macOS** (tested on macOS 15.5) or Windows
+- **Blackmagic Design Desktop Video drivers** (latest version)
+- **Blackmagic Design DeckLink SDK 14.4**
+- **Python 3.13+**
+- **UV package manager**
+  ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
+- **clang++** with C++20 support (macOS) or equivalent C++ compiler
 
-- macOS (tested on macOS 15.5) or presumably Windows
-- Blackmagic Design Desktop Video drivers (tested with 14.5)
-- Blackmagic Design DeckLink SDK (tested with 14.4)
-- Python 3.11+ (for Python interface)
-- clang++ (c++20 or newer) compiler
+### Installation
+
+1. **Get the DeckLink SDK** (see [DEVELOPERS.md](DEVELOPERS.md) for detailed
+   instructions):
+
+   ```bash
+   mkdir -p cpp/include/DeckLinkAPI
+   cp /path/to/decklink-sdk/Mac/include/* cpp/include/DeckLinkAPI/
+   ```
+
+2. **Install dependencies and build**:
+
+   ```bash
+   uv sync
+   uv run invoke build
+   ```
+
+3. **Verify installation**:
+   ```bash
+   uv run python -m bmd_sg.cli.main --help
+   ```
+
+## Usage
+
+### CLI Interface
+
+The CLI provides a comprehensive interface with global device configuration and
+pattern-specific commands:
+
+```bash
+# Show available devices and their capabilities
+uv run python -m bmd_sg.cli.main device-details
+
+# Generate solid white pattern for 10 seconds
+uv run python -m bmd_sg.cli.main solid 4095 4095 4095 --duration 10
+
+# Generate two-color checkerboard with custom colors
+uv run python -m bmd_sg.cli.main pat2 4095 0 0 --color2 0 4095 0 --duration 5
+
+# Generate four-color checkerboard with HDR settings
+uv run python -m bmd_sg.cli.main --device 1 --eotf HLG --max-cll 4000 pat4 4095 0 0 --color2 0 4095 0 --color3 0 0 4095 --color4 4095 4095 4095
+```
+
+### Global Options
+
+- `--device`, `-d`: Device index (default: 0)
+- `--pixel-format`, `-p`: Pixel format (auto-select if not specified)
+- `--width`, `--height`: Resolution (default: 1920x1080)
+- `--roi-x`, `--roi-y`, `--roi-width`, `--roi-height`: Region of interest
+- `--eotf`: EOTF type - SDR, PQ, HLG (default: PQ)
+- `--max-cll`: Maximum Content Light Level in cd/m² (default: 10000)
+- `--max-fall`: Maximum Frame Average Light Level in cd/m² (default: 80)
+- `--no-hdr`: Disable HDR metadata output
+
+### Available Commands
+
+- **`solid`**: Single solid color patterns
+- **`pat2`**: Two-color checkerboard patterns
+- **`pat3`**: Three-color checkerboard patterns
+- **`pat4`**: Four-color checkerboard patterns
+- **`device-details`**: Show device information and capabilities
+
+### Color Value Ranges
+
+Color values depend on the device's pixel format:
+
+- **12-bit**: 0-4095 (default, recommended)
+- **10-bit**: 0-1023
+- **8-bit**: 0-255
 
 ## Project Structure
 
 ```
 bmd-signal-gen/
-├── bmd_sg/scripts/bmd_signal_gen.py   # Command-line application (Typer-based)
-├── cpp/                          # BMD DeckLink API C++ wrapper
-│   ├── decklink_wrapper.h        # C API header
-│   ├── decklink_wrapper.cpp      # C API implementation
-│   ├── pixel_packing.h           # Pixel format conversion utilities
-│   ├── pixel_packing.cpp         # Pixel format conversion implementation
-│   ├── PIXEL_PACKING_DOCUMENTATION.md  # Documentation for pixel packing
-│   ├── Makefile                  # Build configuration for C++ library
-│   └── Blackmagic DeckLink SDK 14.4/  # Blackmagic Design SDK
-├── lib/                          # Python interface and built library artifact
-│   ├── bmd_decklink.py           # Python ctypes wrapper
-│   └── libdecklink.dylib         # Built dynamic library (macOS)
-├── src/                          # Python package source code
-│   └── bmdsignalgen/             # Main Python package
-│       └── patterns.py           # Pattern generation classes and utilities
-├── tests/                        # Unit tests
-│   └── test_patterns.py          # Tests for pattern generation
-├── pyproject.toml                # UV project configuration
-├── uv.lock                       # UV dependency lock file
-└── README.md                     # This file
+├── bmd_sg/                           # Main Python package
+│   ├── cli/                          # Command-line interface
+│   │   ├── main.py                   # Main CLI application
+│   │   ├── shared.py                 # Common utilities and device management
+│   │   └── commands/                 # Pattern-specific commands
+│   ├── decklink/                     # DeckLink SDK wrapper
+│   │   ├── bmd_decklink.py           # Main wrapper with HDR support
+│   │   ├── decklink_types.py         # Type definitions and protocols
+│   │   └── libdecklink.dylib         # Compiled C++ library
+│   ├── image_generators/             # Pattern generation
+│   │   └── checkerboard.py           # Checkerboard pattern generator
+│   └── utilities/                    # System utilities
+├── cpp/                              # C++ DeckLink SDK wrapper
+│   ├── include/DeckLinkAPI/          # DeckLink SDK headers
+│   ├── decklink_wrapper.cpp          # C++ implementation
+│   └── Makefile                      # Build configuration
+├── tests/                            # Unit tests
+├── tasks.py                          # Invoke task automation
+├── DEVELOPERS.md                     # Development setup guide
+└── CLAUDE.md                         # AI development guidelines
 ```
 
-## Building
+## Development
 
-### Prerequisites
-
-1. Install the Blackmagic Design Desktop Video driver
-2. Install the Blackmagic Design DeckLink SDK
-3. Ensure the SDK is located at `cpp/Blackmagic DeckLink SDK 14.4/` relative to
-   the project root
-4. Install Python 3.11+ and UV package manager
-
-### Build the C++ Library
+### Build Commands
 
 ```bash
-cd cpp && make clean && make && cd ..
+uv run invoke build     # Build C++ library and Python package
+uv run invoke check     # Run all checks (lint, format, typecheck)
+uv run invoke fix       # Auto-fix issues and format code
+uv run invoke test      # Run pytest test suite
+uv run invoke dev       # Quick cycle: fix + test
 ```
 
-This creates `bmd_sg/decklink/libdecklink.dylib` - a dynamic library that
-provides the C API for DeckLink device control.
+### Code Quality
 
-### Python Environment Setup
+The project maintains high code quality standards:
 
-The project uses UV for Python dependency management:
+- **Ruff** for linting and formatting
+- **Pyright** for type checking
+- **Pre-commit hooks** for automated quality checks
+- **NumPy-style docstrings** with comprehensive examples
+- **Type hints** throughout the codebase
 
-```bash
-# Install UV if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
+## HDR Configuration
 
-# Install dependencies and create virtual environment
-uv sync
-```
+Default HDR settings follow standards:
 
-## Usage
-
-### Python Command-Line Interface
-
-The easiest way to use this project is through the Python command-line
-interface. After installing / `uv sync` you can activate your `.venv` by calling
-
-```sh
-source .venv/bin/activate
-```
-
-or one of the other activate scripts depending on your choice of shell (for
-example, `source .venv/bin/activate.fish`)
-
-```bash
-bmd_signal_gen <r> <g> <b> [options]
-```
-
-#### Examples
-
-CLI usage: output 12-bit red color for 5 seconds:
-
-```bash
-bmd_signal_gen 4095 0 0
-```
-
-# REST API (default host 127.0.0.1 port 8000)
-
-```bash
-uvicorn bmd_signal_gen:app
-```
-
-#### Command-Line Options
-
-- `r`, `g`, `b`: Red, green, blue components (0-4095)
-- `--duration`, `-d`: Output duration in seconds (default: 5.0)
-- `--device`: Device index to use (default: 0)
+- **EOTF**: PQ (Perceptual Quantizer for HDR10)
+- **MaxCLL**: 10,000 cd/m² (project-specific high luminance)
+- **MaxFALL**: 400 cd/m²
+- **Color Primaries**: Rec.2020 (Ultra HD standard)
+- **White Point**: D65 (0.3127, 0.3290)
 
 ## Contributing
 
-See CONTRIBUTING.md
+See [DEVELOPERS.md](DEVELOPERS.md) for complete development setup instructions
+and coding standards.
 
 ## License
 
-See LICENSE
+See [LICENSE](LICENSE)

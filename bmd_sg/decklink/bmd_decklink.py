@@ -109,7 +109,7 @@ class PixelFormatType(str, Enum):
     FORMAT_H265 = ("hev1", 8, 0x68657631)
     FORMAT_DNxHR = ("AVdh", 8, 0x41566468)
 
-    def __new__(cls, value: str, bit_depth: int, sdk_format_code: int):  # noqa: ARG003
+    def __new__(cls, value: str, *_: Any):
         self = str.__new__(cls, value)
         self._value_ = value
         return self
