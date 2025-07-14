@@ -1,5 +1,14 @@
 # BMD Signal Generator
 
+> **⚠️ AI-Generated Documentation Notice**  
+> Much of this project's documentation was generated using AI assistance. The
+> project and its documentation may contain bugs, missing features, or may not
+> work correctly on certain hardware or operating system configurations. The
+> authors primarily develop on macOS but have made their best effort to make the
+> software cross-platform. If you encounter issues or have questions, please
+> start a
+> [GitHub Discussion](https://github.com/OpenLEDEval/bmd-signal-gen/discussions).
+
 A cross-platform BMD signal generator for Blackmagic Design DeckLink devices
 that outputs test patterns with comprehensive HDR metadata support. This project
 enables deterministic test pattern generation that is not affected by OS or GPU

@@ -156,6 +156,58 @@ def build(ctx: Context) -> None:
 
 
 @task
+def docs(ctx: Context, clean_build: bool = False) -> None:
+    """Build Sphinx documentation.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    clean_build : bool, optional
+        Whether to clean build directory first, by default False
+    """
+    if clean_build:
+        print("🧹 Cleaning documentation build directory...")
+        ctx.run("rm -rf docs/build/*", warn=True)
+
+    print("📚 Building Sphinx documentation...")
+    ctx.run("uv run sphinx-build -b html docs/source docs/build/html")
+
+    print("✅ Documentation built successfully!")
+    print("📖 Open docs/build/html/index.html to view documentation")
+
+
+@task
+def serve_docs(ctx: Context, port: int = 8000) -> None:
+    """Serve documentation locally with HTTP server.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    port : int, optional
+        Port number for the web server, by default 8000
+    """
+    import os
+
+    docs_path = "docs/build/html"
+
+    # Check if documentation exists
+    if not os.path.exists(docs_path):
+        print("📚 Documentation not found. Building first...")
+        docs(ctx)
+
+    print(f"🌐 Starting web server on port {port}...")
+    print(f"📖 Open http://localhost:{port} in your browser")
+    print("💡 Press Ctrl+C to stop the server")
+
+    try:
+        ctx.run(f"cd {docs_path} && python -m http.server {port}")
+    except KeyboardInterrupt:
+        print("\n🛑 Documentation server stopped.")
+
+
+@task
 def dev(ctx: Context) -> None:
     """Quick development check: fix issues and run tests.
 

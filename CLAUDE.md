@@ -3,6 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with
 code in this repository.
 
+## Project Homepage
+
+Check metadata fields in @pyproject.toml for the project home page and author
+information.
+
 ## Project Overview
 
 This project is a cross-platform BMD (Blackmagic Design) signal generator that
