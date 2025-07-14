@@ -10,7 +10,7 @@ import numpy as np
 from numpy.random import rand
 
 from bmd_sg.decklink.bmd_decklink import BMDDeckLink
-from bmd_sg.pattern_generator import DEFAULT_PATTERN_GENERATOR
+from bmd_sg.image_generators.checkerboard import DEFAULT_PATTERN_GENERATOR
 from bmd_sg.utilities import suppress_cpp_output
 
 # ============================================================================

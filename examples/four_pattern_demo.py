@@ -9,7 +9,7 @@ No functions - just a straightforward linear script.
 import time
 
 from bmd_sg.decklink.bmd_decklink import BMDDeckLink
-from bmd_sg.pattern_generator import DEFAULT_PATTERN_GENERATOR
+from bmd_sg.image_generators.checkerboard import DEFAULT_PATTERN_GENERATOR
 
 # Initialize DeckLink device 0
 decklink = BMDDeckLink(0)

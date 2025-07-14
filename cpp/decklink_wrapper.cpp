@@ -217,36 +217,36 @@ int DeckLinkSignalGen::displayFrameSync() {
     return 0;
 }
 
-int DeckLinkSignalGen::setPixelFormat(int pixelFormatIndex) {
+int DeckLinkSignalGen::setPixelFormat(BMDPixelFormat pixelFormat) {
     if (!m_output) return -1;
     
     if (!m_formatsCached) {
         cacheSupportedFormats();
     }
     
-    if (pixelFormatIndex < 0 || pixelFormatIndex >= static_cast<int>(m_supportedFormats.size())) {
-        std::cerr << "[DeckLink] Invalid pixel format index: " << pixelFormatIndex << std::endl;
+    // Check if the format is supported by this device
+    bool isSupported = false;
+    for (const auto& supportedFormat : m_supportedFormats) {
+        if (supportedFormat == pixelFormat) {
+            isSupported = true;
+            break;
+        }
+    }
+    
+    if (!isSupported) {
+        std::cerr << "[DeckLink] Pixel format " << fourCharCode(static_cast<int>(pixelFormat)) 
+                  << " is not supported by this device" << std::endl;
         return -1;
     }
     
-    m_pixelFormat = m_supportedFormats[pixelFormatIndex];
-    std::cerr << "[DeckLink] Set pixel format to API index " << pixelFormatIndex
-              << ", " << fourCharCode(static_cast<int>(m_pixelFormat)) << ")" << std::endl;
+    m_pixelFormat = pixelFormat;
+    std::cerr << "[DeckLink] Set pixel format to " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
     
     return 0;
 }
 
-int DeckLinkSignalGen::getPixelFormat() const {
-    if (!m_formatsCached) return -1;
-    
-    // Find the index of the current pixel format
-    for (int i = 0; i < static_cast<int>(m_supportedFormats.size()); i++) {
-        if (m_supportedFormats[i] == m_pixelFormat) {
-            return i;
-        }
-    }
-    
-    return -1;
+BMDPixelFormat DeckLinkSignalGen::getPixelFormat() const {
+    return m_pixelFormat;
 }
 
 int DeckLinkSignalGen::setHDRMetadata(const HDRMetadata& metadata) {
@@ -531,16 +531,16 @@ int decklink_create_frame_from_data(DeckLinkHandle handle) {
 }
 
 
-int decklink_get_pixel_format(DeckLinkHandle handle) {
-    if (!handle) return -1;
+uint32_t decklink_get_pixel_format(DeckLinkHandle handle) {
+    if (!handle) return 0;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->getPixelFormat();
+    return static_cast<uint32_t>(signalGen->getPixelFormat());
 }
 
-int decklink_set_pixel_format(DeckLinkHandle handle, int pixel_format_index) {
+int decklink_set_pixel_format(DeckLinkHandle handle, uint32_t pixel_format_code) {
     if (!handle) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
-    return signalGen->setPixelFormat(pixel_format_index);
+    return signalGen->setPixelFormat(static_cast<BMDPixelFormat>(pixel_format_code));
 }
 
 int decklink_get_supported_pixel_format_count(DeckLinkHandle handle) {

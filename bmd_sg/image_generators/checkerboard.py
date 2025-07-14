@@ -248,7 +248,7 @@ class PatternGenerator:
         o_image = colors[color_mask]
         # End Numpy advanced indexing.
 
-        return np.ascontiguousarray(o_image.astype(np.uint16))
+        return o_image.astype(np.uint16)
 
     def generate(self, colors: ArrayLike) -> np.ndarray:
         """Generate a checkerboard pattern with the specified colors.
@@ -319,7 +319,7 @@ class PatternGenerator:
             colors = np.broadcast_to(colors, (4, 3))
         elif num_colors == 2:
             # Two colors: tile to create checkerboard of two colors
-            colors = colors[(0, 1, 0, 1), :]
+            colors = colors[(0, 1, 1, 0), :]
         elif num_colors == 3:
             # Three colors: map to [color1, color2, color1, color3]
             # This creates a pattern where color1 appears in top-left and bottom-right
