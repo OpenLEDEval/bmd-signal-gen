@@ -196,7 +196,7 @@ SDK installation.
 ## Developer Guidelines
 
 - Read @DEVELOPERS.md for additional guidance.
-- Check @.memories for additional guidance.
+- Check @.memories/PROJECT_SUMMARY.md for additional guidance.
 
 ### CLI Development
 
