@@ -1,9 +1,44 @@
 [project]
 name = "bmd-signal-generator"
 version = "0.1.0"
-description = "Add your description here"
+description = "Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with HDR metadata support"
+authors = [
+    { name = "Ritchie Argue", email = "ritchie@doequalsglory.com" },
+    { name = "Tucker Downs", email = "tucker@tjdcs.dev" },
+]
+maintainers = [
+    { name = "Ritchie Argue", email = "doequalsglory@gmail.com" },
+    { name = "Tucker Downs", email = "tucker@tjdcs.dev" },
+]
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.13,<3.14"
+keywords = [
+    "blackmagic",
+    "decklink",
+    "video",
+    "signal-generator",
+    "test-patterns",
+    "hdr",
+    "broadcast",
+    "video-production",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: C++",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
 dependencies = [
     "numpy>=2.3.1",
     "fastapi>=0.111.0",
@@ -14,6 +49,13 @@ dependencies = [
     "rich>=14.0.0",
     "aenum>=3.1.16",
 ]
+
+[project.urls]
+Homepage = "https://github.com/OpenLEDEval/bmd-signal-gen"
+Repository = "https://github.com/OpenLEDEval/bmd-signal-gen.git"
+Documentation = "https://bmd-signal-gen.readthedocs.io/"
+Issues = "https://github.com/OpenLEDEval/bmd-signal-gen/issues"
+Changelog = "https://github.com/OpenLEDEval/bmd-signal-gen/blob/main/CHANGELOG.md"
 
 [project.scripts]
 bmd_signal_gen = "bmd_sg.cli.main:app"
@@ -28,11 +70,12 @@ include = ["LICENSE"]
 exclude = ["data/", "cpp/", "tests/"]
 
 [dependency-groups]
-dev = [
-    "invoke>=2.2.0",
- "pre-commit>=4.2.0",
- "pyright>=1.1.403",
- "ruff>=0.12.3",
+dev = ["invoke>=2.2.0", "pre-commit>=4.2.0", "pyright>=1.1.403", "ruff>=0.12.3"]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-autodoc-typehints>=1.25.0",
+    "myst-parser>=2.0.0",
 ]
 
 [tool.ruff]
