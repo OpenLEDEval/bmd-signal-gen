@@ -177,3 +177,7 @@ The project supports complete HDR metadata with:
 ### Development Environment Management
 
 - Use uv and uvx instead of using pip directly. This project uses uv to manage the development environment and development dependencies. 
+
+### Project Testing
+
+- Claude can run `python -m bmd_sg.cli.main` to test the cli for the project and user interface

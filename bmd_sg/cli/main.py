@@ -10,7 +10,12 @@ from typing import Annotated
 
 import typer
 
-from bmd_sg.decklink.bmd_decklink import DecklinkSettings, EOTFType, PixelFormatType
+from bmd_sg.decklink.bmd_decklink import (
+    DecklinkSettings,
+    EOTFType,
+    GamutChromaticities,
+    PixelFormatType,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -153,6 +158,15 @@ def main(
     """
     # Store common settings in context for subcommands to access
     ctx.ensure_object(dict)
+
+    # Create unified chromaticity coordinates from individual components
+    gamut_chromaticities = GamutChromaticities(
+        red_xy=red_primary,
+        green_xy=green_primary,
+        blue_xy=blue_primary,
+        white_xy=white_primary,
+    )
+
     ctx.obj["device_settings"] = DecklinkSettings(
         # Device params
         device=device,
@@ -170,10 +184,7 @@ def main(
         max_fall=max_fall,
         max_display_mastering_luminance=max_display_mastering_luminance,
         min_display_mastering_luminance=min_display_mastering_luminance,
-        red_primary=red_primary,
-        green_primary=green_primary,
-        blue_primary=blue_primary,
-        white_point=white_primary,
+        gamut_chromaticities=gamut_chromaticities,
         no_hdr=no_hdr,
     )
 

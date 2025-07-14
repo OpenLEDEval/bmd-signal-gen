@@ -28,7 +28,7 @@ extern "C" {
 #define DECKLINK_ERROR_FRAME_FAILED -4
 
 // Complete HDR metadata structure (matching SignalGenHDR sample)
-struct ChromaticityCoordinates {
+struct GamutChromaticities {
     double RedX;
     double RedY;
     double GreenX;
@@ -41,7 +41,7 @@ struct ChromaticityCoordinates {
 
 struct HDRMetadata {
     int64_t EOTF;
-    ChromaticityCoordinates referencePrimaries;
+    GamutChromaticities referencePrimaries;
     double maxDisplayMasteringLuminance;
     double minDisplayMasteringLuminance;
     double maxCLL;

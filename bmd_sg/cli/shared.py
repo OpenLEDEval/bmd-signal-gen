@@ -242,16 +242,7 @@ def configure_hdr_metadata(decklink: BMDDeckLink, settings: DecklinkSettings) ->
     )
 
     # Set display primaries and white point chromaticity coordinates
-    primary_coords = [
-        ("Red", settings.red_primary),
-        ("Green", settings.green_primary),
-        ("Blue", settings.blue_primary),
-        ("White", settings.white_point),
-    ]
-
-    for color, (x, y) in primary_coords:
-        setattr(hdr_metadata.referencePrimaries, f"{color}X", float(x))
-        setattr(hdr_metadata.referencePrimaries, f"{color}Y", float(y))
+    hdr_metadata.referencePrimaries = settings.gamut_chromaticities
 
     # Set the complete HDR metadata (unless disabled)
     if not settings.no_hdr:

@@ -346,7 +346,7 @@ class EOTFType(str, Enum):
 
 
 # Complete HDR metadata structures (matching C++ implementation)
-class ChromaticityCoordinates(ctypes.Structure):
+class GamutChromaticities(ctypes.Structure):
     """
     Chromaticity coordinates for display primaries and white point.
 
@@ -380,11 +380,11 @@ class ChromaticityCoordinates(ctypes.Structure):
     --------
     Create Rec.709 chromaticity coordinates:
 
-    >>> coords = ChromaticityCoordinates(
+    >>> coords = GamutChromaticities(
     ...     red_xy=(0.640, 0.330),
     ...     green_xy=(0.300, 0.600),
     ...     blue_xy=(0.150, 0.060),
-    ...     white_xy=(0.3127, 0.3290)
+    ...     white_xy=D65_WHITE_POINT
     ... )
     >>> print(f"Red: ({coords.RedX}, {coords.RedY})")
     Red: (0.64, 0.33)
@@ -424,38 +424,41 @@ class ChromaticityCoordinates(ctypes.Structure):
         self.WhiteY = white_xy[1]
 
 
+# D65 white point (CIE 1931) - Standard illuminant
+D65_WHITE_POINT = (0.3127, 0.3290)
+
 # Standard chromaticity coordinates for common color spaces
-CHROMATICITYCOORDINATES_REC709 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC709 = GamutChromaticities(
     red_xy=(0.640, 0.330),  # Rec.709 Red
     green_xy=(0.300, 0.600),  # Rec.709 Green
     blue_xy=(0.150, 0.060),  # Rec.709 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.709 color space primaries (standard HD)."""
+"""GamutChromaticities: ITU-R BT.709 color space primaries (standard HD)."""
 
-CHROMATICITYCOORDINATES_REC2020 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC2020 = GamutChromaticities(
     red_xy=(0.708, 0.292),  # Rec.2020 Red
     green_xy=(0.170, 0.797),  # Rec.2020 Green
     blue_xy=(0.131, 0.046),  # Rec.2020 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
+"""GamutChromaticities: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
 
-CHROMATICITYCOORDINATES_DCI_P3 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_DCI_P3 = GamutChromaticities(
     red_xy=(0.680, 0.320),  # DCI-P3 Red
     green_xy=(0.265, 0.690),  # DCI-P3 Green
     blue_xy=(0.150, 0.060),  # DCI-P3 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point (P3-D65)
+    white_xy=D65_WHITE_POINT,  # D65 White Point (P3-D65)
 )
-"""ChromaticityCoordinates: DCI-P3 color space primaries (digital cinema)."""
+"""GamutChromaticities: DCI-P3 color space primaries (digital cinema)."""
 
-CHROMATICITYCOORDINATES_REC601 = ChromaticityCoordinates(
+GAMUTCHROMATICITIES_REC601 = GamutChromaticities(
     red_xy=(0.630, 0.340),  # Rec.601 Red
     green_xy=(0.310, 0.595),  # Rec.601 Green
     blue_xy=(0.155, 0.070),  # Rec.601 Blue
-    white_xy=(0.3127, 0.3290),  # D65 White Point
+    white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""ChromaticityCoordinates: ITU-R BT.601 color space primaries (standard definition)."""
+"""GamutChromaticities: ITU-R BT.601 color space primaries (standard definition)."""
 
 
 class HDRMetadata(ctypes.Structure):
@@ -484,7 +487,7 @@ class HDRMetadata(ctypes.Structure):
     ----------
     EOTF : int
         Electro-Optical Transfer Function type
-    referencePrimaries : ChromaticityCoordinates
+    referencePrimaries : GamutChromaticities
         Display color primaries and white point
     maxDisplayMasteringLuminance : float
         Maximum mastering display luminance (cd/m²)
@@ -527,7 +530,7 @@ class HDRMetadata(ctypes.Structure):
 
     _fields_ = [
         ("EOTF", ctypes.c_int64),
-        ("referencePrimaries", ChromaticityCoordinates),
+        ("referencePrimaries", GamutChromaticities),
         ("maxDisplayMasteringLuminance", ctypes.c_double),
         ("minDisplayMasteringLuminance", ctypes.c_double),
         ("maxCLL", ctypes.c_double),
@@ -550,7 +553,7 @@ class HDRMetadata(ctypes.Structure):
         self.maxFALL = max_fall
 
         # Set default Rec2020 primaries
-        self.referencePrimaries = CHROMATICITYCOORDINATES_REC2020
+        self.referencePrimaries = GAMUTCHROMATICITIES_REC2020
 
 
 # Video resolution constants for standard formats
@@ -562,14 +565,6 @@ DEFAULT_MAX_CLL = 10000.0  # Maximum Content Light Level (cd/m²)
 DEFAULT_MAX_FALL = 400.0  # Maximum Frame Average Light Level (cd/m²)
 DEFAULT_MAX_DISPLAY_MASTERING_LUMINANCE = 1000.0  # Display mastering luminance (cd/m²)
 DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE = 0.0001  # Minimum display luminance (cd/m²)
-
-# Rec.2020 color primaries (ITU-R BT.2020) - Ultra HD/HDR standard
-REC2020_RED_PRIMARY = (0.708, 0.292)
-REC2020_GREEN_PRIMARY = (0.170, 0.797)
-REC2020_BLUE_PRIMARY = (0.131, 0.046)
-
-# D65 white point (CIE 1931) - Standard illuminant
-D65_WHITE_POINT = (0.3127, 0.3290)
 
 
 @dataclass
@@ -612,14 +607,9 @@ class DecklinkSettings:
         Maximum display mastering luminance in cd/m². Default is 1000.0.
     min_display_mastering_luminance : float, optional
         Minimum display mastering luminance in cd/m². Default is 0.0001.
-    red_primary : tuple[float, float], optional
-        Red primary chromaticity coordinates (x, y). Default is Rec.2020.
-    green_primary : tuple[float, float], optional
-        Green primary chromaticity coordinates (x, y). Default is Rec.2020.
-    blue_primary : tuple[float, float], optional
-        Blue primary chromaticity coordinates (x, y). Default is Rec.2020.
-    white_point : tuple[float, float], optional
-        White point chromaticity coordinates (x, y). Default is D65.
+    gamut_chromaticities : GamutChromaticities, optional
+        Complete color gamut definition including red, green, blue primaries
+        and white point chromaticity coordinates. Default is Rec.2020.
 
     Attributes
     ----------
@@ -651,14 +641,9 @@ class DecklinkSettings:
         Maximum display mastering luminance in cd/m²
     min_display_mastering_luminance : float
         Minimum display mastering luminance in cd/m²
-    red_primary : tuple[float, float]
-        Red primary chromaticity coordinates (x, y)
-    green_primary : tuple[float, float]
-        Green primary chromaticity coordinates (x, y)
-    blue_primary : tuple[float, float]
-        Blue primary chromaticity coordinates (x, y)
-    white_point : tuple[float, float]
-        White point chromaticity coordinates (x, y)
+    gamut_chromaticities : GamutChromaticities
+        Complete color gamut definition including red, green, blue primaries
+        and white point chromaticity coordinates
 
     Examples
     --------
@@ -730,10 +715,7 @@ class DecklinkSettings:
     min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
 
     # Color space primaries and white point
-    red_primary: tuple[float, float] = REC2020_RED_PRIMARY
-    green_primary: tuple[float, float] = REC2020_GREEN_PRIMARY
-    blue_primary: tuple[float, float] = REC2020_BLUE_PRIMARY
-    white_point: tuple[float, float] = D65_WHITE_POINT
+    gamut_chromaticities: GamutChromaticities = GAMUTCHROMATICITIES_REC2020
 
 
 def _configure_function_signatures(lib: ctypes.CDLL) -> None:
