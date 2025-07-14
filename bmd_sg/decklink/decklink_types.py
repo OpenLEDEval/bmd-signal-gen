@@ -8,9 +8,9 @@ DeckLink library integration.
 """
 
 import ctypes
-from typing import Protocol
+from typing import Any, Protocol
 
-from .bmd_decklink import HDRMetadata
+# from .bmd_decklink import HDRMetadata  # Unused import
 
 
 class DecklinkSDKProtocol(Protocol):
@@ -77,9 +77,7 @@ class DecklinkSDKProtocol(Protocol):
         ...
 
     # HDR metadata functions
-    def decklink_set_hdr_metadata(
-        self, handle: ctypes.c_void_p, metadata: ctypes.POINTER(HDRMetadata)
-    ) -> int:
+    def decklink_set_hdr_metadata(self, handle: ctypes.c_void_p, metadata: Any) -> int:
         """Set complete HDR metadata."""
         ...
 
@@ -91,7 +89,7 @@ class DecklinkSDKProtocol(Protocol):
     def decklink_set_frame_data(
         self,
         handle: ctypes.c_void_p,
-        data: ctypes.POINTER(ctypes.c_uint16),
+        data: Any,
         width: int,
         height: int,
     ) -> int:

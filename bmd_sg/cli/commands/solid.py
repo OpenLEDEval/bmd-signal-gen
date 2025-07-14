@@ -5,12 +5,9 @@ This module provides the solid color pattern generation command that inherits
 global device settings from the main CLI callback.
 """
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
-
-if TYPE_CHECKING:
-    import numpy as np
 
 from bmd_sg.cli.shared import (
     display_image_for_duration,
@@ -88,10 +85,10 @@ def solid_command(
     decklink, generator = setup_tools_from_context(ctx)
 
     # Validate color values using device bit depth
-    color: np.ndarray = validate_color(color, decklink)
+    validated_color = validate_color(color, decklink)
 
     # Generate solid color pattern
-    pattern = generator.generate([color])
+    pattern = generator.generate([validated_color])
 
     # Display the pattern for specified duration
     display_image_for_duration(decklink, pattern, duration)

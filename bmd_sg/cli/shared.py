@@ -298,22 +298,16 @@ def initialize_device(settings: DecklinkSettings) -> BMDDeckLink:
         # 3. Configure pixel format
         configure_pixel_format(decklink, settings.pixel_format, show_logs=True)
 
-        # 4. Store frame dimensions
-        decklink.width = settings.width
-        decklink.height = settings.height
-
-        # 5. Configure HDR metadata
+        # 4. Configure HDR metadata
         configure_hdr_metadata(decklink, settings)
 
-        # 6. Start playback
+        # 5. Start playback
         decklink.start_playback()
 
         return decklink
 
     except Exception as e:
         raise RuntimeError(f"Failed to initialize device: {e!s}") from e
-
-
 
 
 # =============================================================================

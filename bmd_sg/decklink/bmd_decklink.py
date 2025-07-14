@@ -109,7 +109,7 @@ class PixelFormatType(str, Enum):
     FORMAT_H265 = ("hev1", 8, 0x68657631)
     FORMAT_DNxHR = ("AVdh", 8, 0x41566468)
 
-    def __new__(cls, value: str, bit_depth: int, skd_format_code: int):  # noqa: ARG004
+    def __new__(cls, value: str, bit_depth: int, sdk_format_code: int):  # noqa: ARG003
         self = str.__new__(cls, value)
         self._value_ = value
         return self
@@ -272,7 +272,7 @@ class EOTFType(str, Enum):
         self = str.__new__(cls, value)
         self._value_ = value
         for a in args:
-            self._add_value_alias_(a)
+            self._add_value_alias_(a)  # type: ignore Added in python 3.13
         return self
 
     def __init__(
@@ -934,7 +934,7 @@ def get_decklink_sdk_version() -> str:
 
 def ndarray_to_bmd_frame_buffer(
     frame_data: np.ndarray,
-) -> tuple[ctypes.POINTER(ctypes.c_uint16), int, int]:
+) -> tuple[Any, int, int]:
     """
     Convert numpy array to BMD-compatible frame buffer.
 

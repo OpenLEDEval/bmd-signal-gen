@@ -11,12 +11,9 @@ Available commands:
 - checkerboard4_command: Four-color checkerboard patterns
 """
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
-
-if TYPE_CHECKING:
-    import numpy as np
 
 from bmd_sg.cli.shared import (
     display_image_for_duration,
@@ -110,11 +107,10 @@ def checkerboard2_command(
     decklink, generator = setup_tools_from_context(ctx)
 
     # Validate color values using device bit depth
-    color1: np.ndarray = validate_color(color1, decklink)
-    color2: np.ndarray = validate_color(color2, decklink)
+    validated_colors = validate_color([color1, color2], decklink)
 
     # Generate two-color checkerboard pattern
-    pattern = generator.generate([color1, color2])
+    pattern = generator.generate(validated_colors)
 
     # Display the pattern for specified duration
     display_image_for_duration(decklink, pattern, duration)
@@ -214,12 +210,10 @@ def checkerboard3_command(
     decklink, generator = setup_tools_from_context(ctx)
 
     # Validate color values using device bit depth
-    color1: np.ndarray = validate_color(color1, decklink)
-    color2: np.ndarray = validate_color(color2, decklink)
-    color3: np.ndarray = validate_color(color3, decklink)
+    validated_colors = validate_color([color1, color2, color3], decklink)
 
     # Generate three-color checkerboard pattern
-    pattern = generator.generate([color1, color2, color3])
+    pattern = generator.generate(validated_colors)
 
     # Display the pattern for specified duration
     display_image_for_duration(decklink, pattern, duration)
@@ -333,13 +327,10 @@ def checkerboard4_command(
     decklink, generator = setup_tools_from_context(ctx)
 
     # Validate color values using device bit depth
-    color1: np.ndarray = validate_color(color1, decklink)
-    color2: np.ndarray = validate_color(color2, decklink)
-    color3: np.ndarray = validate_color(color3, decklink)
-    color4: np.ndarray = validate_color(color4, decklink)
+    validated_colors = validate_color([color1, color2, color3, color4], decklink)
 
     # Generate four-color checkerboard pattern
-    pattern = generator.generate([color1, color2, color3, color4])
+    pattern = generator.generate(validated_colors)
 
     # Display the pattern for specified duration
     display_image_for_duration(decklink, pattern, duration)
