@@ -39,7 +39,13 @@
     "RGBW",
     "AABBGGRR",
     "AARRGGBB",
-    "GAMUTCHROMATICITIES",
+    "Gamut_Chromaticities",
     "Pyright"
+  ],
+  "cSpell.import": [
+    "@cspell/dict-python/cspell-ext.json",
+    "@cspell/dict-software-terms/cspell-ext.json",
+    "@cspell/dict-cpp/cspell-ext.json",
+    "@cspell/dict-data-science/cspell-ext.json"
   ]
 }
