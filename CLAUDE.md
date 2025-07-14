@@ -16,23 +16,13 @@ outputs test patterns via DeckLink devices. It consists of:
 
 ## Build Commands
 
-### C++ Library
+Use the automated build system:
 
 ```bash
-cd cpp && make clean && make && cd ..
+uv run invoke build
 ```
 
-This builds `bmd_sg/decklink/libdecklink.dylib` - the core dynamic library.
-
-### Python Environment
-
-```bash
-# Install dependencies
-uv sync
-
-# Activate environment
-source .venv/bin/activate
-```
+This builds `bmd_sg/decklink/libdecklink.dylib` and the Python package.
 
 ## Development Guidelines
 
@@ -136,9 +126,7 @@ The project supports complete HDR metadata with:
 
 ## Testing
 
-- Unit tests are in `tests/` directory
-- Focus on pattern generation and pixel format conversion
-- Use pytest framework for test execution
+Use `uv run invoke test` to run the test suite.
 
 ## Common Issues
 
@@ -151,11 +139,7 @@ The project supports complete HDR metadata with:
 
 ## Dependencies
 
-- Python 3.11+ with numpy, FastAPI, pydantic
-- Blackmagic Design Desktop Video drivers
-- Blackmagic Design DeckLink SDK 14.4
-- clang++ with C++20 support (macOS)
-- UV package manager for Python environment
+See DEVELOPERS.md for complete setup instructions including prerequisites and SDK installation.
 
 ## Claude Code Guidelines
 
@@ -172,20 +156,32 @@ The project supports complete HDR metadata with:
 ### Code Quality Guidelines
 
 - Always try to add a return type and type annotations to all functions
-- Do not write functions that return `Optional` types or types that are sometimes None unless doing so adds functionality to the program. If a function cannot compelte correctly, it should raise an error rather than returning None. 
+- Do not write functions that return `Optional` types or types that are
+  sometimes None unless doing so adds functionality to the program. If a
+  function cannot compelte correctly, it should raise an error rather than
+  returning None.
 
 ### Development Environment Management
 
-- Use uv and uvx instead of using pip directly. This project uses uv to manage the development environment and development dependencies. 
+- Use uv and uvx instead of using pip directly. This project uses uv to manage
+  the development environment and development dependencies.
 
 ### Project Testing
 
-- Claude can run `python -m bmd_sg.cli.main` to test the cli for the project and user interface
+- Claude can run `python -m bmd_sg.cli.main` to test the cli for the project and
+  user interface
 
 ### Module Maintenance Guidelines
 
-- Where a module has an __all__ declaration, make sure to keep it up to date by searching for usages of that module's public members. Ensure their usage and documentation are up to date with the latest changes.
+- Where a module has an **all** declaration, make sure to keep it up to date by
+  searching for usages of that module's public members. Ensure their usage and
+  documentation are up to date with the latest changes.
 
 ### Development Tools
 
-- Use `uv run ruff` for linting and `uv run pyright` for type checking. Check @tasks.py to see other developer tools claude can consider using. 
+- Use `uv run ruff` for linting and `uv run pyright` for type checking. Check
+  @tasks.py to see other developer tools claude can consider using.
+
+## Developer Guidelines
+
+Read @DEVELOPERS.md for additional guidance.
