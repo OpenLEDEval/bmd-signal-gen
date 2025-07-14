@@ -1,13 +1,8 @@
 {
-  "files.exclude": {
-    ".cursor": true,
-    ".venv": true
-  },
-  "editor.codeActionsOnSave": {
-    "source.fixAll.ruff": "explicit",
-    "source.organizeImports.ruff": "explicit"
-  },
-  "cSpell.words": [
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en",
+  "words": [
     "eotf",
     "EOTF",
     "Blackmagic",
@@ -41,5 +36,21 @@
     "AARRGGBB",
     "GAMUTCHROMATICITIES",
     "Pyright"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/.venv/**",
+    "**/.git/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/__pycache__/**",
+    "**/cpp/Blackmagic DeckLink SDK 14.4/**",
+    "**/*.dylib",
+    "**/*.so",
+    "**/*.dll"
+  ],
+  "ignoreRegExpList": [
+    "\\b[A-F0-9]{8}\\b",
+    "\\b0x[A-Fa-f0-9]+\\b"
   ]
 }

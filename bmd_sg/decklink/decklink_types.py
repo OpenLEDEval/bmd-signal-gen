@@ -47,6 +47,12 @@ class DecklinkSDKProtocol(Protocol):
         """Start output on device."""
         ...
 
+    def decklink_start_output_with_mode(
+        self, handle: ctypes.c_void_p, display_mode: int
+    ) -> int:
+        """Start output on device with specific display mode."""
+        ...
+
     def decklink_stop_output(self, handle: ctypes.c_void_p) -> int:
         """Stop output on device."""
         ...

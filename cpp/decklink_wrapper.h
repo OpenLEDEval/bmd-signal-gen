@@ -56,6 +56,7 @@ public:
     
     // Output control
     int startOutput();
+    int startOutput(BMDDisplayMode displayMode);
     int stopOutput();
     
     // Frame management
@@ -91,6 +92,7 @@ private:
     int m_height;
     bool m_outputEnabled;
     BMDPixelFormat m_pixelFormat;
+    BMDDisplayMode m_displayMode;
     
     // Complete HDR metadata
     HDRMetadata m_hdrMetadata;
@@ -122,6 +124,7 @@ void decklink_close(DeckLinkHandle handle);
 
 // Output control
 int decklink_start_output(DeckLinkHandle handle);
+int decklink_start_output_with_mode(DeckLinkHandle handle, uint32_t display_mode);
 int decklink_stop_output(DeckLinkHandle handle);
 
 // Frame management

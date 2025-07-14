@@ -208,6 +208,65 @@ def serve_docs(ctx: Context, port: int = 8000) -> None:
 
 
 @task
+def spellcheck(ctx: Context) -> None:
+    """Run spell checking using cspell.
+
+    Checks for spelling errors in Python, C++, and documentation files.
+    Provides helpful installation and configuration guidance if needed.
+
+    Parameters
+    ----------
+    ctx : Context
+        Invoke context object
+    """
+    import shutil
+
+    print("📝 Running spell check...")
+
+    # Check if npx is available
+    if not shutil.which("npx"):
+        print("❌ npx not found!")
+        print("📦 Please install Node.js to get npx:")
+        print("   • macOS: brew install node")
+        print("   • Other: https://nodejs.org/")
+        return
+
+    # Try to run cspell, handle if not installed
+    try:
+        result = ctx.run(
+            'npx cspell "bmd_sg/**/*.py" "cpp/decklink_wrapper.*" "cpp/pixel_packing.*" "*.md" --no-progress',
+            warn=True,
+        )
+
+        if result.return_code == 0:
+            print("✅ No spelling errors found!")
+        else:
+            print("⚠️  Spelling errors detected!")
+            print("🔧 To fix these issues:")
+            print("   1. Correct any genuine spelling mistakes")
+            print("   2. Add legitimate technical terms to cspell.json")
+            print("   3. Technical terms should go in the 'words' array")
+            print("📖 Edit cspell.json to add new technical vocabulary")
+
+    except Exception as e:
+        if "command not found" in str(e).lower() or "not found" in str(e).lower():
+            print("📦 cspell not found. For faster execution, install globally:")
+            print("   npm install -g cspell")
+            print("🔄 Trying to install and run cspell temporarily...")
+            try:
+                ctx.run(
+                    'npx cspell "bmd_sg/**/*.py" "cpp/decklink_wrapper.*" "cpp/pixel_packing.*" "*.md" --no-progress',
+                    warn=True,
+                )
+            except Exception:
+                print(
+                    "❌ Failed to run cspell. Please check your Node.js installation."
+                )
+        else:
+            print(f"❌ Error running cspell: {e}")
+
+
+@task
 def dev(ctx: Context) -> None:
     """Quick development check: fix issues and run tests.
 

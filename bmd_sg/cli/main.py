@@ -25,7 +25,6 @@ from bmd_sg.decklink.bmd_decklink import (
 )
 
 app = typer.Typer(
-    add_completion=False,
     no_args_is_help=True,
     help="BMD Pattern Generator - Output test patterns to Blackmagic Design DeckLink devices",
 )

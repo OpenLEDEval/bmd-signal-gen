@@ -552,7 +552,7 @@ class HDRMetadata(ctypes.Structure):
         self.maxCLL = max_cll
         self.maxFALL = max_fall
 
-        # Set default Rec2020 primaries
+        # Set default Rec2020 primaries (matching C++ defaults)
         self.referencePrimaries = GAMUTCHROMATICITIES_REC2020
 
 
@@ -767,6 +767,13 @@ def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
     if hasattr(lib, "decklink_start_output"):
         lib.decklink_start_output.argtypes = [ctypes.c_void_p]
         lib.decklink_start_output.restype = ctypes.c_int
+
+    if hasattr(lib, "decklink_start_output_with_mode"):
+        lib.decklink_start_output_with_mode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+        ]
+        lib.decklink_start_output_with_mode.restype = ctypes.c_int
 
     if hasattr(lib, "decklink_stop_output"):
         lib.decklink_stop_output.argtypes = [ctypes.c_void_p]
