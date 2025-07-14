@@ -183,9 +183,23 @@ SDK installation.
 
 ### Development Tools
 
+- AI Agents should use `uv run ai-developer-quality` to run quality checks while
+  developing. Some of the checks modify files, so claude will need to re-read
+  files.
+- If the `ai-developer-quality` returns errors for code unrelated to the current
+  project, agents may request to put code check comments around the violating
+  code to bypass the check. Agents must always get explicit permission to do
+  this and must remove the bypass after finishing their current project.
 - Use `uv run ruff` for linting and `uv run pyright` for type checking. Check
   @tasks.py to see other developer tools claude can consider using.
 
 ## Developer Guidelines
 
-Read @DEVELOPERS.md for additional guidance.
+- Read @DEVELOPERS.md for additional guidance.
+- Check @.memories for additional guidance.
+
+### CLI Development
+
+- If there are more 3 related options, and there are more than 2 logical option
+  groups, then update the CLI to belong in option groups in typer.
+- If there are a small number of options, option groups are not necessary.

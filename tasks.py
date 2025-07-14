@@ -48,7 +48,7 @@ def check(ctx):
 
 
 @task
-def fix(ctx):
+def check_fix(ctx):
     """Auto-fix linting issues and format code."""
     print("🔧 Fixing linting issues...")
     lint(ctx, fix=True)
@@ -60,6 +60,16 @@ def fix(ctx):
     typecheck(ctx)
 
     print("✅ All fixes applied!")
+
+
+@task
+def ai_developer_quality(ctx):
+    # AI Agents should use this task for quality checking.
+
+    # After running task ai-developer-quality, ai agents will need to refresh
+    # their context as these commands can change files safely.
+    check_fix(ctx)
+    typecheck(ctx)
 
 
 @task
@@ -94,5 +104,5 @@ def build(ctx):
 @task
 def dev(ctx):
     """Quick development check: fix issues and run tests."""
-    fix(ctx)
+    check_fix(ctx)
     test(ctx)
