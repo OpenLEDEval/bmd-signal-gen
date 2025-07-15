@@ -8,3 +8,12 @@ repos:
       - id: ruff-format
         name: ruff format
         args: []
+  
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v8.16.0
+    hooks:
+      - id: cspell
+        name: cspell
+        args: [--no-progress]
+        files: \.(py|cpp|h|md)$
+        exclude: ^(cpp/Blackmagic|\.venv|__pycache__|build|dist|\.memories|docs|sandbox)/

@@ -167,7 +167,7 @@ SDK installation.
 - Always try to add a return type and type annotations to all functions
 - Do not write functions that return `Optional` types or types that are
   sometimes None unless doing so adds functionality to the program. If a
-  function cannot compelte correctly, it should raise an error rather than
+  function cannot complete correctly, it should raise an error rather than
   returning None.
 
 ### Development Environment Management
@@ -202,6 +202,8 @@ SDK installation.
 
 - Read @DEVELOPERS.md for additional guidance.
 - Check @.memories/PROJECT_SUMMARY.md for additional guidance.
+- You can search the .memories/DesktopVideoSDKManual.md files if needed for BMD
+  SDK documentation during cpp development.
 
 ### CLI Development
 

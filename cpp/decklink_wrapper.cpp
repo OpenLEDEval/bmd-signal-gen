@@ -31,9 +31,10 @@ DeckLinkSignalGen::DeckLinkSignalGen()
     , m_height(1080)
     , m_outputEnabled(false)
     , m_pixelFormat(bmdFormat12BitRGBLE)
+    , m_displayMode(bmdModeHD1080p30)
     , m_formatsCached(false)
 {
-    // Initialize HDR metadata with default Rec2020 values (matching SignalGenHDR sample)
+    // Initialize HDR metadata with default Rec2020 values (matching Python defaults)
     m_hdrMetadata.EOTF = 2; // PQ
     m_hdrMetadata.referencePrimaries.RedX = 0.708;
     m_hdrMetadata.referencePrimaries.RedY = 0.292;
@@ -104,6 +105,10 @@ void DeckLinkSignalGen::logFrameInfo(const char* context) {
  * @see stopOutput(), createFrame(), scheduleFrame(), startPlayback()
  */
 int DeckLinkSignalGen::startOutput() {
+    return startOutput(m_displayMode);
+}
+
+int DeckLinkSignalGen::startOutput(BMDDisplayMode displayMode) {
     if (!m_output) return -1;
     if (m_outputEnabled) return 0;
     
@@ -174,24 +179,12 @@ int DeckLinkSignalGen::createFrame() {
     }
     
     int32_t rowBytes = 0;
-    // Debug output for pixel format and dimensions
-    std::cerr << "[DeckLink][DEBUG] Calling RowBytesForPixelFormat with:"
-              << " pixelFormat=" << fourCharCode(static_cast<int>(m_pixelFormat))
-              << ", width=" << m_width
-              << ", height=" << m_height << std::endl;
     HRESULT result = m_output->RowBytesForPixelFormat(m_pixelFormat, m_width, &rowBytes);
     if (result != S_OK) {
         std::cerr << "[DeckLink] RowBytesForPixelFormat failed. HRESULT: 0x"
                   << std::hex << result << std::dec << std::endl;
-        std::cerr << "[DeckLink][DEBUG] Arguments were: pixelFormat="
-                  << fourCharCode(static_cast<int>(m_pixelFormat))
-                  << ", width=" << m_width
-                  << ", height=" << m_height << std::endl;
         return -3;
     }
-    // Output rowBytes in decimal notation
-    std::cerr << "[DeckLink][DEBUG] RowBytesForPixelFormat returned rowBytes="
-              << rowBytes << std::endl;
     
     result = m_output->CreateVideoFrame(
         m_width, m_height, rowBytes,
@@ -245,7 +238,7 @@ int DeckLinkSignalGen::createFrame() {
         applyHDRMetadata(); // Changed from applyEOTFMetadata to applyHDRMetadata
     }
     
-    logFrameInfo("created");
+    // Frame created successfully
     return 0;
 }
 
@@ -259,7 +252,7 @@ int DeckLinkSignalGen::displayFrameSync() {
         return -1;
     }
     
-    logFrameInfo("displayed synchronously");
+    // Frame displayed successfully
     return 0;
 }
 
@@ -330,16 +323,7 @@ BMDDisplayMode DeckLinkSignalGen::getDisplayMode() const {
 int DeckLinkSignalGen::setHDRMetadata(const HDRMetadata& metadata) {
     m_hdrMetadata = metadata;
     
-    std::cerr << "[DeckLink] Set complete HDR metadata:" << std::endl;
-    std::cerr << "  EOTF: " << metadata.EOTF << std::endl;
-    std::cerr << "  Red Primary: (" << metadata.referencePrimaries.RedX << ", " << metadata.referencePrimaries.RedY << ")" << std::endl;
-    std::cerr << "  Green Primary: (" << metadata.referencePrimaries.GreenX << ", " << metadata.referencePrimaries.GreenY << ")" << std::endl;
-    std::cerr << "  Blue Primary: (" << metadata.referencePrimaries.BlueX << ", " << metadata.referencePrimaries.BlueY << ")" << std::endl;
-    std::cerr << "  White Point: (" << metadata.referencePrimaries.WhiteX << ", " << metadata.referencePrimaries.WhiteY << ")" << std::endl;
-    std::cerr << "  Max Display Mastering Luminance: " << metadata.maxDisplayMasteringLuminance << std::endl;
-    std::cerr << "  Min Display Mastering Luminance: " << metadata.minDisplayMasteringLuminance << std::endl;
-    std::cerr << "  MaxCLL: " << metadata.maxCLL << std::endl;
-    std::cerr << "  MaxFALL: " << metadata.maxFALL << std::endl;
+    // HDR metadata set successfully (debug output reduced)
     
     return 0;
 }
@@ -350,13 +334,10 @@ int DeckLinkSignalGen::setFrameData(const uint16_t* data, int width, int height)
     if (width != m_width || height != m_height) {
         m_width = width;
         m_height = height;
-        std::cerr << "[DeckLink] Updated frame dimensions to " << width << "x" << height << std::endl;
     }
     // Store the frame data
     size_t dataSize = width * height * 3; // 3 channels (R, G, B) per pixel
     m_pendingFrameData.assign(data, data + dataSize);
-    std::cerr << "[DeckLink] Set frame data: " << width << "x" << height
-              << " pixels, " << m_pendingFrameData.size() << " samples" << std::endl;
     return 0;
 }
 
@@ -431,7 +412,7 @@ void DeckLinkSignalGen::cacheSupportedFormats() {
         bool supported;
         
         if (m_output->DoesSupportVideoMode(bmdVideoConnectionUnspecified, 
-                                          bmdModeHD1080p30, 
+                                          m_displayMode, 
                                           format, 
                                           bmdNoVideoOutputConversion, 
                                           bmdSupportedVideoModeDefault, 
@@ -478,44 +459,21 @@ int DeckLinkSignalGen::applyHDRMetadata() {
         m_frame->SetFlags(currentFlags | bmdFrameContainsHDRMetadata);
         
         // Set display primaries
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedX, m_hdrMetadata.referencePrimaries.RedX);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set RedX" << std::endl;
+        // Set display primaries (reduced logging for performance)
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedX, m_hdrMetadata.referencePrimaries.RedX);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedY, m_hdrMetadata.referencePrimaries.RedY);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenX, m_hdrMetadata.referencePrimaries.GreenX);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenY, m_hdrMetadata.referencePrimaries.GreenY);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueX, m_hdrMetadata.referencePrimaries.BlueX);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueY, m_hdrMetadata.referencePrimaries.BlueY);
         
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedY, m_hdrMetadata.referencePrimaries.RedY);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set RedY" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenX, m_hdrMetadata.referencePrimaries.GreenX);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set GreenX" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesGreenY, m_hdrMetadata.referencePrimaries.GreenY);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set GreenY" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueX, m_hdrMetadata.referencePrimaries.BlueX);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set BlueX" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueY, m_hdrMetadata.referencePrimaries.BlueY);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set BlueY" << std::endl;
-        
-        // Set white point
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointX, m_hdrMetadata.referencePrimaries.WhiteX);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set WhiteX" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointY, m_hdrMetadata.referencePrimaries.WhiteY);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set WhiteY" << std::endl;
-        
-        // Set mastering display luminance
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaxDisplayMasteringLuminance, m_hdrMetadata.maxDisplayMasteringLuminance);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxDisplayMasteringLuminance" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMinDisplayMasteringLuminance, m_hdrMetadata.minDisplayMasteringLuminance);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MinDisplayMasteringLuminance" << std::endl;
-        
-        // Set content light level
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumContentLightLevel, m_hdrMetadata.maxCLL);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxCLL" << std::endl;
-        
-        result = metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumFrameAverageLightLevel, m_hdrMetadata.maxFALL);
-        if (result != S_OK) std::cerr << "[DeckLink] Warning: Failed to set MaxFALL" << std::endl;
+        // Set white point and luminance values (reduced logging for performance)
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointX, m_hdrMetadata.referencePrimaries.WhiteX);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointY, m_hdrMetadata.referencePrimaries.WhiteY);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaxDisplayMasteringLuminance, m_hdrMetadata.maxDisplayMasteringLuminance);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMinDisplayMasteringLuminance, m_hdrMetadata.minDisplayMasteringLuminance);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumContentLightLevel, m_hdrMetadata.maxCLL);
+        metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRMaximumFrameAverageLightLevel, m_hdrMetadata.maxFALL);
     } else {
         // Remove HDR metadata flag for non-PQ EOTF
         BMDFrameFlags currentFlags = m_frame->GetFlags();
@@ -523,7 +481,6 @@ int DeckLinkSignalGen::applyHDRMetadata() {
     }
     
     metadataExt->Release();
-    std::cerr << "[DeckLink] HDR metadata applied successfully" << std::endl;
     return 0;
 }
 
@@ -608,6 +565,12 @@ int decklink_start_output(DeckLinkHandle handle) {
     if (!handle) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
     return signalGen->startOutput();
+}
+
+int decklink_start_output_with_mode(DeckLinkHandle handle, uint32_t display_mode) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->startOutput(static_cast<BMDDisplayMode>(display_mode));
 }
 
 int decklink_stop_output(DeckLinkHandle handle) {

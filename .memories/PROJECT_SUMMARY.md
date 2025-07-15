@@ -41,7 +41,7 @@ HDR metadata support. Outputs test patterns via professional video hardware.
   support
 - `HDRMetadata` ctypes structure: Complete HDR metadata (EOTF, primaries,
   mastering display, content light levels)
-- `GamutChromaticities`: Color space primaries (Rec.709, Rec.2020, DCI-P3,
+- `Gamut_Chromaticities`: Color space primaries (Rec.709, Rec.2020, DCI-P3,
   Rec.601)
 - `PixelFormatType` enum: Format types with bit depths and SDK codes (8-bit to
   12-bit, YUV/RGB)

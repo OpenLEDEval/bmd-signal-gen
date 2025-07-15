@@ -380,7 +380,7 @@ class GamutChromaticities(ctypes.Structure):
     --------
     Create Rec.709 chromaticity coordinates:
 
-    >>> coords = GamutChromaticities(
+    >>> coords = Gamut_Chromaticities(
     ...     red_xy=(0.640, 0.330),
     ...     green_xy=(0.300, 0.600),
     ...     blue_xy=(0.150, 0.060),
@@ -428,37 +428,37 @@ class GamutChromaticities(ctypes.Structure):
 D65_WHITE_POINT = (0.3127, 0.3290)
 
 # Standard chromaticity coordinates for common color spaces
-GAMUTCHROMATICITIES_REC709 = GamutChromaticities(
+Gamut_Chromaticities_REC709 = GamutChromaticities(
     red_xy=(0.640, 0.330),  # Rec.709 Red
     green_xy=(0.300, 0.600),  # Rec.709 Green
     blue_xy=(0.150, 0.060),  # Rec.709 Blue
     white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""GamutChromaticities: ITU-R BT.709 color space primaries (standard HD)."""
+"""Gamut_Chromaticities: ITU-R BT.709 color space primaries (standard HD)."""
 
-GAMUTCHROMATICITIES_REC2020 = GamutChromaticities(
+Gamut_Chromaticities_REC2020 = GamutChromaticities(
     red_xy=(0.708, 0.292),  # Rec.2020 Red
     green_xy=(0.170, 0.797),  # Rec.2020 Green
     blue_xy=(0.131, 0.046),  # Rec.2020 Blue
     white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""GamutChromaticities: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
+"""Gamut_Chromaticities: ITU-R BT.2020 color space primaries (ultra HD/HDR)."""
 
-GAMUTCHROMATICITIES_DCI_P3 = GamutChromaticities(
+Gamut_Chromaticities_DCI_P3 = GamutChromaticities(
     red_xy=(0.680, 0.320),  # DCI-P3 Red
     green_xy=(0.265, 0.690),  # DCI-P3 Green
     blue_xy=(0.150, 0.060),  # DCI-P3 Blue
     white_xy=D65_WHITE_POINT,  # D65 White Point (P3-D65)
 )
-"""GamutChromaticities: DCI-P3 color space primaries (digital cinema)."""
+"""Gamut_Chromaticities: DCI-P3 color space primaries (digital cinema)."""
 
-GAMUTCHROMATICITIES_REC601 = GamutChromaticities(
+GAMUT_CHROMATICITIES_REC601 = GamutChromaticities(
     red_xy=(0.630, 0.340),  # Rec.601 Red
     green_xy=(0.310, 0.595),  # Rec.601 Green
     blue_xy=(0.155, 0.070),  # Rec.601 Blue
     white_xy=D65_WHITE_POINT,  # D65 White Point
 )
-"""GamutChromaticities: ITU-R BT.601 color space primaries (standard definition)."""
+"""Gamut_Chromaticities: ITU-R BT.601 color space primaries (standard definition)."""
 
 
 class HDRMetadata(ctypes.Structure):
@@ -487,7 +487,7 @@ class HDRMetadata(ctypes.Structure):
     ----------
     EOTF : int
         Electro-Optical Transfer Function type
-    referencePrimaries : GamutChromaticities
+    referencePrimaries : Gamut_Chromaticities
         Display color primaries and white point
     maxDisplayMasteringLuminance : float
         Maximum mastering display luminance (cd/m²)
@@ -552,8 +552,8 @@ class HDRMetadata(ctypes.Structure):
         self.maxCLL = max_cll
         self.maxFALL = max_fall
 
-        # Set default Rec2020 primaries
-        self.referencePrimaries = GAMUTCHROMATICITIES_REC2020
+        # Set default Rec2020 primaries (matching C++ defaults)
+        self.referencePrimaries = Gamut_Chromaticities_REC2020
 
 
 # Video resolution constants for standard formats
@@ -607,7 +607,7 @@ class DecklinkSettings:
         Maximum display mastering luminance in cd/m². Default is 1000.0.
     min_display_mastering_luminance : float, optional
         Minimum display mastering luminance in cd/m². Default is 0.0001.
-    gamut_chromaticities : GamutChromaticities, optional
+    gamut_chromaticities : Gamut_Chromaticities, optional
         Complete color gamut definition including red, green, blue primaries
         and white point chromaticity coordinates. Default is Rec.2020.
 
@@ -641,7 +641,7 @@ class DecklinkSettings:
         Maximum display mastering luminance in cd/m²
     min_display_mastering_luminance : float
         Minimum display mastering luminance in cd/m²
-    gamut_chromaticities : GamutChromaticities
+    gamut_chromaticities : Gamut_Chromaticities
         Complete color gamut definition including red, green, blue primaries
         and white point chromaticity coordinates
 
@@ -715,7 +715,7 @@ class DecklinkSettings:
     min_display_mastering_luminance: float = DEFAULT_MIN_DISPLAY_MASTERING_LUMINANCE
 
     # Color space primaries and white point
-    gamut_chromaticities: GamutChromaticities = GAMUTCHROMATICITIES_REC2020
+    gamut_chromaticities: GamutChromaticities = Gamut_Chromaticities_REC2020
 
 
 def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
@@ -767,6 +767,13 @@ def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
     if hasattr(lib, "decklink_start_output"):
         lib.decklink_start_output.argtypes = [ctypes.c_void_p]
         lib.decklink_start_output.restype = ctypes.c_int
+
+    if hasattr(lib, "decklink_start_output_with_mode"):
+        lib.decklink_start_output_with_mode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+        ]
+        lib.decklink_start_output_with_mode.restype = ctypes.c_int
 
     if hasattr(lib, "decklink_stop_output"):
         lib.decklink_stop_output.argtypes = [ctypes.c_void_p]
