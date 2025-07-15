@@ -6,8 +6,102 @@
 	},
 	"item": [
 		{
-			"name": "4color",
-			"id": "21048489-1436f32e-98ad-4742-b84c-25be55597ca2",
+			"name": "Root directory / Resources",
+			"id": "21048489-5ad29fc1-531e-4705-bed3-fed0f2cd5bd1",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"roi_x\": 0,\n    \"roi_y\": 0,\n    \"roi_width\": 100,\n    \"roi_height\": 100,\n    \"colors\": [\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        }\n    ]\n}"
+				},
+				"url": {
+					"raw": "{{bmd-sg server}}/",
+					"host": [
+						"{{bmd-sg server}}"
+					],
+					"path": [
+						""
+					]
+				}
+			},
+			"response": [
+				{
+					"id": "21048489-bb1bdcb3-b30b-4c5f-887a-2a2b2368240d",
+					"name": "Root directory / Resources",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"roi_x\": 0,\n    \"roi_y\": 0,\n    \"roi_width\": 100,\n    \"roi_height\": 100,\n    \"colors\": [\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{bmd-sg server}}/",
+							"host": [
+								"{{bmd-sg server}}"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"responseTime": null,
+					"body": null
+				}
+			]
+		},
+		{
+			"name": "Server / Device Status",
+			"id": "21048489-a0a14f01-aa76-4d12-90c6-17a1c846e096",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{bmd-sg server}}/status",
+					"host": [
+						"{{bmd-sg server}}"
+					],
+					"path": [
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Serber Health",
+			"id": "21048489-0bb17134-a428-4e42-b735-ca24d1d4ba38",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{bmd-sg server}}/health",
+					"host": [
+						"{{bmd-sg server}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Pattern",
+			"id": "21048489-63b6ee19-c1c7-4397-8416-2e1c52a66da7",
 			"protocolProfileBehavior": {
 				"disableBodyPruning": true
 			},
@@ -16,7 +110,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"roi_x\": 0,\n    \"roi_y\": 0,\n    \"roi_width\": 100,\n    \"roi_height\": 100,\n    \"colors\": [\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        }\n    ]\n}",
+					"raw": "  {\"colors\": [[2048, 2048, 2048]]}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -24,19 +118,141 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:8000/bmd-signal-gen/4color",
-					"protocol": "http",
+					"raw": "{{bmd-sg server}}/update_color",
 					"host": [
-						"localhost"
+						"{{bmd-sg server}}"
 					],
-					"port": "8000",
 					"path": [
-						"bmd-signal-gen",
-						"4color"
+						"update_color"
 					]
 				}
 			},
-			"response": []
+			"response": [
+				{
+					"id": "21048489-2308b257-a8db-4625-8bfe-f41493e8f5fb",
+					"name": "Solid",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "  {\"colors\": [[2048, 2048, 2048]]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{bmd-sg server}}/update_color",
+							"host": [
+								"{{bmd-sg server}}"
+							],
+							"path": [
+								"update_color"
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"responseTime": null,
+					"body": null
+				},
+				{
+					"id": "21048489-42e2ce6d-0f66-4b50-8e41-fb974ccd1b60",
+					"name": "Two Color",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "  {\"colors\": [[2048, 2048, 2048], [0,0,0]]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{bmd-sg server}}/update_color",
+							"host": [
+								"{{bmd-sg server}}"
+							],
+							"path": [
+								"update_color"
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"responseTime": null,
+					"body": null
+				},
+				{
+					"id": "21048489-fbfae38f-b95a-45b1-a8a3-9ef7307cf34a",
+					"name": "Three Color",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "  {\"colors\": [[0, 2672, 0], [2979, 0, 0], [0, 0, 2979]]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{bmd-sg server}}/update_color",
+							"host": [
+								"{{bmd-sg server}}"
+							],
+							"path": [
+								"update_color"
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"responseTime": null,
+					"body": null
+				},
+				{
+					"id": "21048489-5f217ade-a613-41da-93d1-9df4f8f17d7b",
+					"name": "Four Colors",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "  {\"colors\": [[2048, 0, 0],[0, 2048, 0],[0, 0, 2048],[2048, 2048, 0]]}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{bmd-sg server}}/update_color",
+							"host": [
+								"{{bmd-sg server}}"
+							],
+							"path": [
+								"update_color"
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"responseTime": null,
+					"body": null
+				}
+			]
 		}
 	]
 }
