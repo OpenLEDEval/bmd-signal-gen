@@ -39,6 +39,7 @@ Contents
    installation
    quickstart
    cli_usage
+   api_guide
 
 .. toctree::
    :maxdepth: 2
