@@ -10,6 +10,7 @@ from typing import Annotated
 
 import typer
 
+from bmd_sg.cli.commands.api_server import api_server_command
 from bmd_sg.cli.commands.checkerboard_commands import (
     checkerboard2_command,
     checkerboard3_command,
@@ -202,6 +203,7 @@ app.command(name="pat2")(checkerboard2_command)
 app.command(name="pat3")(checkerboard3_command)
 app.command(name="pat4")(checkerboard4_command)
 app.command(name="device-details")(device_details_command)
+app.command(name="api-server")(api_server_command)
 
 
 __all__ = ["app", "main"]

@@ -68,6 +68,9 @@ def check(ctx: Context) -> None:
     print("🔬 Type checking...")
     typecheck(ctx)
 
+    print("📖 Spell checking...")
+    spellcheck(ctx)
+
     print("✅ All checks completed!")
 
 
@@ -86,9 +89,6 @@ def check_fix(ctx: Context) -> None:
     print("📝 Formatting code...")
     format(ctx, check=False)
 
-    print("🔬 Type checking...")
-    typecheck(ctx)
-
     print("✅ All fixes applied!")
 
 
@@ -105,7 +105,17 @@ def ai_developer_quality(ctx: Context) -> None:
     ctx : Context
         Invoke context object
     """
-    check_fix(ctx)
+    print("🔧 Fixing linting issues...")
+    lint(ctx, fix=True)
+
+    print("📝 Formatting code...")
+    format(ctx, check=False)
+
+    print("🔬 Type checking...")
+    typecheck(ctx)
+
+    print("📖 Spell checking...")
+    spellcheck(ctx)
 
 
 @task
@@ -276,4 +286,6 @@ def dev(ctx: Context) -> None:
         Invoke context object
     """
     check_fix(ctx)
+    typecheck(ctx)
+    spellcheck(ctx)
     test(ctx)

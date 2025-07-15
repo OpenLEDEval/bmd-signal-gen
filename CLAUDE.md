@@ -65,44 +65,6 @@ Use these sections in docstrings:
 - **Notes** - Important implementation details or performance considerations
 - **See Also** - Cross-references to related functionality
 
-#### Example Class Docstring
-
-```python
-class HDRMetadata(ctypes.Structure):
-    """
-    Complete HDR metadata structure for DeckLink output.
-
-    This structure defines comprehensive HDR metadata including EOTF
-    (Electro-Optical Transfer Function), display primaries, and luminance values.
-
-    Parameters
-    ----------
-    eotf : int, optional
-        EOTF type (0=Reserved, 1=SDR, 2=PQ, 3=HLG). Default is 3.
-    max_display_luminance : float, optional
-        Maximum display mastering luminance in cd/m². Default is 1000.0.
-
-    Attributes
-    ----------
-    EOTF : int
-        Electro-Optical Transfer Function type
-    referencePrimaries : ChromaticityCoordinates
-        Display color primaries and white point
-
-    Examples
-    --------
-    Create HDR metadata with default values:
-
-    >>> metadata = HDRMetadata()
-    >>> print(f"EOTF: {metadata.EOTF}")
-    EOTF: 3
-
-    Notes
-    -----
-    The structure automatically sets Rec.2020 color primaries as defaults.
-    """
-```
-
 #### Documentation Quality Requirements
 
 - **Complete parameter documentation** - All parameters must be documented with
@@ -161,6 +123,10 @@ SDK installation.
     minimal code in the chat
   - Wait for explicit confirmation before using edit or multi edit tools to
     implement refactoring
+  - When refactoring, unless explicitly asked for do not preserve backwards
+    compatibility. You can break the api as long as you make corrections
+    throughout the code base. If it is too complicated, ask for help from the
+    user.
 
 ### Code Quality Guidelines
 
@@ -174,6 +140,7 @@ SDK installation.
 
 - Use uv and uvx instead of using pip directly. This project uses uv to manage
   the development environment and development dependencies.
+- **When running python snippets in this library, use `uv run python` instead of invoking python directly.**
 
 ### Project Testing
 
@@ -205,11 +172,6 @@ SDK installation.
 - You can search the .memories/DesktopVideoSDKManual.md files if needed for BMD
   SDK documentation during cpp development.
 
-### CLI Development
-
-- If there are more 3 related options, and there are more than 2 logical option
-  groups, then update the CLI to belong in option groups in typer.
-- If there are a small number of options, option groups are not necessary.
 
 ### Reference Example Paths
 

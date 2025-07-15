@@ -94,6 +94,14 @@ class PixelFormatType(str, Enum):
     12BIT_RGB
     """
 
+    # This table is meant to be in line with "Enum BMDPixelFormat" in
+    # cpp/Blackmagic DeckLink SDK 14.4/Mac/include/DeckLinkAPIModes.h
+    # TODO: Add field to indicate library support
+    # TODO: Add human readable primary selections string and fall back on BMD
+    # string in case the human readable string isn't set. Ensure parse can refer
+    # to either the human readable or bmd string, as well as handling both as a
+    # value alias.
+
     FORMAT_UNSPECIFIED = ("unkn", 8, 0)
     FORMAT_8BIT_YUV = ("2vuy", 8, 0x32767579)
     FORMAT_10BIT_YUV = ("v210", 10, 0x76323130)
