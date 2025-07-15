@@ -83,6 +83,7 @@ public:
     // Core DeckLink objects (made public for C wrapper access)
     IDeckLink* m_device;
     IDeckLinkOutput* m_output;
+    IDeckLinkConfiguration* m_configuration;
     IDeckLinkMutableVideoFrame* m_frame;
 
 private:

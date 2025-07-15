@@ -24,6 +24,7 @@ std::string fourCharCode(int value) {
 DeckLinkSignalGen::DeckLinkSignalGen() 
     : m_device(nullptr)
     , m_output(nullptr)
+    , m_configuration(nullptr)
     , m_frame(nullptr)
     , m_width(1920)
     , m_height(1080)
@@ -58,6 +59,10 @@ DeckLinkSignalGen::~DeckLinkSignalGen() {
     if (m_output) {
         m_output->Release();
         m_output = nullptr;
+    }
+    if (m_configuration) {
+        m_configuration->Release();
+        m_configuration = nullptr;
     }
     if (m_device) {
         m_device->Release();
@@ -241,6 +246,40 @@ int DeckLinkSignalGen::setPixelFormat(BMDPixelFormat pixelFormat) {
     
     m_pixelFormat = pixelFormat;
     std::cerr << "[DeckLink] Set pixel format to " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
+
+    // Set SDI output mode based on pixel format (following SignalGenHDR sample)
+    if (m_configuration) {
+        bool output444;
+        
+        // Determine if this is an RGB format requiring 4:4:4 output
+        switch (m_pixelFormat) {
+            case bmdFormat10BitRGB:
+            case bmdFormat12BitRGB:
+            case bmdFormat12BitRGBLE:
+            case bmdFormat10BitRGBXLE:
+            case bmdFormat10BitRGBX:
+            case bmdFormat8BitARGB:
+            case bmdFormat8BitBGRA:
+                output444 = true;
+                break;
+            default:
+                // YUV formats and others use 4:2:2
+                output444 = false;
+                break;
+        }
+        
+        std::cerr << "[DeckLink] Setting SDI output to " << (output444 ? "4:4:4" : "4:2:2") 
+                  << " for pixel format " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
+        
+        HRESULT configResult = m_configuration->SetFlag(bmdDeckLinkConfig444SDIVideoOutput, output444);
+        // Note: SetFlag may return E_NOTIMPL for devices without SDI output (like Intensity Pro 4K)
+        if (configResult != S_OK && configResult != E_NOTIMPL) {
+            std::cerr << "[DeckLink] Warning: Failed to set SDI output mode. HRESULT: 0x" 
+                      << std::hex << configResult << std::dec << std::endl;
+        }
+    } else {
+        std::cerr << "[DeckLink] Warning: No configuration interface available for SDI setup" << std::endl;
+    }
     
     return 0;
 }
@@ -488,11 +527,25 @@ DeckLinkHandle decklink_open_output_by_index(int index) {
     while (iterator->Next(&device) == S_OK) {
         if (current == index) {
             IDeckLinkOutput* output = nullptr;
+            IDeckLinkConfiguration* configuration = nullptr;
+            
             if (device->QueryInterface(IID_IDeckLinkOutput, (void**)&output) == S_OK) {
-                signalGen->m_device = device;
-                signalGen->m_output = output;
-                iterator->Release();
-                return signalGen;
+                // Also get the configuration interface for SDI output control
+                if (device->QueryInterface(IID_IDeckLinkConfiguration, (void**)&configuration) == S_OK) {
+                    signalGen->m_device = device;
+                    signalGen->m_output = output;
+                    signalGen->m_configuration = configuration;
+                    iterator->Release();
+                    return signalGen;
+                } else {
+                    std::cerr << "[DeckLink] Warning: Could not get configuration interface for device " << index << std::endl;
+                    // Still proceed without configuration interface
+                    signalGen->m_device = device;
+                    signalGen->m_output = output;
+                    signalGen->m_configuration = nullptr;
+                    iterator->Release();
+                    return signalGen;
+                }
             }
             device->Release();
             break;

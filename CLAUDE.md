@@ -208,3 +208,7 @@ SDK installation.
 - If there are more 3 related options, and there are more than 2 logical option
   groups, then update the CLI to belong in option groups in typer.
 - If there are a small number of options, option groups are not necessary.
+
+### Reference Example Paths
+
+- Always use the path `@cpp/Blackmagic\ DeckLink\ SDK\ 14.4/Mac/Samples/SignalGenHDR` as known-good example code when working with the DeckLink SDK API
