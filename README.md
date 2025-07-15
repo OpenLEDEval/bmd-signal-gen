@@ -117,6 +117,8 @@ Color values depend on the device's pixel format:
 - **10-bit**: 0-1023
 - **8-bit**: 0-255
 
+**Note that bmd-signal-gen does not enforce "video" or limited range checking, nor do any conversion from full-range to limited or vice-versa. Please handle this manually as necessary in the design and configuration of your patterns and pixel format selection**
+
 ## Project Structure
 
 ```
