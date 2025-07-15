@@ -27,71 +27,6 @@
  */
 
 /**
- * bmdFormat8BitYUV : '2vuy' 4:2:2 Representation
- * 
- * Four 8-bit unsigned components (CCIR 601) are packed into one 32-bit little-
- * endian word.
- * 
- * int framesize = (Width * 16 / 8) * Height
- *               = rowbytes * Height
- * 
- * In this format, two pixels fits into 32 bits or 4 bytes, so one pixel fits
- * into 16 bits or 2 bytes.
- * 
- * For the row bytes calculation, the image width is multiplied by the number of
- * bytes per pixel.
- * 
- * For the frame size calculation, the row bytes are simply multiplied by the
- * number of rows in the frame.
- * 
- * Note that in the source image, Y U and V are defined per pixel, however U and
- * V are discarded for every second pixel
- * 
- * @param destData Pointer to destination frame buffer
- * @param srcY Pointer to source Y channel data (8-bit, 0-255)
- * @param srcU Pointer to source U channel data (8-bit, 0-255)
- * @param srcV Pointer to source V channel data (8-bit, 0-255)
- * @param width Frame width in pixels
- * @param height Frame height in pixels
- * @param rowBytes Bytes per row (including padding)
- */
-void pack_8bpc_yuv_image(
-    void* destData,
-    const uint16_t* srcY, const uint16_t* srcU, const uint16_t* srcV,
-    uint16_t width, uint16_t height,
-    uint16_t rowBytes) {
-    
-    uint8_t* bytes = static_cast<uint8_t*>(destData);
-    
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x += 2) {
-            int srcIndex = y * width + x;
-            int destIndex = y * rowBytes + (x * 2); // 2 bytes per pixel in YUV 4:2:2
-            
-            uint8_t y_val = std::min(srcY[srcIndex], static_cast<uint16_t>(255));
-            uint8_t u = std::min(srcU[srcIndex], static_cast<uint16_t>(255));
-            uint8_t v = std::min(srcV[srcIndex], static_cast<uint16_t>(255));
-
-            // Pack into YUV 4:2:2 format: Y'0U0Y'1V0
-            // For even pixels: U0 Y0 V0 Y1
-            // For odd pixels:  U1 Y2 V1 Y3
-            if (x % 2 == 0) {
-                // Even pixel: store U and Y'0
-                bytes[destIndex] = v;
-                bytes[destIndex + 1] = y_val;
-            } else {
-                // Odd pixel: store U and Y'1
-                bytes[destIndex] = u;
-                bytes[destIndex + 1] = y_val;
-            }
-        }
-    }
-    
-    std::cerr << "[PixelPacking] 8-bit YUV image packed: " << width << "x" << height << std::endl;
-}
-
-
-/**
  * Pack 8-bit RGB image data into BGRA/ARGB format
  * 
  * Packs existing 8-bit RGB image data into BGRA or ARGB format.
@@ -189,8 +124,18 @@ void pack_10bpc_rgb_image(
             
             // Pack using Blackmagic's reference implementation in ColorBars.cpp
             // Refer to DeckLink SDK Manual, section 2.7.4 for packing structure
-            uint32_t pixel = ((b & 0x3FC) << 22) | ((g & 0x0FC) << 16) | ((b & 0xC00) << 6)
-                           | ((r & 0x03C) << 10) | (g & 0xF00) | ((r & 0xFC0) >> 6);
+            uint32_t r_10 = r & 0x3FF;
+            uint32_t g_10 = g & 0x3FF;
+            uint32_t b_10 = b & 0x3FF;
+            
+            // r210 is big-endian, so we pack the 10-bit components into a 32-bit integer
+            // in R, G, B order from the most significant bits. The top 2 bits are unused.
+            uint32_t pixel = (r_10 << 20) | (g_10 << 10) | b_10;
+            
+            // If the system is little-endian, we need to byte-swap the result.
+            if (std::endian::native == std::endian::little) {
+                pixel = ((pixel & 0xFF000000) >> 24) | ((pixel & 0x00FF0000) >> 8) | ((pixel & 0x0000FF00) << 8) | ((pixel & 0x000000FF) << 24);
+            }
 
             pixels[destIndex] = pixel;
         }

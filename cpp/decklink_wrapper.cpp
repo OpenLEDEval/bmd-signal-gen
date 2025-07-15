@@ -24,7 +24,9 @@ std::string fourCharCode(int value) {
 DeckLinkSignalGen::DeckLinkSignalGen() 
     : m_device(nullptr)
     , m_output(nullptr)
+    , m_configuration(nullptr)
     , m_frame(nullptr)
+    , m_displayMode(bmdModeHD1080p30)
     , m_width(1920)
     , m_height(1080)
     , m_outputEnabled(false)
@@ -59,6 +61,10 @@ DeckLinkSignalGen::~DeckLinkSignalGen() {
         m_output->Release();
         m_output = nullptr;
     }
+    if (m_configuration) {
+        m_configuration->Release();
+        m_configuration = nullptr;
+    }
     if (m_device) {
         m_device->Release();
         m_device = nullptr;
@@ -88,11 +94,12 @@ void DeckLinkSignalGen::logFrameInfo(const char* context) {
 /**
  * @brief Enables video output on the DeckLink device
  * 
- * This method enables video output on the DeckLink device in HD1080p30 mode
- * with default video output flags. This is the first step in starting output.
+ * This method configures and enables video output on the DeckLink device.
+ * Following SignalGenHDR pattern: configure SDI mode first, then enable output.
  * 
  * @return int Returns 0 on success, negative values on failure:
  *         - -1: Output interface not available or already enabled
+ *         - -2: SDI configuration failed critically
  * 
  * @see stopOutput(), createFrame(), scheduleFrame(), startPlayback()
  */
@@ -100,13 +107,52 @@ int DeckLinkSignalGen::startOutput() {
     if (!m_output) return -1;
     if (m_outputEnabled) return 0;
     
-    // Enable video output
-    HRESULT enableResult = m_output->EnableVideoOutput(bmdModeHD1080p30, bmdVideoOutputFlagDefault);
+    // CRITICAL: Configure SDI output mode BEFORE enabling video output (following SignalGenHDR)
+    if (m_configuration) {
+        bool output444;
+        
+        // Determine if this is an RGB format requiring 4:4:4 output
+        switch (m_pixelFormat) {
+            case bmdFormat10BitRGB:
+            case bmdFormat12BitRGB:
+            case bmdFormat12BitRGBLE:
+            case bmdFormat10BitRGBXLE:
+            case bmdFormat10BitRGBX:
+            case bmdFormat8BitARGB:
+            case bmdFormat8BitBGRA:
+                output444 = true;
+                break;
+            default:
+                // YUV formats and others use 4:2:2
+                output444 = false;
+                break;
+        }
+        
+        std::cerr << "[DeckLink] Pre-EnableOutput: Setting SDI to " << (output444 ? "4:4:4" : "4:2:2") 
+                  << " for pixel format " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
+        
+        HRESULT configResult = m_configuration->SetFlag(bmdDeckLinkConfig444SDIVideoOutput, output444);
+        // Note: SetFlag may return E_NOTIMPL for devices without SDI output (like Intensity Pro 4K)
+        if (configResult != S_OK && configResult != E_NOTIMPL) {
+            std::cerr << "[DeckLink] CRITICAL: Failed to set SDI output mode before EnableVideoOutput. HRESULT: 0x" 
+                      << std::hex << configResult << std::dec << std::endl;
+            return -2;
+        }
+    } else {
+        std::cerr << "[DeckLink] Warning: No configuration interface available for pre-EnableOutput SDI setup" << std::endl;
+    }
+    
+    // Enable video output with current display mode
+    HRESULT enableResult = m_output->EnableVideoOutput(m_displayMode, bmdVideoOutputFlagDefault);
     if (enableResult != S_OK) {
-        std::cerr << "[DeckLink] EnableVideoOutput failed. HRESULT: 0x" << std::hex << enableResult << std::dec << std::endl;
+        std::cerr << "[DeckLink] EnableVideoOutput failed for mode " << fourCharCode(static_cast<int>(m_displayMode)) 
+                  << ". HRESULT: 0x" << std::hex << enableResult << std::dec << std::endl;
         return -1;
     }
     m_outputEnabled = true;
+    
+    std::cerr << "[DeckLink] Video output enabled successfully with display mode " 
+              << fourCharCode(static_cast<int>(m_displayMode)) << std::endl;
     
     return 0;
 }
@@ -241,12 +287,44 @@ int DeckLinkSignalGen::setPixelFormat(BMDPixelFormat pixelFormat) {
     
     m_pixelFormat = pixelFormat;
     std::cerr << "[DeckLink] Set pixel format to " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
+    std::cerr << "[DeckLink] Note: SDI output mode will be configured when startOutput() is called" << std::endl;
     
     return 0;
 }
 
 BMDPixelFormat DeckLinkSignalGen::getPixelFormat() const {
     return m_pixelFormat;
+}
+
+int DeckLinkSignalGen::setDisplayMode(BMDDisplayMode displayMode) {
+    if (!m_output) return -1;
+    
+    // Validate that the display mode is supported
+    BMDDisplayMode actualMode;
+    bool supported;
+    
+    HRESULT result = m_output->DoesSupportVideoMode(bmdVideoConnectionUnspecified,
+                                                   displayMode,
+                                                   m_pixelFormat,
+                                                   bmdNoVideoOutputConversion,
+                                                   bmdSupportedVideoModeDefault,
+                                                   &actualMode,
+                                                   &supported);
+    
+    if (result != S_OK || !supported) {
+        std::cerr << "[DeckLink] Display mode " << fourCharCode(static_cast<int>(displayMode)) 
+                  << " is not supported with current pixel format " << fourCharCode(static_cast<int>(m_pixelFormat)) << std::endl;
+        return -1;
+    }
+    
+    m_displayMode = displayMode;
+    std::cerr << "[DeckLink] Set display mode to " << fourCharCode(static_cast<int>(m_displayMode)) << std::endl;
+    
+    return 0;
+}
+
+BMDDisplayMode DeckLinkSignalGen::getDisplayMode() const {
+    return m_displayMode;
 }
 
 int DeckLinkSignalGen::setHDRMetadata(const HDRMetadata& metadata) {
@@ -488,11 +566,25 @@ DeckLinkHandle decklink_open_output_by_index(int index) {
     while (iterator->Next(&device) == S_OK) {
         if (current == index) {
             IDeckLinkOutput* output = nullptr;
+            IDeckLinkConfiguration* configuration = nullptr;
+            
             if (device->QueryInterface(IID_IDeckLinkOutput, (void**)&output) == S_OK) {
-                signalGen->m_device = device;
-                signalGen->m_output = output;
-                iterator->Release();
-                return signalGen;
+                // Also get the configuration interface for SDI output control
+                if (device->QueryInterface(IID_IDeckLinkConfiguration, (void**)&configuration) == S_OK) {
+                    signalGen->m_device = device;
+                    signalGen->m_output = output;
+                    signalGen->m_configuration = configuration;
+                    iterator->Release();
+                    return signalGen;
+                } else {
+                    std::cerr << "[DeckLink] Warning: Could not get configuration interface for device " << index << std::endl;
+                    // Still proceed without configuration interface
+                    signalGen->m_device = device;
+                    signalGen->m_output = output;
+                    signalGen->m_configuration = nullptr;
+                    iterator->Release();
+                    return signalGen;
+                }
             }
             device->Release();
             break;
@@ -651,6 +743,19 @@ int decklink_display_frame_sync(DeckLinkHandle handle) {
     if (!handle) return -1;
     auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
     return signalGen->displayFrameSync();
+}
+
+// Display mode management
+uint32_t decklink_get_display_mode(DeckLinkHandle handle) {
+    if (!handle) return 0;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return static_cast<uint32_t>(signalGen->getDisplayMode());
+}
+
+int decklink_set_display_mode(DeckLinkHandle handle, uint32_t display_mode_code) {
+    if (!handle) return -1;
+    auto* signalGen = static_cast<DeckLinkSignalGen*>(handle);
+    return signalGen->setDisplayMode(static_cast<BMDDisplayMode>(display_mode_code));
 }
 
 } // extern "C" 
