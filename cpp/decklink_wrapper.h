@@ -65,6 +65,10 @@ public:
     // Pixel format management
     int setPixelFormat(BMDPixelFormat pixelFormat);
     BMDPixelFormat getPixelFormat() const;
+
+    // Display mode management
+    int setDisplayMode(BMDDisplayMode displayMode);
+    BMDDisplayMode getDisplayMode() const;
     
     // Complete HDR metadata management
     int setHDRMetadata(const HDRMetadata& metadata);
@@ -85,6 +89,7 @@ public:
     IDeckLinkOutput* m_output;
     IDeckLinkConfiguration* m_configuration;
     IDeckLinkMutableVideoFrame* m_frame;
+    BMDDisplayMode m_displayMode;
 
 private:
     // Configuration
@@ -145,6 +150,10 @@ int decklink_display_frame_sync(DeckLinkHandle handle);
 
 // HDR capability detection
 bool decklink_device_supports_hdr(DeckLinkHandle handle);
+
+// Display mode management
+uint32_t decklink_get_display_mode(DeckLinkHandle handle);
+int decklink_set_display_mode(DeckLinkHandle handle, uint32_t display_mode_code);
 
 // Version info
 const char* decklink_get_driver_version();
