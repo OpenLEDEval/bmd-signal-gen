@@ -1,0 +1,42 @@
+{
+	"info": {
+		"_postman_id": "21048489-1c2a6d5e-5f7d-45c4-940b-eeb2c52a254e",
+		"name": "bmd-signal-gen",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "4color",
+			"id": "21048489-1436f32e-98ad-4742-b84c-25be55597ca2",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"roi_x\": 0,\n    \"roi_y\": 0,\n    \"roi_width\": 100,\n    \"roi_height\": 100,\n    \"colors\": [\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        },\n        {\n            \"r\": 4000,\n            \"g\": 3000,\n            \"b\": 2000\n        }\n    ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8000/bmd-signal-gen/4color",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"bmd-signal-gen",
+						"4color"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
