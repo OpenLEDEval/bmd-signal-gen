@@ -48,6 +48,7 @@ dependencies = [
     "typer>=0.16,<0.17",
     "rich>=14.0.0",
     "aenum>=3.1.16",
+    "requests>=2.32.4",
 ]
 
 [project.urls]
@@ -58,7 +59,7 @@ Issues = "https://github.com/OpenLEDEval/bmd-signal-gen/issues"
 Changelog = "https://github.com/OpenLEDEval/bmd-signal-gen/blob/main/CHANGELOG.md"
 
 [project.scripts]
-bmd_signal_gen = "bmd_sg.cli.main:app"
+bmd-signal-gen = "bmd_sg.cli.main:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -70,7 +71,13 @@ include = ["LICENSE"]
 exclude = ["data/", "cpp/", "tests/"]
 
 [dependency-groups]
-dev = ["invoke>=2.2.0", "pre-commit>=4.2.0", "pyright>=1.1.403", "ruff>=0.12.3"]
+dev = [
+    "invoke>=2.2.0",
+ "pre-commit>=4.2.0",
+ "pyright>=1.1.403",
+ "pytest>=8.4.1",
+ "ruff>=0.12.3",
+]
 docs = [
     "sphinx>=7.0.0",
     "sphinx-rtd-theme>=2.0.0",
