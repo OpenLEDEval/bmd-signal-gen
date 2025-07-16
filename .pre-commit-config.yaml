@@ -16,4 +16,4 @@ repos:
         name: cspell
         args: [--no-progress]
         files: \.(py|cpp|h|md)$
-        exclude: ^(cpp/Blackmagic|\.venv|__pycache__|build|dist|\.memories|docs|sandbox)/
+        exclude: ^(cpp/Blackmagic|\.venv|__pycache__|build|dist|\.memories|sandbox)/

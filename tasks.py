@@ -105,11 +105,11 @@ def ai_developer_quality(ctx: Context) -> None:
     ctx : Context
         Invoke context object
     """
-    print("🔧 Fixing linting issues...")
-    lint(ctx, fix=True)
-
     print("📝 Formatting code...")
     format(ctx, check=False)
+
+    print("🔧 Fixing linting issues...")
+    lint(ctx, fix=True)
 
     print("🔬 Type checking...")
     typecheck(ctx)
@@ -244,7 +244,7 @@ def spellcheck(ctx: Context) -> None:
     # Try to run cspell, handle if not installed
     try:
         result = ctx.run(
-            'npx cspell "bmd_sg/**/*.py" "cpp/decklink_wrapper.*" "cpp/pixel_packing.*" "*.md" --no-progress',
+            'npx cspell "bmd_sg/**/*" "cpp/**/*" "docs/**/*" "tests/**/*" "examples/**/*" "*.md" --no-progress',
             warn=True,
         )
 
@@ -265,7 +265,7 @@ def spellcheck(ctx: Context) -> None:
             print("🔄 Trying to install and run cspell temporarily...")
             try:
                 ctx.run(
-                    'npx cspell "bmd_sg/**/*.py" "cpp/decklink_wrapper.*" "cpp/pixel_packing.*" "*.md" --no-progress',
+                    'npx cspell "bmd_sg/**/*" "cpp/**/*" "docs/**/*" "tests/**/*" "examples/**/*" "*.md" --no-progress',
                     warn=True,
                 )
             except Exception:

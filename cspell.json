@@ -42,7 +42,19 @@
     "AABBGGRR",
     "AARRGGBB",
     "Gamut_Chromaticities",
-    "Pyright"
+    "Pyright",
+    "argtypes",
+    "restype",
+    "meshgrid",
+    "arange",
+    "dataclass",
+    "dtype",
+    "contextlib",
+    "contextmanager",
+    "devnull",
+    "fileno",
+    "byteswap",
+    "dynamiclib"
   ],
   "ignorePaths": [
     "**/node_modules/**",

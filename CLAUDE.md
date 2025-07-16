@@ -142,6 +142,10 @@ SDK installation.
   the development environment and development dependencies.
 - **When running python snippets in this library, use `uv run python` instead of
   invoking python directly.**
+- When using `uv run` for any tasks, make sure to change directories to the root
+  directory. After running the tool, you may return to the previous directory if
+  needed.
+- **When checking the pre-commit configuration, use `uv run pre-commit` instead of invoking pre-commit directly**
 
 ### Project Testing
 
@@ -158,13 +162,11 @@ SDK installation.
 
 - AI Agents should use `uv run ai-developer-quality` to run quality checks while
   developing. Some of the checks modify files, so claude will need to re-read
-  files. Make sure to change to the project directory before using `uv run`
+  files.
 - If the `ai-developer-quality` returns errors for code unrelated to the current
   project, agents may request to put code check comments around the violating
   code to bypass the check. Agents must always get explicit permission to do
   this and must remove the bypass after finishing their current project.
-- Use `uv run ruff` for linting and `uv run pyright` for type checking. Check
-  @tasks.py to see other developer tools claude can consider using.
 
 ## Developer Guidelines
 
