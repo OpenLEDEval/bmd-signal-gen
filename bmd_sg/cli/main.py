@@ -44,6 +44,14 @@ def main(
             rich_help_panel="Device / Pixel Format",
         ),
     ] = 0,
+    mock_device: Annotated[
+        bool,
+        typer.Option(
+            "--mock-device",
+            help="Use mock virtual device instead of real hardware",
+            rich_help_panel="Device / Pixel Format",
+        ),
+    ] = False,
     pixel_format: Annotated[
         PixelFormatType | None,
         typer.Option(
@@ -194,6 +202,9 @@ def main(
         gamut_chromaticities=gamut_chromaticities,
         no_hdr=no_hdr,
     )
+
+    # Store mock device flag for CLI commands
+    ctx.obj["mock_device"] = mock_device
 
 
 # Register commands

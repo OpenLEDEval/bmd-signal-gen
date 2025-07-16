@@ -140,7 +140,8 @@ SDK installation.
 
 - Use uv and uvx instead of using pip directly. This project uses uv to manage
   the development environment and development dependencies.
-- **When running python snippets in this library, use `uv run python` instead of invoking python directly.**
+- **When running python snippets in this library, use `uv run python` instead of
+  invoking python directly.**
 
 ### Project Testing
 
@@ -157,7 +158,7 @@ SDK installation.
 
 - AI Agents should use `uv run ai-developer-quality` to run quality checks while
   developing. Some of the checks modify files, so claude will need to re-read
-  files.
+  files. Make sure to change to the project directory before using `uv run`
 - If the `ai-developer-quality` returns errors for code unrelated to the current
   project, agents may request to put code check comments around the violating
   code to bypass the check. Agents must always get explicit permission to do
@@ -172,7 +173,8 @@ SDK installation.
 - You can search the .memories/DesktopVideoSDKManual.md files if needed for BMD
   SDK documentation during cpp development.
 
-
 ### Reference Example Paths
 
-- Always use the path `@cpp/Blackmagic\ DeckLink\ SDK\ 14.4/Mac/Samples/SignalGenHDR` as known-good example code when working with the DeckLink SDK API
+- Always use the path
+  `@cpp/Blackmagic\ DeckLink\ SDK\ 14.4/Mac/Samples/SignalGenHDR` as known-good
+  example code when working with the DeckLink SDK API

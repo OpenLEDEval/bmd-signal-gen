@@ -12,23 +12,68 @@ from typing import Annotated
 
 import typer
 import uvicorn
+from rich.console import Console
+from rich.panel import Panel
 
 from bmd_sg.api.device_manager import device_manager
 from bmd_sg.cli.shared import setup_tools_from_context
 
 
+def _show_network_exposure_warning(host: str) -> None:
+    """
+    Display network exposure warning and prompt for user confirmation.
+
+    Parameters
+    ----------
+    host : str
+        The host address being bound to
+    """
+    console = Console(stderr=True)
+    warning_text = (
+        "Binding to this interface is dangerous. This makes the API accessible "
+        "from other machines. This software is not tested for security against "
+        "the internet. Use 127.0.0.1 or localhost for local-only access."
+    )
+
+    panel = Panel(
+        warning_text,
+        title="⚠️ SECURITY WARNING",
+        border_style="yellow",
+        title_align="left",
+    )
+    console.print(panel)
+
+    # Prompt for explicit confirmation
+    if not typer.confirm(
+        f"Do you want to continue binding to {host}?",
+        default=False,
+    ):
+        typer.secho(
+            "❌ Server startup cancelled for security reasons.",
+            fg=typer.colors.RED,
+            bold=True,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
 def _validate_host_security(host: str) -> None:
     """
-    Validate host binding and issue security warnings for non-local addresses.
+    Validate host binding and prompt for confirmation on unsafe addresses.
 
     This function checks if the provided host address is a local/loopback address
-    or if it exposes the API to the network. Strong warnings are issued for
-    network-exposed bindings to alert users about potential security risks.
+    or if it exposes the API to the network. For network-exposed bindings, it issues
+    strong warnings and requires explicit user confirmation to continue.
 
     Parameters
     ----------
     host : str
         The host address to validate (e.g., '127.0.0.1', '0.0.0.0', '192.168.1.100')
+
+    Raises
+    ------
+    typer.Exit
+        If user declines to continue with unsafe host binding
 
     Notes
     -----
@@ -45,8 +90,8 @@ def _validate_host_security(host: str) -> None:
     Examples
     --------
     >>> _validate_host_security('127.0.0.1')  # No warning
-    >>> _validate_host_security('0.0.0.0')    # Strong warning about network exposure
-    >>> _validate_host_security('192.168.1.100')  # Warning with specific IP
+    >>> _validate_host_security('0.0.0.0')    # Strong warning and user prompt
+    >>> _validate_host_security('192.168.1.100')  # Warning and user prompt
     """
     # Handle common hostname cases first
     if host.lower() == "localhost":
@@ -60,35 +105,13 @@ def _validate_host_security(host: str) -> None:
         if ip_addr.is_loopback:
             return  # Safe local binding
 
-        # Check for bind-to-all addresses (0.0.0.0, ::)
+        # Network-exposed addresses require warning and confirmation
         if ip_addr.is_unspecified:
-            typer.echo(
-                "⚠️  WARNING: Binding to all interfaces exposes API to network!",
-                err=True,
-            )
-            typer.echo(
-                "   This makes the API accessible from other machines on the network.",
-                err=True,
-            )
-            typer.echo(
-                "   Use 127.0.0.1 or localhost for local-only access.",
-                err=True,
-            )
-            return
-
-        # Any other IP address is potentially network-exposed
-        typer.echo(
-            f"⚠️  WARNING: Binding to network IP {host} exposes API to network!",
-            err=True,
-        )
-        typer.echo(
-            "   This makes the API accessible from other machines.",
-            err=True,
-        )
-        typer.echo(
-            "   Use 127.0.0.1 or localhost for local-only access.",
-            err=True,
-        )
+            # Bind-to-all addresses (0.0.0.0, ::)
+            _show_network_exposure_warning(host)
+        else:
+            # Specific network IP addresses
+            _show_network_exposure_warning(host)
 
     except ValueError:
         # Invalid IP address format - let uvicorn handle the error
@@ -179,6 +202,11 @@ def api_server_command(
     as pattern commands (setup_tools_from_context). Device errors during
     initialization will prevent the server from starting.
 
+    Security validation is performed on the host address before starting
+    the server. Network-exposed addresses (0.0.0.0, specific IP addresses)
+    will trigger security warnings and require explicit user confirmation
+    to proceed. This prevents accidental network exposure of the API.
+
     The API endpoints accept color values in the same range as CLI commands:
     - 12-bit: 0-4095 (default, recommended)
     - 10-bit: 0-1023
@@ -191,7 +219,8 @@ def api_server_command(
     RuntimeError
         If device setup fails (passed through from setup_tools_from_context)
     typer.Exit
-        If device initialization fails or server startup errors
+        If device initialization fails, server startup errors, or user
+        declines to continue with unsafe host configuration
 
     See Also
     --------

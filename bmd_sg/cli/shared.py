@@ -6,6 +6,7 @@ and pattern generation utilities used across all CLI commands.
 """
 
 import time
+from typing import Any
 
 import numpy as np
 import typer
@@ -22,12 +23,70 @@ from bmd_sg.decklink.bmd_decklink import (
 )
 from bmd_sg.image_generators.checkerboard import ROI, PatternGenerator
 
+# Optional mock imports for --mock-device support
+try:
+    from bmd_sg.decklink.mock import (
+        MockBMDDeckLink,
+        mock_get_decklink_devices,
+        mock_get_decklink_driver_version,
+        mock_get_decklink_sdk_version,
+        set_available_devices,
+    )
+
+    MOCK_AVAILABLE = True
+except ImportError:
+    MOCK_AVAILABLE = False
+
+# =============================================================================
+# Mock Device Support
+# =============================================================================
+
+
+def is_mock_mode_enabled(ctx: typer.Context) -> bool:
+    """
+    Check if mock device mode is enabled from CLI context.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context containing CLI options
+
+    Returns
+    -------
+    bool
+        True if mock device mode is enabled
+    """
+    return ctx.obj.get("mock_device", False) if ctx.obj else False
+
+
+def setup_mock_environment() -> None:
+    """
+    Configure mock environment with default settings.
+
+    Sets up mock devices with standard configurations for development
+    and testing purposes.
+    """
+    if not MOCK_AVAILABLE:
+        raise RuntimeError(
+            "Mock device support not available. Please ensure mock module is properly installed."
+        )
+
+    # Configure default mock devices
+    set_available_devices(
+        [
+            "Mock DeckLink 8K Pro",
+            "Mock DeckLink Mini Monitor 4K",
+            "Mock DeckLink Studio 4K",
+        ]
+    )
+
+
 # =============================================================================
 # Device Discovery & Enumeration
 # =============================================================================
 
 
-def list_available_devices(show_logs: bool = True) -> list[str]:
+def list_available_devices(show_logs: bool = True, use_mock: bool = False) -> list[str]:
     """
     List all available DeckLink devices.
 
@@ -35,6 +94,8 @@ def list_available_devices(show_logs: bool = True) -> list[str]:
     ----------
     show_logs : bool, optional
         Whether to print device information. Default is True.
+    use_mock : bool, optional
+        Whether to use mock devices instead of real hardware. Default is False.
 
     Returns
     -------
@@ -50,12 +111,29 @@ def list_available_devices(show_logs: bool = True) -> list[str]:
     --------
     >>> devices = list_available_devices()
     >>> print(f"Found {len(devices)} devices")
-    """
-    if show_logs:
-        print(f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}")
-        print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
 
-    devices = get_decklink_devices()
+    >>> devices = list_available_devices(use_mock=True)
+    >>> print(f"Found {len(devices)} mock devices")
+    """
+    if use_mock:
+        if not MOCK_AVAILABLE:
+            raise RuntimeError("Mock device support not available")
+
+        if show_logs:
+            print(
+                f"DeckLink driver/API version (runtime): {mock_get_decklink_driver_version()}"
+            )
+            print(f"DeckLink SDK version (build): {mock_get_decklink_sdk_version()}")
+
+        devices = mock_get_decklink_devices()
+    else:
+        if show_logs:
+            print(
+                f"DeckLink driver/API version (runtime): {get_decklink_driver_version()}"
+            )
+            print(f"DeckLink SDK version (build): {get_decklink_sdk_version()}")
+
+        devices = get_decklink_devices()
 
     if show_logs:
         print("Available DeckLink devices:")
@@ -100,7 +178,7 @@ def validate_device_index(device_index: int, devices: list[str]) -> None:
 # =============================================================================
 
 
-def create_decklink_device(device_index: int) -> BMDDeckLink:
+def create_decklink_device(device_index: int, use_mock: bool = False) -> Any:
     """
     Create a DeckLink device instance.
 
@@ -108,11 +186,13 @@ def create_decklink_device(device_index: int) -> BMDDeckLink:
     ----------
     device_index : int
         Index of the DeckLink device to create
+    use_mock : bool, optional
+        Whether to create a mock device instead of real hardware. Default is False.
 
     Returns
     -------
-    BMDDeckLink
-        Opened DeckLink device instance
+    BMDDeckLink | MockBMDDeckLink
+        Opened DeckLink device instance (real or mock)
 
     Raises
     ------
@@ -122,11 +202,20 @@ def create_decklink_device(device_index: int) -> BMDDeckLink:
     Examples
     --------
     >>> device = create_decklink_device(0)
+    >>> mock_device = create_decklink_device(0, use_mock=True)
     """
     try:
-        return BMDDeckLink(device_index=device_index)
+        if use_mock:
+            if not MOCK_AVAILABLE:
+                raise RuntimeError("Mock device support not available")
+            return MockBMDDeckLink(device_index=device_index)
+        else:
+            return BMDDeckLink(device_index=device_index)
     except Exception as e:
-        raise RuntimeError(f"Failed to create DeckLink device: {e!s}") from e
+        device_type = "mock" if use_mock else "real"
+        raise RuntimeError(
+            f"Failed to create {device_type} DeckLink device: {e!s}"
+        ) from e
 
 
 def configure_pixel_format(  # noqa: C901
@@ -256,7 +345,7 @@ def configure_hdr_metadata(decklink: BMDDeckLink, settings: DecklinkSettings) ->
         )
 
 
-def initialize_device(settings: DecklinkSettings) -> BMDDeckLink:
+def initialize_device(settings: DecklinkSettings, use_mock: bool = False) -> Any:
     """
     Complete device initialization with configuration.
 
@@ -271,11 +360,13 @@ def initialize_device(settings: DecklinkSettings) -> BMDDeckLink:
     ----------
     settings : DecklinkSettings
         Global device settings from CLI callback
+    use_mock : bool, optional
+        Whether to use mock devices instead of real hardware. Default is False.
 
     Returns
     -------
-    BMDDeckLink
-        Fully configured and started DeckLink device
+    BMDDeckLink | MockBMDDeckLink
+        Fully configured and started DeckLink device (real or mock)
 
     Raises
     ------
@@ -288,12 +379,16 @@ def initialize_device(settings: DecklinkSettings) -> BMDDeckLink:
     >>> device = initialize_device(device_settings)
     """
     try:
+        # 0. Setup mock environment if using mock devices
+        if use_mock:
+            setup_mock_environment()
+
         # 1. Device discovery and validation
-        devices = list_available_devices(show_logs=True)
+        devices = list_available_devices(show_logs=True, use_mock=use_mock)
         validate_device_index(settings.device, devices)
 
         # 2. Create device
-        decklink = create_decklink_device(settings.device)
+        decklink = create_decklink_device(settings.device, use_mock=use_mock)
 
         # 3. Configure pixel format
         configure_pixel_format(decklink, settings.pixel_format, show_logs=True)
@@ -307,7 +402,8 @@ def initialize_device(settings: DecklinkSettings) -> BMDDeckLink:
         return decklink
 
     except Exception as e:
-        raise RuntimeError(f"Failed to initialize device: {e!s}") from e
+        device_type = "mock" if use_mock else "real"
+        raise RuntimeError(f"Failed to initialize {device_type} device: {e!s}") from e
 
 
 # =============================================================================
@@ -479,7 +575,7 @@ def display_image_for_duration(
 
 def setup_tools_from_context(
     ctx: typer.Context,
-) -> tuple[BMDDeckLink, PatternGenerator]:
+) -> tuple[Any, PatternGenerator]:
     """
     Setup DeckLink device and pattern generator from typer context.
 
@@ -493,8 +589,8 @@ def setup_tools_from_context(
 
     Returns
     -------
-    tuple[BMDDeckLink, PatternGenerator]
-        Initialized DeckLink device and pattern generator
+    tuple[BMDDeckLink | MockBMDDeckLink, PatternGenerator]
+        Initialized DeckLink device (real or mock) and pattern generator
 
     Raises
     ------
@@ -516,7 +612,8 @@ def setup_tools_from_context(
     from the device's pixel format.
     """
     settings = get_device_settings(ctx)
-    decklink = initialize_device(settings)
+    use_mock = is_mock_mode_enabled(ctx)
+    decklink = initialize_device(settings, use_mock=use_mock)
     generator = create_pattern_generator(decklink, settings)
     return decklink, generator
 
@@ -529,7 +626,9 @@ __all__ = [
     "display_image_for_duration",
     "get_device_settings",
     "initialize_device",
+    "is_mock_mode_enabled",
     "list_available_devices",
+    "setup_mock_environment",
     "setup_tools_from_context",
     "validate_color",
     "validate_device_index",

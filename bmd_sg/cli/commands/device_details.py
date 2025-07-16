@@ -9,28 +9,50 @@ from typing import Annotated
 
 import typer
 
+from bmd_sg.cli.shared import (
+    create_decklink_device,
+    is_mock_mode_enabled,
+    list_available_devices,
+    setup_mock_environment,
+)
 from bmd_sg.decklink.bmd_decklink import (
-    BMDDeckLink,
-    get_decklink_devices,
     get_decklink_driver_version,
     get_decklink_sdk_version,
 )
 
+# Optional mock imports for version functions
+try:
+    from bmd_sg.decklink.mock import (
+        mock_get_decklink_driver_version,
+        mock_get_decklink_sdk_version,
+    )
 
-def _print_system_info() -> None:
+    MOCK_AVAILABLE = True
+except ImportError:
+    MOCK_AVAILABLE = False
+
+
+def _print_system_info(use_mock: bool = False) -> None:
     """Print DeckLink system information."""
     typer.echo("DeckLink System Information:")
-    typer.echo(f"  SDK Version: {get_decklink_sdk_version()}")
-    typer.echo(f"  Driver Version: {get_decklink_driver_version()}")
+
+    if use_mock and MOCK_AVAILABLE:
+        typer.echo(f"  SDK Version: {mock_get_decklink_sdk_version()}")
+        typer.echo(f"  Driver Version: {mock_get_decklink_driver_version()}")
+    else:
+        typer.echo(f"  SDK Version: {get_decklink_sdk_version()}")
+        typer.echo(f"  Driver Version: {get_decklink_driver_version()}")
+
     typer.echo()
 
 
-def _print_device_details(idx: int, device_name: str) -> None:
+def _print_device_details(idx: int, device_name: str, use_mock: bool = False) -> None:
     """Print detailed information for a specific device."""
     typer.echo(f"Device {idx}: {device_name}")
     try:
-        # Open the device to get its details using context manager
-        with BMDDeckLink(device_index=idx) as decklink:
+        # Create device (real or mock) to get its details using context manager
+        decklink = create_decklink_device(idx, use_mock=use_mock)
+        with decklink:
             # Get supported pixel formats
             formats = decklink.get_supported_pixel_formats()
             typer.echo(f"  Supported pixel formats ({len(formats)}):")
@@ -50,6 +72,7 @@ def _print_device_details(idx: int, device_name: str) -> None:
 
 
 def device_details_command(
+    ctx: typer.Context,
     device_index: Annotated[
         int | None,
         typer.Option(
@@ -120,11 +143,15 @@ def device_details_command(
         is out of range
     """
     try:
-        # Get all available devices
-        devices = get_decklink_devices()
-        if not devices:
-            typer.echo("No DeckLink devices found.")
-            return
+        # Check if mock mode is enabled
+        use_mock = is_mock_mode_enabled(ctx)
+
+        # Setup mock environment if needed
+        if use_mock:
+            setup_mock_environment()
+
+        # Get all available devices using shared mock-enabled function
+        devices = list_available_devices(show_logs=False, use_mock=use_mock)
 
         # Validate device_index if specified
         if device_index is not None and (
@@ -138,7 +165,7 @@ def device_details_command(
 
         # Print SDK and driver version information (unless list_only)
         if not list_only:
-            _print_system_info()
+            _print_system_info(use_mock=use_mock)
 
         # Determine which devices to process
         if device_index is not None:
@@ -157,7 +184,7 @@ def device_details_command(
             if list_only:
                 typer.echo(f"Device {idx}: {device_name}")
             else:
-                _print_device_details(idx, device_name)
+                _print_device_details(idx, device_name, use_mock=use_mock)
 
     except Exception as e:
         typer.echo(f"Error enumerating devices: {e}", err=True)

@@ -26,6 +26,7 @@
     "pyright",
     "pytest",
     "typer",
+    "secho",
     "docstrings",
     "Quantizer",
     "bitdepth",
