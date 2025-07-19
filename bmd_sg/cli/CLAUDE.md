@@ -2,10 +2,8 @@
 
 ## Architecture Patterns
 
-- Global callback pattern with Typer context (`ctx.obj`)
-- Commands inherit configuration via `setup_tools_from_context(ctx)`
-- Use rich help panels: `"Device / Pixel Format"`, `"ROI"`, `"HDR Metadata"`,
-  `"Pattern Options"`
+**Global callback**: Typer context (`ctx.obj`) with `setup_tools_from_context(ctx)`  
+**Rich help panels**: `"Device / Pixel Format"`, `"ROI"`, `"HDR Metadata"`, `"Pattern Options"`
 
 ## Standard Command Structure
 
@@ -19,28 +17,12 @@ def pattern_command(ctx: typer.Context, duration: float = 5.0) -> None:
 
 ## Key Patterns
 
-- **Parameter validation**:
-  `validate_color(color_value, tools.decklink.get_bit_depth())`
-- **Error handling**: Use `typer.echo(f"Error: {e}", err=True)` and
-  `typer.Exit(1)`
-- **Mock support**: Handled automatically by `setup_tools_from_context()`
-- **Registration**: Add to `main.py` with `app.command("name")(function)`
-
-## Option Groups
-
-Use when 3+ options and 2+ logical groups exist. Standard panels above cover
-most cases.
+**Parameter validation**: `validate_color(color_value, tools.decklink.get_bit_depth())`  
+**Error handling**: `typer.echo(f"Error: {e}", err=True)` and `typer.Exit(1)`  
+**Mock support**: Automatic via `setup_tools_from_context()`  
+**Registration**: Add to `main.py` with `app.command("name")(function)`
 
 ## Testing
 
-Check if there are any physical devices connect for real and test using them.
-
-```bash
-uv run python -m bmd_sg.cli.main command --duration 2.0
-```
-
-If no hardware devices are available, you may test with the mock-device:
-
-```bash
-uv run python -m bmd_sg.cli.main --mock-device command --duration 2.0
-```
+**Hardware**: `uv run python -m bmd_sg.cli.main command --duration 2.0`  
+**Mock device**: `uv run python -m bmd_sg.cli.main --mock-device command --duration 2.0`

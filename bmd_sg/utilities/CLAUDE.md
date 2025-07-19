@@ -1,8 +1,6 @@
 # Utilities Module Development Guide
 
-## Primary Purpose
-
-System-level operations and C++ library integration support.
+**Primary Purpose**: System-level operations and C++ library integration support.
 
 ## Core Utility: Output Suppression
 
@@ -23,37 +21,10 @@ def suppress_cpp_output() -> Generator[None]:
             os.close(old_stderr)
 ```
 
-## Context Manager Pattern
+## Guidelines
 
-Standard template for robust resource management:
-```python
-@contextlib.contextmanager
-def robust_context_manager() -> Generator[SomeResource]:
-    resource = None
-    try:
-        resource = acquire_resource()
-        yield resource
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        raise
-    finally:
-        if resource is not None:
-            release_resource(resource)
-```
+**Context Manager Pattern**: Standard template with try/finally for robust resource management  
+**Cross-Platform**: Use platform-specific paths (`"NUL"` vs `"/dev/null"`)  
+**Design**: Lightweight, focused utilities with NumPy docstrings, maintain `__all__`, minimal overhead, cross-platform compatibility
 
-## Cross-Platform Support
-
-```python
-def get_null_device() -> str:
-    return "NUL" if platform.system() == "Windows" else "/dev/null"
-```
-
-## Key Guidelines
-
-- Keep utilities lightweight and focused
-- Use NumPy docstring format for all functions
-- Maintain `__all__` list for clean public API
-- Design for minimal overhead when not in use
-- Ensure cross-platform compatibility
-
-This module provides foundational support - ensure utilities are robust and well-tested.
+Foundational support module - ensure utilities are robust and well-tested.
