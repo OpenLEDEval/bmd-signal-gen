@@ -67,7 +67,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["bmd_sg"]
-include = ["LICENSE"]
+include = ["LICENSE", "bmd_sg/decklink/libdecklink.dylib"]
 exclude = ["data/", "cpp/", "tests/", "**/*CLAUDE.md", "bmd_sg/**/tests"]
 
 [dependency-groups]
