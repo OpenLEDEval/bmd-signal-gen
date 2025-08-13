@@ -74,7 +74,7 @@ public:
     // Display mode management
     int setDisplayMode(BMDDisplayMode displayMode);
     BMDDisplayMode getDisplayMode() const;
-    
+
     // Complete HDR metadata management
     int setHDRMetadata(const HDRMetadata &metadata);
 
@@ -90,10 +90,10 @@ public:
     std::vector<BMDPixelFormat> &getSupportedFormats() { return m_supportedFormats; }
 
     // Core DeckLink objects (made public for C wrapper access)
-    IDeckLink* m_device;
-    IDeckLinkOutput* m_output;
-    IDeckLinkConfiguration* m_configuration;
-    IDeckLinkMutableVideoFrame* m_frame;
+    IDeckLink *m_device;
+    IDeckLinkOutput *m_output;
+    IDeckLinkConfiguration *m_configuration;
+    IDeckLinkMutableVideoFrame *m_frame;
     BMDDisplayMode m_displayMode;
 
 private:
@@ -102,7 +102,6 @@ private:
     int m_height;
     bool m_outputEnabled;
     BMDPixelFormat m_pixelFormat;
-    BMDDisplayMode m_displayMode;
 
     // Complete HDR metadata
     HDRMetadata m_hdrMetadata;
@@ -159,13 +158,13 @@ extern "C"
     // HDR capability detection
     bool decklink_device_supports_hdr(DeckLinkHandle handle);
 
-// Display mode management
-uint32_t decklink_get_display_mode(DeckLinkHandle handle);
-int decklink_set_display_mode(DeckLinkHandle handle, uint32_t display_mode_code);
+    // Display mode management
+    uint32_t decklink_get_display_mode(DeckLinkHandle handle);
+    int decklink_set_display_mode(DeckLinkHandle handle, uint32_t display_mode_code);
 
-// Version info
-const char* decklink_get_driver_version();
-const char* decklink_get_sdk_version();
+    // Version info
+    const char *decklink_get_driver_version();
+    const char *decklink_get_sdk_version();
 
 #ifdef __cplusplus
 }
