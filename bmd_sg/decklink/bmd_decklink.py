@@ -277,7 +277,7 @@ class EOTFType(str, Enum):
     HLG = ("HLG", 3)
 
     def __new__(cls, value: str, *args: Any):
-        self = object.__new__(cls, value)
+        self = str.__new__(cls, value)
         self._value_ = value
         for a in args:
             self._add_value_alias_(a)  # type: ignore Added in python 3.13
