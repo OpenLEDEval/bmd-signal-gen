@@ -22,7 +22,7 @@ uv run invoke check                  # Verify everything works
 
 ### Verification
 ```bash
-uv run python -m bmd_sg.cli.main --help  # CLI help
+uv run bmd-signal-gen --help  # CLI help
 uv run invoke test                        # Run tests
 ```
 

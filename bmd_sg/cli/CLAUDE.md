@@ -24,5 +24,6 @@ def pattern_command(ctx: typer.Context, duration: float = 5.0) -> None:
 
 ## Testing
 
-**Hardware**: `uv run python -m bmd_sg.cli.main command --duration 2.0`  
-**Mock device**: `uv run python -m bmd_sg.cli.main --mock-device command --duration 2.0`
+**Hardware**: `uv run bmd-signal-gen command --duration 2.0`  
+**Mock device**: `uv run bmd-signal-gen --mock-device command --duration 2.0`  
+**Alternative**: `uv run python -m bmd_sg.cli.main` syntax also works

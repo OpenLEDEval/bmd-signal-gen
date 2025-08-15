@@ -66,7 +66,7 @@ both capable of full 12-bit RGB output at 1080p30.
 
 3. **Verify installation**:
    ```bash
-   uv run python -m bmd_sg.cli.main --help
+   uv run bmd-signal-gen --help
    ```
 
 ## Usage
@@ -78,16 +78,16 @@ pattern-specific commands:
 
 ```bash
 # Show available devices and their capabilities
-uv run python -m bmd_sg.cli.main device-details
+uv run bmd-signal-gen device-details
 
 # Generate solid white pattern for 10 seconds
-uv run python -m bmd_sg.cli.main solid 4095 4095 4095 --duration 10
+uv run bmd-signal-gen solid 4095 4095 4095 --duration 10
 
 # Generate two-color checkerboard with custom colors
-uv run python -m bmd_sg.cli.main pat2 4095 0 0 --color2 0 4095 0 --duration 5
+uv run bmd-signal-gen pat2 4095 0 0 --color2 0 4095 0 --duration 5
 
 # Generate four-color checkerboard with HDR settings
-uv run python -m bmd_sg.cli.main --device 1 --eotf HLG --max-cll 4000 pat4 4095 0 0 --color2 0 4095 0 --color3 0 0 4095 --color4 4095 4095 4095
+uv run bmd-signal-gen --device 1 --eotf HLG --max-cll 4000 pat4 4095 0 0 --color2 0 4095 0 --color3 0 0 4095 --color4 4095 4095 4095
 ```
 
 ### Global Options

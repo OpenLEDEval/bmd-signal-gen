@@ -22,7 +22,7 @@ information, see `.memories/PROJECT_SUMMARY.md`.
 
 **Testing:** `uv run invoke test` or `uv run pytest -v --tb-no <files>`
 
-**CLI:** `uv run python -m bmd_sg.cli.main [--mock-device] <command>`
+**CLI:** `uv run bmd-signal-gen [--mock-device] <command>`
 
 **Tools:** `uv run invoke lint|format|typecheck|clean`, `uv run pre-commit install`
 
@@ -103,6 +103,7 @@ SDK installation.
 - **Mock device**: Use `--mock-device` flag for development without hardware
 - **Mock capabilities**: Simulates all operations, validates parameters, provides realistic timing
 - **Workflow**: Start with mock device testing, use hardware for final validation
+- **CLI methods**: Primary: `uv run bmd-signal-gen`, Alternative: `uv run python -m bmd_sg.cli.main`
 
 ### Development Tools
 - **Always try `uv run invoke ai-developer-quality` before other quality tools**
