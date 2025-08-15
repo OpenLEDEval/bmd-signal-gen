@@ -119,11 +119,32 @@ Color values depend on the device's pixel format:
 
 **Note that bmd-signal-gen does not enforce "video" or limited range checking, nor do any conversion from full-range to limited or vice-versa. Please handle this manually as necessary in the design and configuration of your patterns and pixel format selection**
 
-## Project Structure
+## HDR Configuration
+
+Default HDR settings follow standards:
+
+- **System Colorimetry**: Rec.2020/BT.2020 (Ultra HD standard)
+- **EOTF**: PQ/ST-2084 (Perceptual Quantizer for HDR10)
+- **White Point**: D65 (0.3127, 0.3290)
+- **MaxCLL**: 10,000 cd/m² (project-specific high luminance)
+- **MaxFALL**: 400 cd/m²
+
+## Video Output Support
+
+The primary recommended video output is HDMI. SDI support is currently less well tested than HDMI.
+
+## Known Issues
+
+❌ SDI output appears green when no signal is being generated
+
+## Development
+
+### Project Structure
 
 ```
 bmd-signal-gen/
 ├── bmd_sg/                           # Main Python package
+│   ├── api/                          # REST API implementation
 │   ├── cli/                          # Command-line interface
 │   │   ├── main.py                   # Main CLI application
 │   │   ├── shared.py                 # Common utilities and device management
@@ -131,7 +152,8 @@ bmd-signal-gen/
 │   ├── decklink/                     # DeckLink SDK wrapper
 │   │   ├── bmd_decklink.py           # Main wrapper with HDR support
 │   │   ├── decklink_types.py         # Type definitions and protocols
-│   │   └── libdecklink.dylib         # Compiled C++ library
+│   │   ├── libdecklink.dylib         # Compiled C++ library
+│   │   └── mock/                     # Mock device implementation
 │   ├── image_generators/             # Pattern generation
 │   │   └── checkerboard.py           # Checkerboard pattern generator
 │   └── utilities/                    # System utilities
@@ -139,43 +161,37 @@ bmd-signal-gen/
 │   ├── include/DeckLinkAPI/          # DeckLink SDK headers
 │   ├── decklink_wrapper.cpp          # C++ implementation
 │   └── Makefile                      # Build configuration
-├── tests/                            # Unit tests
+├── docs/                             # Sphinx-compatible documentation source
+├── examples/                         # Demo and test scripts
+├── postman/                          # API testing collections
 ├── tasks.py                          # Invoke task automation
-├── DEVELOPERS.md                     # Development setup guide
-└── CLAUDE.md                         # AI development guidelines
+└── DEVELOPERS.md                     # Development setup guide
 ```
-
-## Development
 
 ### Build Commands
 
 ```bash
+uv run invoke setup     # Set up toolchain (llvm, cmake)
 uv run invoke build     # Build C++ library and Python package
 uv run invoke check     # Run all checks (lint, format, typecheck)
 uv run invoke fix       # Auto-fix issues and format code
 uv run invoke test      # Run pytest test suite
 uv run invoke dev       # Quick cycle: fix + test
+uv run invoke clean     # Remove build artifacts
+uv run invoke pristine  # Remove toolchain & build artifacts
 ```
 
 ### Code Quality
 
 The project maintains high code quality standards:
 
-- **Ruff** for linting and formatting
+- **Ruff** for Python linting and formatting
 - **Pyright** for type checking
-- **Pre-commit hooks** for automated quality checks
 - **NumPy-style docstrings** with comprehensive examples
 - **Type hints** throughout the codebase
-
-## HDR Configuration
-
-Default HDR settings follow standards:
-
-- **EOTF**: PQ (Perceptual Quantizer for HDR10)
-- **MaxCLL**: 10,000 cd/m² (project-specific high luminance)
-- **MaxFALL**: 400 cd/m²
-- **Color Primaries**: Rec.2020 (Ultra HD standard)
-- **White Point**: D65 (0.3127, 0.3290)
+- **clang-tidy** for c++ linting
+- **clang-format** for c++ formatting
+- **Pre-commit hooks** for automated quality checks
 
 ## Contributing
 

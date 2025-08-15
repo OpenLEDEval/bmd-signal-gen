@@ -119,3 +119,4 @@ SDK installation.
 - Check `.memories/PROJECT_SUMMARY.md` for architecture details  
 - Search `.memories/DesktopVideoSDKManual.md` for BMD SDK documentation
 - Use `cpp/Blackmagic\ DeckLink\ SDK\ 14.4/Mac/Samples/SignalGenHDR` as known-good example code
+- don't document hidden directories or CLAUDE.md files in the README.md project structure
