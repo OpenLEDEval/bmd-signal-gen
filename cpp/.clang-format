@@ -1,0 +1,7 @@
+---
+# Clang-format configuration for BMD Signal Generator
+# C++20 project with cross-platform support
+
+BasedOnStyle: chromium
+Language: Cpp
+Standard: c++20

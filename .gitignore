@@ -1,5 +1,6 @@
 # Libraries
 Blackmagic\ DeckLink\ SDK\ 14.4/
+.toolchain/
 
 # BEGIN gitignore.io GENERATED IGNORE 
 # (MacOS, Windows, Linux, Python, C++, Visual Studio Code, PyCharm)
@@ -394,3 +395,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,linux,macos,python,c++,visualstudiocode,pycharm+all
+cpp/compile_commands.json

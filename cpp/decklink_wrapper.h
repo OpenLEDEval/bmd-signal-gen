@@ -1,25 +1,24 @@
 #pragma once
 
-#include "DeckLinkAPI.h"
-#include <memory>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
+#include "DeckLinkAPI.h"
 
 // Handle type for C API
-typedef void *DeckLinkHandle;
+typedef void* DeckLinkHandle;
 
 // Wrapper definitions for versioned symbols
-extern "C"
-{
-    IDeckLinkIterator *CreateDeckLinkIteratorInstance_0004(void);
-    IDeckLinkDiscovery *CreateDeckLinkDiscoveryInstance_0003(void);
-    IDeckLinkAPIInformation *CreateDeckLinkAPIInformationInstance_0001(void);
+extern "C" {
+IDeckLinkIterator* CreateDeckLinkIteratorInstance_0004(void);
+IDeckLinkDiscovery* CreateDeckLinkDiscoveryInstance_0003(void);
+IDeckLinkAPIInformation* CreateDeckLinkAPIInformationInstance_0001(void);
 }
 
 #define CreateDeckLinkIteratorInstance CreateDeckLinkIteratorInstance_0004
 #define CreateDeckLinkDiscoveryInstance CreateDeckLinkDiscoveryInstance_0003
-#define CreateDeckLinkAPIInformationInstance CreateDeckLinkAPIInformationInstance_0001
+#define CreateDeckLinkAPIInformationInstance \
+  CreateDeckLinkAPIInformationInstance_0001
 
 // Error codes
 #define DECKLINK_SUCCESS 0
@@ -29,139 +28,146 @@ extern "C"
 #define DECKLINK_ERROR_FRAME_FAILED -4
 
 // Complete HDR metadata structure (matching SignalGenHDR sample)
-struct Gamut_Chromaticities
-{
-    double RedX;
-    double RedY;
-    double GreenX;
-    double GreenY;
-    double BlueX;
-    double BlueY;
-    double WhiteX;
-    double WhiteY;
+struct Gamut_Chromaticities {
+  double RedX;
+  double RedY;
+  double GreenX;
+  double GreenY;
+  double BlueX;
+  double BlueY;
+  double WhiteX;
+  double WhiteY;
 };
 
-struct HDRMetadata
-{
-    int64_t EOTF;
-    Gamut_Chromaticities referencePrimaries;
-    double maxDisplayMasteringLuminance;
-    double minDisplayMasteringLuminance;
-    double maxCLL;
-    double maxFALL;
+struct HDRMetadata {
+  int64_t EOTF;
+  Gamut_Chromaticities referencePrimaries;
+  double maxDisplayMasteringLuminance;
+  double minDisplayMasteringLuminance;
+  double maxCLL;
+  double maxFALL;
 };
 
 // C++ Implementation Class
-class DeckLinkSignalGen
-{
-public:
-    DeckLinkSignalGen();
-    ~DeckLinkSignalGen();
+class DeckLinkSignalGen {
+ public:
+  DeckLinkSignalGen();
+  ~DeckLinkSignalGen();
 
-    // Output control
-    int startOutput();
-    int startOutput(BMDDisplayMode displayMode);
-    int stopOutput();
+  // Output control
+  int startOutput();
+  int startOutput(BMDDisplayMode displayMode);
+  int stopOutput();
 
-    // Frame management
-    int createFrame();
-    int displayFrameSync();
+  // Frame management
+  int createFrame();
+  int displayFrameSync();
 
-    // Pixel format management
-    int setPixelFormat(BMDPixelFormat pixelFormat);
-    BMDPixelFormat getPixelFormat() const;
+  // Pixel format management
+  int setPixelFormat(BMDPixelFormat pixelFormat);
+  BMDPixelFormat getPixelFormat() const;
 
-    // Display mode management
-    int setDisplayMode(BMDDisplayMode displayMode);
-    BMDDisplayMode getDisplayMode() const;
-    
-    // Complete HDR metadata management
-    int setHDRMetadata(const HDRMetadata &metadata);
+  // Display mode management
+  int setDisplayMode(BMDDisplayMode displayMode);
+  BMDDisplayMode getDisplayMode() const;
 
-    // Frame data management
-    int setFrameData(const uint16_t *data, int width, int height);
+  // Complete HDR metadata management
+  int setHDRMetadata(const HDRMetadata& metadata);
 
-    // Device enumeration (static)
-    static int getDeviceCount();
-    static std::string getDeviceName(int deviceIndex);
+  // Frame data management
+  int setFrameData(const uint16_t* data, int width, int height);
 
-    // Public access for C wrapper
-    void cacheSupportedFormats();
-    std::vector<BMDPixelFormat> &getSupportedFormats() { return m_supportedFormats; }
+  // Device enumeration (static)
+  static int getDeviceCount();
+  static std::string getDeviceName(int deviceIndex);
 
-    // Core DeckLink objects (made public for C wrapper access)
-    IDeckLink* m_device;
-    IDeckLinkOutput* m_output;
-    IDeckLinkConfiguration* m_configuration;
-    IDeckLinkMutableVideoFrame* m_frame;
-    BMDDisplayMode m_displayMode;
+  // Public access for C wrapper
+  void cacheSupportedFormats();
+  std::vector<BMDPixelFormat>& getSupportedFormats() {
+    return m_supportedFormats;
+  }
 
-private:
-    // Configuration
-    int m_width;
-    int m_height;
-    bool m_outputEnabled;
-    BMDPixelFormat m_pixelFormat;
-    BMDDisplayMode m_displayMode;
+  // Core DeckLink objects (made public for C wrapper access)
+  IDeckLink* m_device;
+  IDeckLinkOutput* m_output;
+  IDeckLinkConfiguration* m_configuration;
+  IDeckLinkMutableVideoFrame* m_frame;
+  BMDDisplayMode m_displayMode;
 
-    // Complete HDR metadata
-    HDRMetadata m_hdrMetadata;
+ private:
+  // Configuration
+  int m_width;
+  int m_height;
+  bool m_outputEnabled;
+  BMDPixelFormat m_pixelFormat;
 
-    // Cached supported formats
-    std::vector<BMDPixelFormat> m_supportedFormats;
-    bool m_formatsCached;
+  // Complete HDR metadata
+  HDRMetadata m_hdrMetadata;
 
-    // Pending frame data
-    std::vector<uint16_t> m_pendingFrameData;
+  // Cached supported formats
+  std::vector<BMDPixelFormat> m_supportedFormats;
+  bool m_formatsCached;
 
-    // Private helper methods
-    int applyHDRMetadata();
-    void logFrameInfo(const char *context);
+  // Pending frame data
+  std::vector<uint16_t> m_pendingFrameData;
+
+  // Private helper methods
+  int applyHDRMetadata();
+  void logFrameInfo(const char* context);
 };
 
 // Thin C wrapper for ctypes compatibility
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-    // Device enumeration
-    int decklink_get_device_count();
-    int decklink_get_device_name_by_index(int index, char *name, int name_size);
+// Device enumeration
+int decklink_get_device_count();
+int decklink_get_device_name_by_index(int index, char* name, int name_size);
 
-    // Device management
-    DeckLinkHandle decklink_open_output_by_index(int index);
-    void decklink_close(DeckLinkHandle handle);
+// Device management
+DeckLinkHandle decklink_open_output_by_index(int index);
+void decklink_close(DeckLinkHandle handle);
 
-    // Output control
-    int decklink_start_output(DeckLinkHandle handle);
-    int decklink_start_output_with_mode(DeckLinkHandle handle, uint32_t display_mode);
-    int decklink_stop_output(DeckLinkHandle handle);
+// Output control
+int decklink_start_output(DeckLinkHandle handle);
+int decklink_start_output_with_mode(DeckLinkHandle handle,
+                                    uint32_t display_mode);
+int decklink_stop_output(DeckLinkHandle handle);
 
-    // Frame management
-    int decklink_create_frame_from_data(DeckLinkHandle handle);
+// Frame management
+int decklink_create_frame_from_data(DeckLinkHandle handle);
 
-    // Pixel format management
-    int decklink_get_supported_pixel_format_count(DeckLinkHandle handle);
-    int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, char *name, int name_size);
-    int decklink_set_pixel_format(DeckLinkHandle handle, uint32_t pixel_format_code);
-    uint32_t decklink_get_pixel_format(DeckLinkHandle handle);
+// Pixel format management
+int decklink_get_supported_pixel_format_count(DeckLinkHandle handle);
+int decklink_get_supported_pixel_format_name(DeckLinkHandle handle,
+                                             int index,
+                                             char* name,
+                                             int name_size);
+int decklink_set_pixel_format(DeckLinkHandle handle,
+                              uint32_t pixel_format_code);
+uint32_t decklink_get_pixel_format(DeckLinkHandle handle);
 
-    // Complete HDR metadata control
-    int decklink_set_hdr_metadata(DeckLinkHandle handle, const HDRMetadata *metadata);
+// Complete HDR metadata control
+int decklink_set_hdr_metadata(DeckLinkHandle handle,
+                              const HDRMetadata* metadata);
 
-    // Frame data management
-    int decklink_set_frame_data(DeckLinkHandle handle, const uint16_t *data, int width, int height);
+// Frame data management
+int decklink_set_frame_data(DeckLinkHandle handle,
+                            const uint16_t* data,
+                            int width,
+                            int height);
 
-    // Synchronous display
-    int decklink_display_frame_sync(DeckLinkHandle handle);
+// Synchronous display
+int decklink_display_frame_sync(DeckLinkHandle handle);
 
-    // HDR capability detection
-    bool decklink_device_supports_hdr(DeckLinkHandle handle);
+// HDR capability detection
+bool decklink_device_supports_hdr(DeckLinkHandle handle);
 
 // Display mode management
 uint32_t decklink_get_display_mode(DeckLinkHandle handle);
-int decklink_set_display_mode(DeckLinkHandle handle, uint32_t display_mode_code);
+int decklink_set_display_mode(DeckLinkHandle handle,
+                              uint32_t display_mode_code);
 
 // Version info
 const char* decklink_get_driver_version();
@@ -173,4 +179,7 @@ const char* decklink_get_sdk_version();
 
 // C++ wrapper functions (not in extern "C" block)
 int decklink_get_supported_pixel_format_count(DeckLinkHandle handle);
-int decklink_get_supported_pixel_format_name(DeckLinkHandle handle, int index, char *name, int name_size);
+int decklink_get_supported_pixel_format_name(DeckLinkHandle handle,
+                                             int index,
+                                             char* name,
+                                             int name_size);

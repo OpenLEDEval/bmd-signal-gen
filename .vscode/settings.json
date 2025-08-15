@@ -47,5 +47,6 @@
     "@cspell/dict-software-terms/cspell-ext.json",
     "@cspell/dict-cpp/cspell-ext.json",
     "@cspell/dict-data-science/cspell-ext.json"
-  ]
+  ],
+  "C_Cpp.default.cppStandard": "c++20"
 }
