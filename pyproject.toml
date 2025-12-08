@@ -150,6 +150,5 @@ reportUnnecessaryTypeIgnoreComment = true
 reportMissingModuleSource = false
 reportUnboundVariable = false
 reportUnnecessaryCast = true
-reportUnnecessaryTypeIgnorComment = true
 reportUnsupportedDunderAll = false
 reportUnusedExpression = false

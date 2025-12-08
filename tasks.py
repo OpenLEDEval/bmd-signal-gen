@@ -625,9 +625,7 @@ def setup_cmake(_: Context, version: str = "4.1.0") -> None:
 
 
 @task
-def setup(
-    ctx: Context, version: str = "20.1.8", cmake_version: str = "4.1.0"
-) -> None:
+def setup(ctx: Context, version: str = "20.1.8", cmake_version: str = "4.1.0") -> None:
     """Download and setup complete development toolchain (LLVM + CMake).
 
     Orchestrates installation of both LLVM tools and CMake by calling the

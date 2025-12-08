@@ -135,7 +135,9 @@ The primary recommended video output is HDMI. SDI support is currently less well
 
 ## Known Issues
 
-❌ SDI output appears green when no signal is being generated
+- ❌ when no signal is actively being generated (device is on, but uncontrolled), SDI output appears YUV 10b green (512 on C channel).
+- ❌ SDI R12L format (RGB444 12b Full Range) outputs `[0-4] → 4` and `4095 => ??`
+- ❌ SDI r210 format (RGBA444 10b Full Range) outputs `[0-4] → 4` and `[1019-1023] → 1019`
 
 ## Development
 

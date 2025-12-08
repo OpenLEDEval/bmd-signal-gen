@@ -7,5 +7,6 @@
     "source.fixAll.ruff": "explicit",
     "source.organizeImports.ruff": "explicit"
   },
-  "C_Cpp.default.cppStandard": "c++20"
+  "C_Cpp.default.cppStandard": "c++20",
+  "cmake.sourceDirectory": "/Users/fuse/Development/bmd-signal-gen/cpp"
 }
