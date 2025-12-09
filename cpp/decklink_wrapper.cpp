@@ -34,15 +34,15 @@ DeckLinkSignalGen::DeckLinkSignalGen()
       m_outputEnabled(false),
       m_pixelFormat(bmdFormat12BitRGBLE),
       m_formatsCached(false) {
-  // Initialize HDR metadata with default Rec2020 values (matching Python
-  // defaults)
-  m_hdrMetadata.EOTF = 2;  // PQ
-  m_hdrMetadata.referencePrimaries.RedX = 0.708;
-  m_hdrMetadata.referencePrimaries.RedY = 0.292;
-  m_hdrMetadata.referencePrimaries.GreenX = 0.170;
-  m_hdrMetadata.referencePrimaries.GreenY = 0.797;
-  m_hdrMetadata.referencePrimaries.BlueX = 0.131;
-  m_hdrMetadata.referencePrimaries.BlueY = 0.046;
+  // Initialize with SDR/Rec709 defaults to minimize HDR signaling until
+  // explicitly set. This matches BMD SDK SignalGenerator sample behavior.
+  m_hdrMetadata.EOTF = 1;                         // SDR
+  m_hdrMetadata.referencePrimaries.RedX = 0.640;  // Rec.709
+  m_hdrMetadata.referencePrimaries.RedY = 0.330;
+  m_hdrMetadata.referencePrimaries.GreenX = 0.300;
+  m_hdrMetadata.referencePrimaries.GreenY = 0.600;
+  m_hdrMetadata.referencePrimaries.BlueX = 0.150;
+  m_hdrMetadata.referencePrimaries.BlueY = 0.060;
   m_hdrMetadata.referencePrimaries.WhiteX = 0.3127;
   m_hdrMetadata.referencePrimaries.WhiteY = 0.3290;
   m_hdrMetadata.maxDisplayMasteringLuminance = 1000.0;
@@ -247,10 +247,20 @@ int DeckLinkSignalGen::createFrame() {
   if (err)
     return err;
 
-  // Apply EOTF metadata if set
-  if (m_hdrMetadata.EOTF >=
-      0) {               // Changed from m_eotfType to m_hdrMetadata.EOTF
-    applyHDRMetadata();  // Changed from applyEOTFMetadata to applyHDRMetadata
+  // Apply HDR metadata only for HDR transfer functions (PQ=2, HLG=3)
+  // For SDR (EOTF=1), skip HDR metadata entirely to avoid sending DRM InfoFrame
+  if (m_hdrMetadata.EOTF == 2 || m_hdrMetadata.EOTF == 3) {
+    applyHDRMetadata();
+  } else {
+    // SDR: Clear HDR flag but do NOT set EOTF/colorspace metadata
+    // This matches BMD SDK SignalGenerator sample behavior - SDR frames
+    // have no metadata set, which tells the device to use SDR signaling
+    if (m_frame) {
+      BMDFrameFlags currentFlags = m_frame->GetFlags();
+      m_frame->SetFlags(currentFlags & ~bmdFrameContainsHDRMetadata);
+    }
+    std::cerr << "[DeckLink] SDR mode: Cleared HDR flag, no metadata set"
+              << std::endl;
   }
 
   // Frame created successfully
@@ -345,7 +355,13 @@ BMDDisplayMode DeckLinkSignalGen::getDisplayMode() const {
 int DeckLinkSignalGen::setHDRMetadata(const HDRMetadata& metadata) {
   m_hdrMetadata = metadata;
 
-  // HDR metadata set successfully (debug output reduced)
+  // Debug: Log the received metadata values
+  std::cerr << "[DeckLink] setHDRMetadata received:" << std::endl;
+  std::cerr << "  EOTF: " << m_hdrMetadata.EOTF << std::endl;
+  std::cerr << "  Red primary: (" << m_hdrMetadata.referencePrimaries.RedX
+            << ", " << m_hdrMetadata.referencePrimaries.RedY << ")"
+            << std::endl;
+  std::cerr << "  MaxCLL: " << m_hdrMetadata.maxCLL << std::endl;
 
   return 0;
 }
@@ -474,9 +490,36 @@ int DeckLinkSignalGen::applyHDRMetadata() {
     return 0;  // Don't fail the frame creation, just skip metadata
   }
 
-  // Set colorspace metadata (Rec2020 for HDR)
-  result = metadataExt->SetInt(bmdDeckLinkFrameMetadataColorspace,
-                               bmdColorspaceRec2020);
+  // Determine colorspace from primaries by checking red primary coordinates
+  // Rec.709:  Red (0.640, 0.330)
+  // DCI-P3:   Red (0.680, 0.320)
+  // Rec.2020: Red (0.708, 0.292)
+  BMDColorspace colorspace = bmdColorspaceRec709;  // Default to Rec.709
+  double redX = m_hdrMetadata.referencePrimaries.RedX;
+
+  if (redX > 0.70) {
+    colorspace = bmdColorspaceRec2020;
+  } else if (redX > 0.66) {
+    // DCI-P3 has Red at 0.680 - but BMD SDK doesn't have a specific P3 constant
+    // Use Rec.2020 as closest HDR-compatible colorspace for P3
+    colorspace = bmdColorspaceRec2020;
+  } else {
+    colorspace = bmdColorspaceRec709;
+  }
+
+  // Debug: Log what we're about to set
+  std::cerr << "[DeckLink] applyHDRMetadata:" << std::endl;
+  std::cerr << "  Red X from metadata: " << redX << std::endl;
+  std::cerr << "  Colorspace to set: "
+            << (colorspace == bmdColorspaceRec709 ? "Rec709" : "Rec2020")
+            << std::endl;
+  std::cerr << "  EOTF to set: " << m_hdrMetadata.EOTF
+            << " (1=SDR, 2=PQ, 3=HLG)" << std::endl;
+
+  // Set colorspace metadata based on determined primaries
+  result = metadataExt->SetInt(bmdDeckLinkFrameMetadataColorspace, colorspace);
+  std::cerr << "  SetInt colorspace result: "
+            << (result == S_OK ? "OK" : "FAILED") << std::endl;
   if (result != S_OK) {
     std::cerr
         << "[DeckLink] Warning: Failed to set colorspace metadata (HRESULT: 0x"
@@ -487,19 +530,21 @@ int DeckLinkSignalGen::applyHDRMetadata() {
   result =
       metadataExt->SetInt(bmdDeckLinkFrameMetadataHDRElectroOpticalTransferFunc,
                           m_hdrMetadata.EOTF);
+  std::cerr << "  SetInt EOTF result: " << (result == S_OK ? "OK" : "FAILED")
+            << std::endl;
   if (result != S_OK) {
     std::cerr << "[DeckLink] Warning: Failed to set EOTF metadata (HRESULT: 0x"
               << std::hex << result << std::dec << ")" << std::endl;
   }
 
-  // Only apply full HDR metadata for PQ (EOTF = 2)
-  if (m_hdrMetadata.EOTF == 2) {
+  // Only apply full HDR primaries/luminance metadata for PQ (EOTF = 2) or HLG
+  // (EOTF = 3)
+  if (m_hdrMetadata.EOTF == 2 || m_hdrMetadata.EOTF == 3) {
     // Set the HDR metadata flag
     BMDFrameFlags currentFlags = m_frame->GetFlags();
     m_frame->SetFlags(currentFlags | bmdFrameContainsHDRMetadata);
 
     // Set display primaries
-    // Set display primaries (reduced logging for performance)
     metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedX,
                           m_hdrMetadata.referencePrimaries.RedX);
     metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesRedY,
@@ -513,7 +558,7 @@ int DeckLinkSignalGen::applyHDRMetadata() {
     metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRDisplayPrimariesBlueY,
                           m_hdrMetadata.referencePrimaries.BlueY);
 
-    // Set white point and luminance values (reduced logging for performance)
+    // Set white point and luminance values
     metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointX,
                           m_hdrMetadata.referencePrimaries.WhiteX);
     metadataExt->SetFloat(bmdDeckLinkFrameMetadataHDRWhitePointY,
@@ -530,7 +575,7 @@ int DeckLinkSignalGen::applyHDRMetadata() {
         bmdDeckLinkFrameMetadataHDRMaximumFrameAverageLightLevel,
         m_hdrMetadata.maxFALL);
   } else {
-    // Remove HDR metadata flag for non-PQ EOTF
+    // Remove HDR metadata flag for SDR EOTF
     BMDFrameFlags currentFlags = m_frame->GetFlags();
     m_frame->SetFlags(currentFlags & ~bmdFrameContainsHDRMetadata);
   }

@@ -1,5 +1,8 @@
 # context
 context/
+data/
+*.tif
+*.png
 
 # Libraries
 Blackmagic\ DeckLink\ SDK\ 14.4/

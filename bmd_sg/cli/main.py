@@ -207,7 +207,8 @@ def main(
     ctx.obj["mock_device"] = mock_device
 
 
-# Register commands
+from bmd_sg.cli.commands.display_tiff import display_tiff_command
+from bmd_sg.cli.commands.gen_chart import gen_chart_command
 
 app.command(name="solid")(solid_command)
 app.command(name="pat2")(checkerboard2_command)
@@ -215,6 +216,8 @@ app.command(name="pat3")(checkerboard3_command)
 app.command(name="pat4")(checkerboard4_command)
 app.command(name="device-details")(device_details_command)
 app.command(name="api-server")(api_server_command)
+app.command(name="gen-chart")(gen_chart_command)
+app.command(name="display-tiff")(display_tiff_command)
 
 
 __all__ = ["app", "main"]

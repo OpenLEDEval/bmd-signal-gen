@@ -469,6 +469,74 @@ GAMUT_CHROMATICITIES_REC601 = GamutChromaticities(
 """Gamut_Chromaticities: ITU-R BT.601 color space primaries (standard definition)."""
 
 
+def colorspace_to_gamut_chromaticities(
+    colorspace_value: str,
+) -> GamutChromaticities:
+    """
+    Map a ColorSpace enum value string to GamutChromaticities.
+
+    Parameters
+    ----------
+    colorspace_value : str
+        The ColorSpace.value string (e.g., "ITU-R BT.709", "ITU-R BT.2020").
+
+    Returns
+    -------
+    GamutChromaticities
+        The corresponding chromaticity coordinates for HDMI/SDI signaling.
+
+    Notes
+    -----
+    This function uses the serialized string value from ColorSpace.value
+    to enable type-safe mapping from TIFF metadata to DeckLink settings.
+    XYZ colorspace maps to Rec.709 as a sensible default.
+    """
+    mapping = {
+        "XYZ": Gamut_Chromaticities_REC709,  # Default for XYZ source
+        "ITU-R BT.709": Gamut_Chromaticities_REC709,
+        "P3-D65": Gamut_Chromaticities_DCI_P3,
+        "ITU-R BT.2020": Gamut_Chromaticities_REC2020,
+    }
+    if colorspace_value not in mapping:
+        # Default to Rec.709 for unknown colorspaces
+        return Gamut_Chromaticities_REC709
+    return mapping[colorspace_value]
+
+
+def transfer_function_to_eotf(transfer_value: str) -> "EOTFType":
+    """
+    Map a TransferFunction enum value string to EOTFType.
+
+    Parameters
+    ----------
+    transfer_value : str
+        The TransferFunction.value string (e.g., "sRGB", "ST.2084").
+
+    Returns
+    -------
+    EOTFType
+        The corresponding EOTF for HDMI/SDI signaling.
+
+    Notes
+    -----
+    This function uses the serialized string value from TransferFunction.value
+    to enable type-safe mapping from TIFF metadata to DeckLink settings.
+
+    SDR transfer functions (linear, sRGB, gamma2.2) all map to SDR EOTF.
+    """
+    # Map transfer function strings to EOTF types
+    # SDR transfers map to SDR EOTF, HDR transfers map to their specific EOTFs
+    if transfer_value in ("linear", "sRGB", "gamma2.2"):
+        return EOTFType.SDR
+    elif transfer_value == "ST.2084":
+        return EOTFType.PQ
+    elif transfer_value == "HLG":
+        return EOTFType.HLG
+    else:
+        # Default to SDR for unknown transfers
+        return EOTFType.SDR
+
+
 class HDRMetadata(ctypes.Structure):
     """
     Complete HDR metadata structure for DeckLink output.
