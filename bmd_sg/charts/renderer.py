@@ -10,8 +10,10 @@ from numpy.typing import NDArray
 from PIL import Image, ImageDraw, ImageFont
 
 from bmd_sg.charts.color_types import (
+    AnnotationLayout,
     ChartLayout,
     ColorSpace,
+    Illuminant,
     TransferFunction,
 )
 from bmd_sg.charts.conversion import xyz_to_display_rgb
@@ -59,6 +61,11 @@ def render_chart(
     # Create image as float first
     image = np.zeros((height, width, 3), dtype=np.float64)
 
+    # Get illuminant from chart colorimetry (default to D65)
+    illuminant = Illuminant.D65
+    if layout.colorimetry is not None:
+        illuminant = layout.colorimetry.illuminant
+
     for patch in layout.patches:
         # Calculate pixel bounds
         x0 = int(patch.x_pct * width)
@@ -73,6 +80,7 @@ def render_chart(
                 target_space=target_space,
                 transfer_function=transfer_function,
                 reference_white_Y=reference_white_Y,
+                illuminant=illuminant,
             )
         elif patch.color.space == target_space:
             # Already in target space, just apply transfer function
@@ -96,19 +104,21 @@ def render_chart(
     # Convert to uint16
     image_uint16 = np.clip(image * max_value, 0, max_value).astype(np.uint16)
 
-    # Add text labels and annotation stripes if requested
+    # Add text labels on patches if requested
     if include_labels:
         image_uint16 = _add_labels(image_uint16, layout, width, height, bit_depth)
-        image_uint16 = _add_annotation_stripes(
-            image_uint16,
-            layout=layout,
-            width=width,
-            height=height,
-            bit_depth=bit_depth,
-            target_space=target_space,
-            transfer_function=transfer_function,
-            reference_white_Y=reference_white_Y,
-        )
+
+    # Always add annotation stripes (critical encoding/chart metadata)
+    image_uint16 = _add_annotation_stripes(
+        image_uint16,
+        layout=layout,
+        width=width,
+        height=height,
+        bit_depth=bit_depth,
+        target_space=target_space,
+        transfer_function=transfer_function,
+        reference_white_Y=reference_white_Y,
+    )
 
     return image_uint16
 
@@ -244,11 +254,20 @@ def _add_annotation_stripes(
     except OSError:
         font = ImageFont.load_default()
 
-    # Gap stripe positions (matching color_chart_xyz.yaml layout)
-    top_stripe_y = int(0.17 * height)
-    top_stripe_end = int(0.21 * height)
-    bottom_stripe_y = int(0.79 * height)
-    bottom_stripe_end = int(0.83 * height)
+    # Get stripe positions from layout annotations (or use defaults)
+    if layout.annotations and layout.annotations.top_stripe:
+        top_stripe_y = int(layout.annotations.top_stripe.y_start * height)
+        top_stripe_end = int(layout.annotations.top_stripe.y_end * height)
+    else:
+        top_stripe_y = int(0.17 * height)
+        top_stripe_end = int(0.21 * height)
+
+    if layout.annotations and layout.annotations.bottom_stripe:
+        bottom_stripe_y = int(layout.annotations.bottom_stripe.y_start * height)
+        bottom_stripe_end = int(layout.annotations.bottom_stripe.y_end * height)
+    else:
+        bottom_stripe_y = int(0.79 * height)
+        bottom_stripe_end = int(0.83 * height)
 
     # Calculate stripe center Y positions
     top_center_y = (top_stripe_y + top_stripe_end) // 2
@@ -273,10 +292,10 @@ def _add_annotation_stripes(
 
     # Bottom stripe: Chart metadata
     chart_name = layout.name if layout.name else "Unnamed Chart"
-    source_info = f"Source: {layout.source}" if layout.source else "Source: XYZ"
-    white_info = f"Ref White Y: {reference_white_Y}"
+    illuminant_name = layout.colorimetry.illuminant.value if layout.colorimetry else "D65"
+    white_info = f"Illuminant: {illuminant_name}  │  Ref White Y: {reference_white_Y}"
 
-    bottom_text = f"{chart_name}  │  {source_info}  │  {white_info}"
+    bottom_text = f"{chart_name}  │  {white_info}"
 
     # Draw top annotation stripe text (centered horizontally)
     draw.text(

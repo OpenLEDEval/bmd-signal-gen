@@ -10,7 +10,16 @@ from typing import Any
 
 import yaml
 
-from bmd_sg.charts.color_types import ChartLayout, ColorSpace, ColorValue, Patch
+from bmd_sg.charts.color_types import (
+    AnnotationLayout,
+    AnnotationStripe,
+    ChartLayout,
+    Colorimetry,
+    ColorSpace,
+    ColorValue,
+    Illuminant,
+    Patch,
+)
 
 
 def load_chart(
@@ -57,10 +66,10 @@ def load_chart(
 
     # Parse metadata
     chart_name = data.get("name", path.stem)
-    colorimetry = data.get("colorimetry", {})
+    colorimetry_data = data.get("colorimetry", {})
 
     # Parse color space
-    color_space_str = colorimetry.get("color_space", "XYZ")
+    color_space_str = colorimetry_data.get("color_space", "XYZ")
     color_space_map = {
         "XYZ": ColorSpace.XYZ,
         "Rec.709": ColorSpace.REC709,
@@ -71,7 +80,52 @@ def load_chart(
     }
     color_space = color_space_map.get(color_space_str, ColorSpace.XYZ)
 
-    reference_white_Y = colorimetry.get("reference_white_Y", 100.0)
+    # Parse illuminant (default to D65 for display/broadcast work)
+    illuminant_str = colorimetry_data.get("illuminant", "D65")
+    try:
+        illuminant = Illuminant.parse(illuminant_str)
+    except ValueError:
+        illuminant = Illuminant.D65  # Safe fallback
+
+    # Parse white point chromaticity
+    white_point_list = colorimetry_data.get("white_point", [0.3127, 0.329])
+    white_point = (float(white_point_list[0]), float(white_point_list[1]))
+
+    reference_white_Y = colorimetry_data.get("reference_white_Y", 100.0)
+
+    # Create Colorimetry object
+    colorimetry = Colorimetry(
+        color_space=color_space,
+        illuminant=illuminant,
+        white_point=white_point,
+        reference_white_Y=reference_white_Y,
+    )
+
+    # Parse annotations
+    annotations_data = data.get("annotations", {})
+    annotations = None
+    if annotations_data:
+        top_stripe = None
+        bottom_stripe = None
+
+        if "top_stripe" in annotations_data:
+            ts = annotations_data["top_stripe"]
+            top_stripe = AnnotationStripe(
+                y_start=float(ts.get("y_start", 0.17)),
+                y_end=float(ts.get("y_end", 0.21)),
+            )
+
+        if "bottom_stripe" in annotations_data:
+            bs = annotations_data["bottom_stripe"]
+            bottom_stripe = AnnotationStripe(
+                y_start=float(bs.get("y_start", 0.79)),
+                y_end=float(bs.get("y_end", 0.83)),
+            )
+
+        annotations = AnnotationLayout(
+            top_stripe=top_stripe,
+            bottom_stripe=bottom_stripe,
+        )
 
     # Parse patches
     patches: list[Patch] = []
@@ -91,6 +145,8 @@ def load_chart(
         name=chart_name,
         patches=patches,
         source=str(path),
+        colorimetry=colorimetry,
+        annotations=annotations,
     )
 
 

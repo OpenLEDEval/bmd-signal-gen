@@ -84,6 +84,102 @@ class TransferFunction(Enum):
         raise ValueError(f"Unknown transfer function: '{value}'. Valid: {valid}")
 
 
+class Illuminant(Enum):
+    """CIE standard illuminants for XYZ reference white."""
+
+    D65 = "D65"  # Average daylight (~6500K), standard for broadcast/display
+    D50 = "D50"  # Horizon light (~5000K), standard for print/ICC profiles
+    D55 = "D55"  # Mid-morning/afternoon daylight (~5500K)
+    A = "A"  # Incandescent/tungsten (~2856K)
+    E = "E"  # Equal energy (theoretical reference)
+
+    @classmethod
+    def parse(cls, value: str) -> "Illuminant":
+        """
+        Parse an illuminant from its string value.
+
+        Parameters
+        ----------
+        value : str
+            The illuminant string (e.g., "D65", "D50").
+
+        Returns
+        -------
+        Illuminant
+            The matching Illuminant enum member.
+
+        Raises
+        ------
+        ValueError
+            If the value doesn't match any known illuminant.
+        """
+        for member in cls:
+            if member.value == value:
+                return member
+        valid = ", ".join(f"'{m.value}'" for m in cls)
+        raise ValueError(f"Unknown illuminant: '{value}'. Valid: {valid}")
+
+
+@dataclass
+class Colorimetry:
+    """
+    Colorimetry metadata for a chart.
+
+    This captures the color space, illuminant, and normalization parameters
+    needed to correctly interpret and convert the chart's color values.
+
+    Parameters
+    ----------
+    color_space : ColorSpace
+        The color space of the chart's color values.
+    illuminant : Illuminant
+        The CIE standard illuminant the XYZ values are referenced to.
+    white_point : tuple[float, float]
+        The white point chromaticity coordinates (x, y).
+    reference_white_Y : float
+        The Y value that corresponds to white (typically 100.0).
+    """
+
+    color_space: ColorSpace = ColorSpace.XYZ
+    illuminant: Illuminant = Illuminant.D65
+    white_point: tuple[float, float] = (0.3127, 0.329)  # D65 chromaticity
+    reference_white_Y: float = 100.0
+
+
+@dataclass
+class AnnotationStripe:
+    """
+    Position of an annotation stripe.
+
+    Parameters
+    ----------
+    y_start : float
+        Starting Y position as percentage (0.0-1.0).
+    y_end : float
+        Ending Y position as percentage (0.0-1.0).
+    """
+
+    y_start: float
+    y_end: float
+
+
+@dataclass
+class AnnotationLayout:
+    """
+    Layout positions for annotation stripes.
+
+    Parameters
+    ----------
+    top_stripe : AnnotationStripe | None
+        Top annotation stripe (typically for encoding info).
+    bottom_stripe : AnnotationStripe | None
+        Bottom annotation stripe (typically for chart metadata).
+    """
+
+    top_stripe: AnnotationStripe | None = None
+    bottom_stripe: AnnotationStripe | None = None
+
+
 @dataclass
 class ColorValue:
     """
@@ -158,12 +254,19 @@ class ChartLayout:
         List of color patches in the chart.
     source : str | None
         Source file or description.
+    colorimetry : Colorimetry | None
+        Colorimetry metadata for the chart (illuminant, white point, etc.).
+    annotations : AnnotationLayout | None
+        Layout positions for annotation stripes.
     """
 
     name: str
     patches: list[Patch] = field(default_factory=list)
     source: str | None = None
+    colorimetry: Colorimetry | None = None
+    annotations: AnnotationLayout | None = None
 
     def add_patch(self, patch: Patch) -> None:
         """Add a patch to the layout."""
         self.patches.append(patch)
+

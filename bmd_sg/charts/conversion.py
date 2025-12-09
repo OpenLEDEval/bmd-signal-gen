@@ -9,7 +9,7 @@ import colour
 import numpy as np
 from numpy.typing import NDArray
 
-from bmd_sg.charts.color_types import ColorSpace, ColorValue, TransferFunction
+from bmd_sg.charts.color_types import ColorSpace, ColorValue, Illuminant, TransferFunction
 
 
 def xyz_to_display_rgb(
@@ -17,6 +17,7 @@ def xyz_to_display_rgb(
     target_space: ColorSpace = ColorSpace.REC709,
     transfer_function: TransferFunction = TransferFunction.SRGB,
     reference_white_Y: float = 100.0,
+    illuminant: Illuminant = Illuminant.D65,
 ) -> NDArray[np.float64]:
     """
     Convert XYZ color value to display-ready RGB.
@@ -31,6 +32,9 @@ def xyz_to_display_rgb(
         Transfer function to apply (encoding).
     reference_white_Y : float
         The Y value that corresponds to white (default 100 for Y=100 normalized data).
+    illuminant : Illuminant
+        The CIE standard illuminant the XYZ values are referenced to.
+        This must match the illuminant used when the XYZ values were calculated.
 
     Returns
     -------
@@ -63,14 +67,17 @@ def xyz_to_display_rgb(
     # Get the colorspace definition
     cs = colour.RGB_COLOURSPACES[cs_name]
 
+    # Map our Illuminant enum to colour-science illuminant names
+    illuminant_xy = colour.CCS_ILLUMINANTS["CIE 1931 2 Degree Standard Observer"][
+        illuminant.value
+    ]
+
     # XYZ to linear RGB using colour-science
-    # Uses D65 illuminant by default
+    # Uses the illuminant from chart metadata
     linear_rgb = colour.XYZ_to_RGB(
         xyz_normalized,
         colourspace=cs,
-        illuminant=colour.CCS_ILLUMINANTS["CIE 1931 2 Degree Standard Observer"][
-            "D65"
-        ],
+        illuminant=illuminant_xy,
     )
 
     # Clip to gamut
@@ -101,6 +108,7 @@ def xyz_to_display_rgb(
 def rgb_to_xyz(
     color: ColorValue,
     reference_white_Y: float = 100.0,
+    illuminant: Illuminant = Illuminant.D65,
 ) -> ColorValue:
     """
     Convert RGB color value to XYZ.
@@ -111,6 +119,8 @@ def rgb_to_xyz(
         Input color in an RGB space.
     reference_white_Y : float
         The Y value for white (for denormalization).
+    illuminant : Illuminant
+        The CIE standard illuminant for the output XYZ values.
 
     Returns
     -------
@@ -132,12 +142,15 @@ def rgb_to_xyz(
 
     cs = colour.RGB_COLOURSPACES[cs_name]
 
+    # Map our Illuminant enum to colour-science illuminant names
+    illuminant_xy = colour.CCS_ILLUMINANTS["CIE 1931 2 Degree Standard Observer"][
+        illuminant.value
+    ]
+
     xyz_normalized = colour.RGB_to_XYZ(
         color.values,
         colourspace=cs,
-        illuminant=colour.CCS_ILLUMINANTS["CIE 1931 2 Degree Standard Observer"][
-            "D65"
-        ],
+        illuminant=illuminant_xy,
     )
 
     xyz = xyz_normalized * reference_white_Y
