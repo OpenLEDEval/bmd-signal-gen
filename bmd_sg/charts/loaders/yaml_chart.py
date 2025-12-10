@@ -19,6 +19,7 @@ from bmd_sg.charts.color_types import (
     ColorValue,
     Illuminant,
     Patch,
+    PatternType,
 )
 
 
@@ -210,6 +211,13 @@ def _parse_patch(
         else:
             label_text = f"{name}\nL={y_val:.2f}"
 
+    # Parse pattern type (default to solid)
+    pattern_str = data.get("pattern", "solid")
+    try:
+        pattern = PatternType.parse(pattern_str)
+    except ValueError:
+        pattern = PatternType.SOLID  # Safe fallback
+
     return Patch(
         name=name,
         x_pct=left,
@@ -217,5 +225,6 @@ def _parse_patch(
         width_pct=width,
         height_pct=height,
         color=color,
+        pattern=pattern,
         label_text=label_text,
     )

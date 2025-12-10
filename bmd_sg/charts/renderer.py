@@ -14,6 +14,7 @@ from bmd_sg.charts.color_types import (
     ChartLayout,
     ColorSpace,
     Illuminant,
+    PatternType,
     TransferFunction,
 )
 from bmd_sg.charts.conversion import xyz_to_display_rgb
@@ -98,8 +99,8 @@ def render_chart(
             # Need cross-colorspace conversion - for now just use values directly
             rgb = patch.color.values
 
-        # Fill patch area
-        image[y0:y1, x0:x1, :] = rgb
+        # Fill patch area based on pattern type
+        _fill_patch_region(image, x0, y0, x1, y1, rgb, patch.pattern)
 
     # Convert to uint16
     image_uint16 = np.clip(image * max_value, 0, max_value).astype(np.uint16)
@@ -121,6 +122,78 @@ def render_chart(
     )
 
     return image_uint16
+
+
+def _fill_patch_region(
+    image: NDArray[np.float64],
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+    rgb: NDArray[np.float64],
+    pattern: PatternType,
+) -> None:
+    """
+    Fill a patch region with solid color or checkerboard pattern.
+
+    For checkerboard patterns, generates 2×2 pixel repeating patterns
+    using 100% white and 0% black to produce gamma-invariant luminance.
+
+    Parameters
+    ----------
+    image : NDArray[np.float64]
+        The image array to fill (modified in-place).
+    x0, y0 : int
+        Top-left corner of the patch.
+    x1, y1 : int
+        Bottom-right corner of the patch.
+    rgb : NDArray[np.float64]
+        RGB color values (used for solid, ignored for checkerboard).
+    pattern : PatternType
+        The pattern type to render.
+    """
+    if pattern == PatternType.SOLID:
+        image[y0:y1, x0:x1, :] = rgb
+    else:
+        # Checkerboard patterns use white (1.0) and black (0.0)
+        white = np.array([1.0, 1.0, 1.0])
+        black = np.array([0.0, 0.0, 0.0])
+
+        # Create coordinate grids for the patch region
+        height = y1 - y0
+        width = x1 - x0
+
+        if height == 0 or width == 0:
+            return
+
+        # Generate pattern based on coordinate parity
+        y_coords = np.arange(height).reshape(-1, 1)
+        x_coords = np.arange(width).reshape(1, -1)
+
+        # Compute parity for each pixel (0-3 for 2×2 pattern)
+        # Position in 2×2 tile: (y % 2) * 2 + (x % 2)
+        tile_pos = (y_coords % 2) * 2 + (x_coords % 2)
+
+        # Define which positions are white for each pattern
+        # Tile positions: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+        if pattern == PatternType.CHECKERBOARD_50:
+            # Diagonal checkerboard: positions 0 and 3 are white
+            is_white = (tile_pos == 0) | (tile_pos == 3)
+        elif pattern == PatternType.CHECKERBOARD_25:
+            # Only position 0 is white (1 white, 3 black = 25%)
+            is_white = tile_pos == 0
+        elif pattern == PatternType.CHECKERBOARD_75:
+            # Positions 0, 1, 2 are white (3 white, 1 black = 75%)
+            is_white = tile_pos != 3
+        else:
+            # Default to solid fill for unknown patterns
+            image[y0:y1, x0:x1, :] = rgb
+            return
+
+        # Fill the patch region
+        patch_region = image[y0:y1, x0:x1, :]
+        patch_region[is_white] = white
+        patch_region[~is_white] = black
 
 
 def _add_labels(

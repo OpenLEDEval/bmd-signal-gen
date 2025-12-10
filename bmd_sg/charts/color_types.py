@@ -120,6 +120,51 @@ class Illuminant(Enum):
         raise ValueError(f"Unknown illuminant: '{value}'. Valid: {valid}")
 
 
+class PatternType(Enum):
+    """Pattern types for patch rendering.
+
+    Defines how a patch should be rendered - either as a solid color
+    or as a checkerboard pattern for gamma-invariant luminance measurement.
+
+    Checkerboard patterns use 2×2 pixel repeating patterns of 100% white
+    and 0% black to produce gamma-invariant luminance values:
+    - CHECKERBOARD_25: 1 white + 3 black pixels = 25% luminance
+    - CHECKERBOARD_50: 2 white + 2 black pixels = 50% luminance
+    - CHECKERBOARD_75: 3 white + 1 black pixels = 75% luminance
+    """
+
+    SOLID = "solid"
+    CHECKERBOARD_25 = "checkerboard_25"  # 2×2: 1 white, 3 black
+    CHECKERBOARD_50 = "checkerboard_50"  # 2×2: 2 white, 2 black (diagonal)
+    CHECKERBOARD_75 = "checkerboard_75"  # 2×2: 3 white, 1 black
+
+    @classmethod
+    def parse(cls, value: str) -> "PatternType":
+        """
+        Parse a pattern type from its string value.
+
+        Parameters
+        ----------
+        value : str
+            The pattern type string (e.g., "solid", "checkerboard_50").
+
+        Returns
+        -------
+        PatternType
+            The matching PatternType enum member.
+
+        Raises
+        ------
+        ValueError
+            If the value doesn't match any known pattern type.
+        """
+        for member in cls:
+            if member.value == value:
+                return member
+        valid = ", ".join(f"'{m.value}'" for m in cls)
+        raise ValueError(f"Unknown pattern type: '{value}'. Valid: {valid}")
+
+
 @dataclass
 class Colorimetry:
     """
@@ -227,7 +272,9 @@ class Patch:
     height_pct : float
         Height as percentage of total height (0.0-1.0).
     color : ColorValue
-        The color of this patch.
+        The color of this patch (used for solid patterns, ignored for checkerboards).
+    pattern : PatternType
+        How to render the patch (solid color or checkerboard pattern).
     label_text : str | None
         Optional text to display on the patch for measurement validation.
     """
@@ -238,6 +285,7 @@ class Patch:
     width_pct: float
     height_pct: float
     color: ColorValue
+    pattern: PatternType = PatternType.SOLID
     label_text: str | None = None
 
 
