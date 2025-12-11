@@ -561,16 +561,23 @@ def display_image_for_duration(
     image : np.ndarray
         Image data to display (pattern, frame, or any image array)
     duration : float
-        Duration in seconds to display the image
+        Duration in seconds to display the image.
+        If 0 or negative, displays indefinitely until user presses Enter.
 
     Examples
     --------
     >>> display_image_for_duration(decklink, image, 5.0)
     Displaying image for 5.0 seconds...
+    >>> display_image_for_duration(decklink, image, 0)
+    Displaying image indefinitely. Press Enter to stop...
     """
     decklink.display_frame(image)
-    typer.echo(f"Displaying image for {duration} seconds...")
-    time.sleep(duration)
+    if duration > 0:
+        typer.echo(f"Displaying image for {duration} seconds...")
+        time.sleep(duration)
+    else:
+        typer.echo("Displaying image indefinitely. Press Enter to stop...")
+        input()  # Wait for user to press Enter
 
 
 def setup_tools_from_context(

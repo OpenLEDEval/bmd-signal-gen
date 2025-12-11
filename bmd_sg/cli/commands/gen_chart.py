@@ -49,13 +49,13 @@ def gen_chart_command(
         typer.Option("--output", "-o", help="Output TIFF file path (default: <source>.tif)"),
     ] = None,
     width: Annotated[
-        int,
-        typer.Option("--width", "-w", help="Output width in pixels"),
-    ] = 1920,
+        int | None,
+        typer.Option("--width", "-w", help="Output frame width (default: chart canvas width)"),
+    ] = None,
     height: Annotated[
-        int,
-        typer.Option("--height", "-h", help="Output height in pixels"),
-    ] = 1080,
+        int | None,
+        typer.Option("--height", "-h", help="Output frame height (default: chart canvas height)"),
+    ] = None,
     colorspace: Annotated[
         ColorSpaceOption,
         typer.Option("--colorspace", "-c", help="Target color space for output"),
@@ -80,9 +80,14 @@ def gen_chart_command(
     """
     Generate a display-ready test chart TIFF from a YAML definition.
 
+    The chart is rendered at its canvas dimensions (defined in YAML, default
+    1920x1080). Use --width/--height to embed the chart centered in a larger
+    output frame (e.g., 3840x2160 for 4K output).
+
     Examples:
         bmd-signal-gen gen-chart data/my_chart.yaml -o chart.tif --labels
         bmd-signal-gen gen-chart data/smpte_bars.yaml -o smpte.tif
+        bmd-signal-gen gen-chart chart.yaml --width 3840 --height 2160 -o chart_4k.tif
     """
     # Map CLI options to internal types
     cs_map = {
@@ -113,9 +118,25 @@ def gen_chart_command(
     console.print(f"Loading chart from [cyan]{source}[/cyan]...")
     layout = load_chart(source, include_labels=labels)
 
+    # Determine actual output dimensions
+    if layout.canvas:
+        canvas_width = layout.canvas.width
+        canvas_height = layout.canvas.height
+    else:
+        canvas_width = 1920
+        canvas_height = 1080
+
+    out_width = width if width is not None else canvas_width
+    out_height = height if height is not None else canvas_height
+
     console.print(f"  Chart: {layout.name}")
     console.print(f"  Patches: {len(layout.patches)}")
-    console.print(f"  Output: {width}x{height} @ {bit_depth}-bit")
+    console.print(f"  Canvas: {canvas_width}x{canvas_height}")
+    if out_width != canvas_width or out_height != canvas_height:
+        console.print(f"  Output frame: {out_width}x{out_height} (embedded)")
+    else:
+        console.print(f"  Output: {out_width}x{out_height}")
+    console.print(f"  Bit depth: {bit_depth}-bit")
     console.print(f"  Colorspace: {target_space.value}")
     console.print(f"  Transfer: {transfer_func.value}")
 
@@ -123,8 +144,8 @@ def gen_chart_command(
     console.print("Rendering chart...")
     image = render_chart(
         layout=layout,
-        width=width,
-        height=height,
+        output_width=width,  # None = use canvas size
+        output_height=height,
         bit_depth=bit_depth,
         target_space=target_space,
         transfer_function=transfer_func,
@@ -147,7 +168,7 @@ def gen_chart_command(
     # Generate PNG preview with watermark (append _preview before extension)
     preview_path = output.with_stem(output.stem + "_preview").with_suffix(".png")
     console.print(f"Writing preview to [cyan]{preview_path}[/cyan]...")
-    _write_preview_png(image, preview_path, bit_depth, width, height)
+    _write_preview_png(image, preview_path, bit_depth, out_width, out_height)
 
     console.print("[green]✓[/green] Chart generated successfully!")
 

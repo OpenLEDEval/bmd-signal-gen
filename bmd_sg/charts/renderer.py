@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from bmd_sg.charts.color_types import (
     AnnotationLayout,
+    Canvas,
     ChartLayout,
     ColorSpace,
     Illuminant,
@@ -22,8 +23,8 @@ from bmd_sg.charts.conversion import xyz_to_display_rgb
 
 def render_chart(
     layout: ChartLayout,
-    width: int = 1920,
-    height: int = 1080,
+    output_width: int | None = None,
+    output_height: int | None = None,
     bit_depth: int = 12,
     target_space: ColorSpace = ColorSpace.REC709,
     transfer_function: TransferFunction = TransferFunction.SRGB,
@@ -33,14 +34,19 @@ def render_chart(
     """
     Render a chart layout to a numpy array.
 
+    The chart is rendered at its native canvas dimensions (from layout.canvas,
+    or 1920x1080 by default). If output_width/output_height are specified and
+    differ from the canvas size, the chart is embedded pixel-for-pixel centered
+    in the output frame with the surround color filling the remaining area.
+
     Parameters
     ----------
     layout : ChartLayout
         The chart layout to render.
-    width : int
-        Output width in pixels.
-    height : int
-        Output height in pixels.
+    output_width : int | None
+        Output frame width in pixels. If None, uses canvas width.
+    output_height : int | None
+        Output frame height in pixels. If None, uses canvas height.
     bit_depth : int
         Output bit depth (8, 10, 12, or 16).
     target_space : ColorSpace
@@ -55,7 +61,65 @@ def render_chart(
     Returns
     -------
     NDArray[np.uint16]
-        Image data as uint16 array of shape (height, width, 3).
+        Image data as uint16 array of shape (output_height, output_width, 3).
+    """
+    # Get canvas dimensions (default to 1920x1080)
+    canvas = layout.canvas if layout.canvas else Canvas()
+    canvas_width = canvas.width
+    canvas_height = canvas.height
+    surround = canvas.surround
+
+    # Determine output dimensions
+    out_width = output_width if output_width is not None else canvas_width
+    out_height = output_height if output_height is not None else canvas_height
+
+    max_value = 2**bit_depth - 1
+
+    # Render chart at canvas size first
+    chart_image = _render_chart_content(
+        layout=layout,
+        width=canvas_width,
+        height=canvas_height,
+        bit_depth=bit_depth,
+        target_space=target_space,
+        transfer_function=transfer_function,
+        reference_white_Y=reference_white_Y,
+        include_labels=include_labels,
+    )
+
+    # If output size matches canvas, we're done
+    if out_width == canvas_width and out_height == canvas_height:
+        return chart_image
+
+    # Otherwise, embed chart at top-left of output frame with surround color
+    # Create output frame filled with surround color
+    surround_rgb = np.array(surround, dtype=np.float64)
+    surround_uint16 = np.clip(surround_rgb * max_value, 0, max_value).astype(np.uint16)
+
+    output_image = np.zeros((out_height, out_width, 3), dtype=np.uint16)
+    output_image[:, :] = surround_uint16
+
+    # Place chart at top-left corner
+    output_image[0:canvas_height, 0:canvas_width] = chart_image
+
+    return output_image
+
+
+def _render_chart_content(
+    layout: ChartLayout,
+    width: int,
+    height: int,
+    bit_depth: int,
+    target_space: ColorSpace,
+    transfer_function: TransferFunction,
+    reference_white_Y: float,
+    include_labels: bool,
+) -> NDArray[np.uint16]:
+    """
+    Render chart content at specified dimensions.
+
+    This is an internal function that renders the actual chart content
+    without frame embedding logic.
     """
     max_value = 2**bit_depth - 1
 

@@ -13,6 +13,7 @@ import yaml
 from bmd_sg.charts.color_types import (
     AnnotationLayout,
     AnnotationStripe,
+    Canvas,
     ChartLayout,
     Colorimetry,
     ColorSpace,
@@ -128,6 +129,22 @@ def load_chart(
             bottom_stripe=bottom_stripe,
         )
 
+    # Parse canvas
+    canvas_data = data.get("canvas", {})
+    canvas = None
+    if canvas_data:
+        surround_list = canvas_data.get("surround", [0.0, 0.0, 0.0])
+        if len(surround_list) >= 3:
+            surround = (float(surround_list[0]), float(surround_list[1]), float(surround_list[2]))
+        else:
+            surround = (0.0, 0.0, 0.0)
+
+        canvas = Canvas(
+            width=int(canvas_data.get("width", 1920)),
+            height=int(canvas_data.get("height", 1080)),
+            surround=surround,
+        )
+
     # Parse patches
     patches: list[Patch] = []
     patch_list = data.get("patches", [])
@@ -148,6 +165,7 @@ def load_chart(
         source=str(path),
         colorimetry=colorimetry,
         annotations=annotations,
+        canvas=canvas,
     )
 
 
@@ -188,12 +206,16 @@ def _parse_patch(
         )
         cie_x = cie_y = None  # Not applicable for RGB input
 
-    # Parse layout
-    layout = data.get("layout", [0, 0, 1, 1])
-    if len(layout) != 4:
-        layout = [0, 0, 1, 1]
+    # Parse position and size
+    pos = data.get("pos", [0, 0])
+    size = data.get("size", [1, 1])
+    if len(pos) != 2:
+        pos = [0, 0]
+    if len(size) != 2:
+        size = [1, 1]
 
-    left, top, width, height = layout
+    left, top = pos
+    width, height = size
 
     # Label text
     label_text = None

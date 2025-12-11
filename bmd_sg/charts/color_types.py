@@ -226,6 +226,30 @@ class AnnotationLayout:
 
 
 @dataclass
+class Canvas:
+    """
+    Chart canvas dimensions and embedding settings.
+
+    The canvas defines the native size of the chart content. When rendering
+    to a larger output frame, the chart is centered with surround color fill.
+
+    Parameters
+    ----------
+    width : int
+        Canvas width in pixels.
+    height : int
+        Canvas height in pixels.
+    surround : tuple[float, float, float]
+        RGB surround color (0.0-1.0) for embedding in larger frames.
+        Default is black (0.0, 0.0, 0.0).
+    """
+
+    width: int = 1920
+    height: int = 1080
+    surround: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+@dataclass
 class ColorValue:
     """
     A color value with its color space.
@@ -306,6 +330,8 @@ class ChartLayout:
         Colorimetry metadata for the chart (illuminant, white point, etc.).
     annotations : AnnotationLayout | None
         Layout positions for annotation stripes.
+    canvas : Canvas | None
+        Canvas dimensions for chart rendering. If None, defaults to 1920x1080.
     """
 
     name: str
@@ -313,6 +339,7 @@ class ChartLayout:
     source: str | None = None
     colorimetry: Colorimetry | None = None
     annotations: AnnotationLayout | None = None
+    canvas: Canvas | None = None
 
     def add_patch(self, patch: Patch) -> None:
         """Add a patch to the layout."""
