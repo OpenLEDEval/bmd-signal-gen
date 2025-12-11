@@ -15,6 +15,7 @@ from bmd_sg.charts.color_types import (
     ChartLayout,
     ColorSpace,
     Illuminant,
+    LightSource,
     PatternType,
     TransferFunction,
 )
@@ -30,6 +31,7 @@ def render_chart(
     transfer_function: TransferFunction = TransferFunction.SRGB,
     reference_white_Y: float = 100.0,
     include_labels: bool = False,
+    simulation_light_source: LightSource | None = None,
 ) -> NDArray[np.uint16]:
     """
     Render a chart layout to a numpy array.
@@ -57,6 +59,9 @@ def render_chart(
         Reference white Y value for XYZ normalization.
     include_labels : bool
         Whether to render text labels on patches.
+    simulation_light_source : LightSource | None
+        If provided, apply chromatic adaptation to simulate how the chart
+        would appear when lit by this light source (CCT or D-series).
 
     Returns
     -------
@@ -85,6 +90,7 @@ def render_chart(
         transfer_function=transfer_function,
         reference_white_Y=reference_white_Y,
         include_labels=include_labels,
+        simulation_light_source=simulation_light_source,
     )
 
     # If output size matches canvas, we're done
@@ -114,6 +120,7 @@ def _render_chart_content(
     transfer_function: TransferFunction,
     reference_white_Y: float,
     include_labels: bool,
+    simulation_light_source: LightSource | None = None,
 ) -> NDArray[np.uint16]:
     """
     Render chart content at specified dimensions.
@@ -146,6 +153,7 @@ def _render_chart_content(
                 transfer_function=transfer_function,
                 reference_white_Y=reference_white_Y,
                 illuminant=illuminant,
+                simulation_light_source=simulation_light_source,
             )
         elif patch.color.space == target_space:
             # Already in target space, just apply transfer function
@@ -183,6 +191,7 @@ def _render_chart_content(
         target_space=target_space,
         transfer_function=transfer_function,
         reference_white_Y=reference_white_Y,
+        simulation_light_source=simulation_light_source,
     )
 
     return image_uint16
@@ -346,6 +355,7 @@ def _add_annotation_stripes(
     target_space: ColorSpace,
     transfer_function: TransferFunction,
     reference_white_Y: float,
+    simulation_light_source: LightSource | None = None,
 ) -> NDArray[np.uint16]:
     """
     Add annotation stripes in the gap regions between chroma and greyscale patches.
@@ -371,6 +381,8 @@ def _add_annotation_stripes(
         Transfer function used for encoding.
     reference_white_Y : float
         Reference white Y value used.
+    simulation_light_source : LightSource | None
+        Light source used for chromatic adaptation simulation.
 
     Returns
     -------
@@ -414,17 +426,27 @@ def _add_annotation_stripes(
     text_color = (255, 255, 255)
 
     # Build annotation strings
-    # Top stripe: Encoding information
+    # Top stripe: Encoding information + simulation status
     colorspace_name = target_space.value
     transfer_name = transfer_function.value
     max_code = 2**bit_depth - 1
     # Currently always full range (0 to max_value)
     range_type = "Full"
 
+    # Determine simulation status string
+    chart_illuminant = layout.colorimetry.illuminant if layout.colorimetry else Illuminant.D65
+    if simulation_light_source is not None:
+        # Active simulation
+        sim_status = f"{simulation_light_source} sim"
+    else:
+        # No simulation - passthrough
+        sim_status = f"{chart_illuminant.value} passthrough"
+
     top_text = (
         f"{colorspace_name}  │  "
         f"{transfer_name}  │  "
-        f"{bit_depth}-bit {range_type} (0-{max_code})"
+        f"{bit_depth}-bit {range_type} (0-{max_code})  │  "
+        f"{sim_status}"
     )
 
     # Bottom stripe: Chart metadata

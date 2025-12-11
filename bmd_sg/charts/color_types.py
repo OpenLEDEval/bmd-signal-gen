@@ -120,6 +120,90 @@ class Illuminant(Enum):
         raise ValueError(f"Unknown illuminant: '{value}'. Valid: {valid}")
 
 
+@dataclass
+class LightSource:
+    """
+    Light source specification for chromatic adaptation simulation.
+
+    Represents a light source that can be used to simulate how an XYZ-defined
+    chart would appear when lit by different illuminants. Supports two modes:
+
+    1. CCT (Correlated Color Temperature) - uses Planckian (blackbody) locus
+       Best for matching cinema/production lights (Arri Skypanel, etc.)
+
+    2. D-series Illuminant - uses CIE daylight locus
+       Best for daylight simulation (D50, D55, D65, etc.)
+
+    Only one of cct or illuminant should be specified.
+
+    Parameters
+    ----------
+    cct : int | None
+        Color temperature in Kelvin (e.g., 5600 for tungsten-balanced daylight).
+        Uses Planckian locus for chromaticity calculation.
+    illuminant : Illuminant | None
+        CIE standard illuminant (e.g., D55, D65).
+        Uses daylight locus for chromaticity calculation.
+
+    Examples
+    --------
+    >>> # For matching a Skypanel at 5600K
+    >>> light = LightSource(cct=5600)
+    >>> xy = light.to_xy()
+
+    >>> # For simulating D55 daylight
+    >>> light = LightSource(illuminant=Illuminant.D55)
+    >>> xy = light.to_xy()
+    """
+
+    cct: int | None = None
+    illuminant: Illuminant | None = None
+
+    def __post_init__(self) -> None:
+        """Validate that exactly one source type is specified."""
+        if self.cct is None and self.illuminant is None:
+            msg = "LightSource requires either cct or illuminant"
+            raise ValueError(msg)
+        if self.cct is not None and self.illuminant is not None:
+            msg = "LightSource cannot have both cct and illuminant"
+            raise ValueError(msg)
+        if self.cct is not None and (self.cct < 1000 or self.cct > 25000):
+            msg = f"CCT must be between 1000K and 25000K, got {self.cct}K"
+            raise ValueError(msg)
+
+    def to_xy(self) -> tuple[float, float]:
+        """
+        Get CIE 1931 xy chromaticity coordinates for this light source.
+
+        Returns
+        -------
+        tuple[float, float]
+            CIE xy chromaticity coordinates.
+        """
+        import colour
+
+        if self.cct is not None:
+            # Use Planckian locus for CCT
+            # Kang 2002 method is accurate for 1667K-25000K
+            xy = colour.temperature.CCT_to_xy(self.cct, method="Kang 2002")
+            return (float(xy[0]), float(xy[1]))
+        else:
+            # Use CIE standard illuminant
+            assert self.illuminant is not None
+            xy = colour.CCS_ILLUMINANTS["CIE 1931 2 Degree Standard Observer"][
+                self.illuminant.value
+            ]
+            return (float(xy[0]), float(xy[1]))
+
+    def __str__(self) -> str:
+        """Human-readable representation."""
+        if self.cct is not None:
+            return f"{self.cct}K (Planckian)"
+        else:
+            assert self.illuminant is not None
+            return f"{self.illuminant.value} (Daylight)"
+
+
 class PatternType(Enum):
     """Pattern types for patch rendering.
 

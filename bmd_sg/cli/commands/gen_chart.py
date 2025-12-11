@@ -13,7 +13,7 @@ import typer
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
 
-from bmd_sg.charts.color_types import ColorSpace, TransferFunction
+from bmd_sg.charts.color_types import ColorSpace, Illuminant, LightSource, TransferFunction
 from bmd_sg.charts.loaders import load_chart
 from bmd_sg.charts.renderer import render_chart
 from bmd_sg.charts.tiff_writer import write_chart_tiff
@@ -76,6 +76,22 @@ def gen_chart_command(
         float,
         typer.Option("--white-nits", help="Reference white luminance in nits"),
     ] = 100.0,
+    light_cct: Annotated[
+        int | None,
+        typer.Option(
+            "--light-cct",
+            help="Simulate light source CCT in Kelvin (e.g., 5600). Uses Planckian locus.",
+            rich_help_panel="Light Source Simulation",
+        ),
+    ] = None,
+    light_illuminant: Annotated[
+        str | None,
+        typer.Option(
+            "--light-illuminant",
+            help="Simulate D-series illuminant (D50, D55, D65, A, E). Uses daylight locus.",
+            rich_help_panel="Light Source Simulation",
+        ),
+    ] = None,
 ) -> None:
     """
     Generate a display-ready test chart TIFF from a YAML definition.
@@ -84,10 +100,14 @@ def gen_chart_command(
     1920x1080). Use --width/--height to embed the chart centered in a larger
     output frame (e.g., 3840x2160 for 4K output).
 
+    Light source simulation applies chromatic adaptation to render the chart
+    as if lit by a different light source than its native illuminant.
+
     Examples:
         bmd-signal-gen gen-chart data/my_chart.yaml -o chart.tif --labels
         bmd-signal-gen gen-chart data/smpte_bars.yaml -o smpte.tif
         bmd-signal-gen gen-chart chart.yaml --width 3840 --height 2160 -o chart_4k.tif
+        bmd-signal-gen gen-chart chart.yaml --light-cct 5600 -o chart_5600k.tif
     """
     # Map CLI options to internal types
     cs_map = {
@@ -105,6 +125,27 @@ def gen_chart_command(
 
     target_space = cs_map[colorspace]
     transfer_func = tf_map[transfer]
+
+    # Validate and create light source for simulation
+    simulation_light_source: LightSource | None = None
+    if light_cct is not None and light_illuminant is not None:
+        console.print("[red]Error:[/red] Cannot specify both --light-cct and --light-illuminant")
+        raise typer.Exit(1)
+
+    if light_cct is not None:
+        try:
+            simulation_light_source = LightSource(cct=light_cct)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from e
+
+    if light_illuminant is not None:
+        try:
+            illum = Illuminant.parse(light_illuminant)
+            simulation_light_source = LightSource(illuminant=illum)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            raise typer.Exit(1) from e
 
     # Derive output path from source if not specified
     if output is None:
@@ -139,6 +180,8 @@ def gen_chart_command(
     console.print(f"  Bit depth: {bit_depth}-bit")
     console.print(f"  Colorspace: {target_space.value}")
     console.print(f"  Transfer: {transfer_func.value}")
+    if simulation_light_source is not None:
+        console.print(f"  [yellow]Light simulation: {simulation_light_source}[/yellow]")
 
     # Render chart
     console.print("Rendering chart...")
@@ -151,6 +194,7 @@ def gen_chart_command(
         transfer_function=transfer_func,
         reference_white_Y=white_nits,
         include_labels=labels,
+        simulation_light_source=simulation_light_source,
     )
 
     # Write TIFF
