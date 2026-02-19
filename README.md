@@ -23,6 +23,12 @@ both capable of full 12-bit RGB output at 1080p30.
 
 ## Features
 
+- **Chart Generation**: Generate calibration charts from YAML definitions with
+  XYZ or RGB color specifications, automatic annotations, and per-patch labels
+- **TIFF Display**: Load pre-generated TIFF charts and display them on DeckLink
+  devices with automatic colorimetry signaling from embedded metadata
+- **Light Source Simulation**: Chromatic adaptation to simulate charts under
+  different lighting conditions (CCT or D-series illuminants)
 - **HDR Support**: Complete HDR metadata with SMPTE ST 2086 and CEA-861.3
   compliance
 - **Multiple Pixel Formats**: Auto-detection and support for 8-bit to 12-bit
@@ -42,7 +48,7 @@ both capable of full 12-bit RGB output at 1080p30.
 - **macOS** (tested on macOS 15.5) or Windows
 - **Blackmagic Design Desktop Video drivers** (latest version)
 - **Blackmagic Design DeckLink SDK 14.4**
-- **Python 3.13+**
+- **Python 3.12+**
 - **UV package manager**
   ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - **clang++** with C++20 support (macOS) or equivalent C++ compiler
@@ -80,6 +86,18 @@ pattern-specific commands:
 # Show available devices and their capabilities
 uv run bmd-signal-gen device-details
 
+# Generate a chart from YAML definition
+uv run bmd-signal-gen gen-chart data/DSC_D65_XYZ_portrait_chart.yaml -o chart.tif
+
+# Generate chart with simulated 5600K lighting
+uv run bmd-signal-gen gen-chart data/chart.yaml --light-cct 5600 -o chart_5600k.tif
+
+# Generate 4K chart (chart embedded in larger frame)
+uv run bmd-signal-gen gen-chart data/chart.yaml --width 3840 --height 2160 -o chart_4k.tif
+
+# Display a pre-generated TIFF on DeckLink device
+uv run bmd-signal-gen display-tiff chart.tif --duration 0  # indefinite
+
 # Generate solid white pattern for 10 seconds
 uv run bmd-signal-gen solid 4095 4095 4095 --duration 10
 
@@ -89,6 +107,23 @@ uv run bmd-signal-gen pat2 4095 0 0 --color2 0 4095 0 --duration 5
 # Generate four-color checkerboard with HDR settings
 uv run bmd-signal-gen --device 1 --eotf HLG --max-cll 4000 pat4 4095 0 0 --color2 0 4095 0 --color3 0 0 4095 --color4 4095 4095 4095
 ```
+
+### Chart Generation (`gen-chart`)
+
+Generate calibration charts from YAML definitions:
+
+- **Input**: YAML file with colorimetry, patch definitions, and layout
+- **Output**: 16-bit TIFF with embedded metadata for colorimetry signaling
+- **Annotations**: Encoding info stripes always included
+- **Labels**: Per-patch labels on by default (`--no-labels` to suppress)
+
+### TIFF Display (`display-tiff`)
+
+Display pre-generated TIFF files on DeckLink devices:
+
+- Automatically reads embedded colorimetry metadata
+- Configures HDMI/SDI signaling (EOTF, primaries, range)
+- Supports indefinite display (`--duration 0`) or timed
 
 ### Global Options
 
@@ -103,6 +138,8 @@ uv run bmd-signal-gen --device 1 --eotf HLG --max-cll 4000 pat4 4095 0 0 --color
 
 ### Available Commands
 
+- **`gen-chart`**: Generate TIFF chart from YAML definition
+- **`display-tiff`**: Display a TIFF file on DeckLink device
 - **`solid`**: Single solid color patterns
 - **`pat2`**: Two-color checkerboard patterns
 - **`pat3`**: Three-color checkerboard patterns

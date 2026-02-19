@@ -70,8 +70,8 @@ def gen_chart_command(
     ] = 12,
     labels: Annotated[
         bool,
-        typer.Option("--labels/--no-labels", help="Add text labels for measurements"),
-    ] = False,
+        typer.Option("--labels/--no-labels", help="Add per-patch text labels (annotations always shown)"),
+    ] = True,
     white_nits: Annotated[
         float,
         typer.Option("--white-nits", help="Reference white luminance in nits"),

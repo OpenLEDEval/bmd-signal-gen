@@ -1,0 +1,38 @@
+# SMPTE RP 219-2002 Color Bars (75%)
+# Reference: ITU-R BT.709 primaries
+
+name: "SMPTE RP 219 Color Bars (75%)"
+version: "1.0"
+
+colorimetry:
+  color_space: "Rec.709"
+  white_point: [0.3127, 0.329]
+
+patches:
+  - name: "Gray 75%"
+    color: [0.75, 0.75, 0.75]
+    layout: [0.000, 0.0, 0.143, 1.0]
+
+  - name: "Yellow"
+    color: [0.75, 0.75, 0.0]
+    layout: [0.143, 0.0, 0.143, 1.0]
+
+  - name: "Cyan"
+    color: [0.0, 0.75, 0.75]
+    layout: [0.286, 0.0, 0.143, 1.0]
+
+  - name: "Green"
+    color: [0.0, 0.75, 0.0]
+    layout: [0.429, 0.0, 0.143, 1.0]
+
+  - name: "Magenta"
+    color: [0.75, 0.0, 0.75]
+    layout: [0.572, 0.0, 0.143, 1.0]
+
+  - name: "Red"
+    color: [0.75, 0.0, 0.0]
+    layout: [0.715, 0.0, 0.143, 1.0]
+
+  - name: "Blue"
+    color: [0.0, 0.0, 0.75]
+    layout: [0.858, 0.0, 0.142, 1.0]

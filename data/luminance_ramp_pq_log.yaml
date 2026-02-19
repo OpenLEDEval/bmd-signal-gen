@@ -1,0 +1,241 @@
+# HDR PQ Luminance Ramp (Log Scale) for Spectroradiometer Measurement
+# Logarithmic steps across PQ range: 1 cd/m² steps 0-10, 10 cd/m² steps 10-100, etc.
+# XYZ colorspace with D65 neutral patches, arranged in rows by decade
+
+name: HDR PQ Luminance Ramp (Log Scale)
+version: '1.0'
+
+colorimetry:
+  color_space: XYZ
+  illuminant: D65
+  white_point: [0.3127, 0.329]
+  reference_white_Y: 10000.0  # cd/m² PQ absolute scale
+
+# Annotation stripes - narrower for multi-row layout
+annotations:
+  top_stripe:
+    y_start: 0.02
+    y_end: 0.05
+  bottom_stripe:
+    y_start: 0.95
+    y_end: 0.98
+
+# Size constants for patch layout
+sizes:
+  row1_patch: &sz_row1 [0.08, 0.18]
+  decade_patch: &sz_decade [0.089, 0.18]
+
+patches:
+  # === Row 1: 0-10 cd/m² in 1 cd/m² steps (11 patches) ===
+  # XYZ neutral (D65): X = Y * 0.9505, Z = Y * 1.0888
+  
+  - name: "0"
+    color: [0.0, 0.0, 0.0]
+    pos: [0.01, 0.07]
+    size: *sz_row1
+    
+  - name: "1"
+    color: [0.9505, 1.0, 1.0888]
+    pos: [0.10, 0.07]
+    size: *sz_row1
+
+  - name: "2"
+    color: [1.901, 2.0, 2.1776]
+    pos: [0.19, 0.07]
+    size: *sz_row1
+
+  - name: "3"
+    color: [2.8515, 3.0, 3.2664]
+    pos: [0.28, 0.07]
+    size: *sz_row1
+
+  - name: "4"
+    color: [3.802, 4.0, 4.3552]
+    pos: [0.37, 0.07]
+    size: *sz_row1
+
+  - name: "5"
+    color: [4.7525, 5.0, 5.444]
+    pos: [0.46, 0.07]
+    size: *sz_row1
+
+  - name: "6"
+    color: [5.703, 6.0, 6.5328]
+    pos: [0.55, 0.07]
+    size: *sz_row1
+
+  - name: "7"
+    color: [6.6535, 7.0, 7.6216]
+    pos: [0.64, 0.07]
+    size: *sz_row1
+
+  - name: "8"
+    color: [7.604, 8.0, 8.7104]
+    pos: [0.73, 0.07]
+    size: *sz_row1
+
+  - name: "9"
+    color: [8.5545, 9.0, 9.7992]
+    pos: [0.82, 0.07]
+    size: *sz_row1
+
+  - name: "10"
+    color: [9.505, 10.0, 10.888]
+    pos: [0.91, 0.07]
+    size: *sz_row1
+
+  # === Row 2: 10-100 cd/m² in 10 cd/m² steps (10 patches) ===
+  
+  - name: "10"
+    color: [9.505, 10.0, 10.888]
+    pos: [0.01, 0.27]
+    size: *sz_decade
+
+  - name: "20"
+    color: [19.01, 20.0, 21.776]
+    pos: [0.10, 0.27]
+    size: *sz_decade
+
+  - name: "30"
+    color: [28.515, 30.0, 32.664]
+    pos: [0.19, 0.27]
+    size: *sz_decade
+
+  - name: "40"
+    color: [38.02, 40.0, 43.552]
+    pos: [0.28, 0.27]
+    size: *sz_decade
+
+  - name: "50"
+    color: [47.525, 50.0, 54.44]
+    pos: [0.37, 0.27]
+    size: *sz_decade
+
+  - name: "60"
+    color: [57.03, 60.0, 65.328]
+    pos: [0.46, 0.27]
+    size: *sz_decade
+
+  - name: "70"
+    color: [66.535, 70.0, 76.216]
+    pos: [0.55, 0.27]
+    size: *sz_decade
+
+  - name: "80"
+    color: [76.04, 80.0, 87.104]
+    pos: [0.64, 0.27]
+    size: *sz_decade
+
+  - name: "90"
+    color: [85.545, 90.0, 97.992]
+    pos: [0.73, 0.27]
+    size: *sz_decade
+
+  - name: "100"
+    color: [95.05, 100.0, 108.88]
+    pos: [0.82, 0.27]
+    size: *sz_decade
+
+  # === Row 3: 100-1000 cd/m² in 100 cd/m² steps (10 patches) ===
+  
+  - name: "100"
+    color: [95.05, 100.0, 108.88]
+    pos: [0.01, 0.47]
+    size: *sz_decade
+
+  - name: "200"
+    color: [190.1, 200.0, 217.76]
+    pos: [0.10, 0.47]
+    size: *sz_decade
+
+  - name: "300"
+    color: [285.15, 300.0, 326.64]
+    pos: [0.19, 0.47]
+    size: *sz_decade
+
+  - name: "400"
+    color: [380.2, 400.0, 435.52]
+    pos: [0.28, 0.47]
+    size: *sz_decade
+
+  - name: "500"
+    color: [475.25, 500.0, 544.4]
+    pos: [0.37, 0.47]
+    size: *sz_decade
+
+  - name: "600"
+    color: [570.3, 600.0, 653.28]
+    pos: [0.46, 0.47]
+    size: *sz_decade
+
+  - name: "700"
+    color: [665.35, 700.0, 762.16]
+    pos: [0.55, 0.47]
+    size: *sz_decade
+
+  - name: "800"
+    color: [760.4, 800.0, 871.04]
+    pos: [0.64, 0.47]
+    size: *sz_decade
+
+  - name: "900"
+    color: [855.45, 900.0, 979.92]
+    pos: [0.73, 0.47]
+    size: *sz_decade
+
+  - name: "1000"
+    color: [950.5, 1000.0, 1088.8]
+    pos: [0.82, 0.47]
+    size: *sz_decade
+
+  # === Row 4: 1000-10000 cd/m² in 1000 cd/m² steps (10 patches) ===
+  
+  - name: "1000"
+    color: [950.5, 1000.0, 1088.8]
+    pos: [0.01, 0.67]
+    size: *sz_decade
+
+  - name: "2000"
+    color: [1901.0, 2000.0, 2177.6]
+    pos: [0.10, 0.67]
+    size: *sz_decade
+
+  - name: "3000"
+    color: [2851.5, 3000.0, 3266.4]
+    pos: [0.19, 0.67]
+    size: *sz_decade
+
+  - name: "4000"
+    color: [3802.0, 4000.0, 4355.2]
+    pos: [0.28, 0.67]
+    size: *sz_decade
+
+  - name: "5000"
+    color: [4752.5, 5000.0, 5444.0]
+    pos: [0.37, 0.67]
+    size: *sz_decade
+
+  - name: "6000"
+    color: [5703.0, 6000.0, 6532.8]
+    pos: [0.46, 0.67]
+    size: *sz_decade
+
+  - name: "7000"
+    color: [6653.5, 7000.0, 7621.6]
+    pos: [0.55, 0.67]
+    size: *sz_decade
+
+  - name: "8000"
+    color: [7604.0, 8000.0, 8710.4]
+    pos: [0.64, 0.67]
+    size: *sz_decade
+
+  - name: "9000"
+    color: [8554.5, 9000.0, 9799.2]
+    pos: [0.73, 0.67]
+    size: *sz_decade
+
+  - name: "10000"
+    color: [9505.0, 10000.0, 10888.0]
+    pos: [0.82, 0.67]
+    size: *sz_decade

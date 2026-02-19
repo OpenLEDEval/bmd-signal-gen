@@ -1,0 +1,119 @@
+# Code-Value Linear Luminance Ramp
+# Patches with evenly-spaced code values (linear on waveform monitor)
+# Single horizontal row for proper waveform display
+# Includes gamma-invariant checkerboard patches for 25%, 50%, 75% luminance validation
+
+name: Luminance Ramp (Code-Value Linear)
+version: '1.0'
+
+colorimetry:
+  color_space: Rec.709
+  illuminant: D65
+  white_point: [0.3127, 0.329]
+  reference_white_Y: 100.0
+
+# Annotation stripes
+annotations:
+  top_stripe:
+    y_start: 0.03
+    y_end: 0.07
+  bottom_stripe:
+    y_start: 0.93
+    y_end: 0.97
+
+# Size constants for patch layout
+sizes:
+  ramp_patch: &sz_ramp [0.075, 0.40]
+  ramp_end: &sz_ramp_end [0.08, 0.40]
+  checker: &sz_checker [0.18, 0.28]
+
+patches:
+  # === Main grayscale ramp: single horizontal row for waveform display ===
+  # 13 steps: 0%, 10%, 20%, 25%, 30%, 40%, 50%, 60%, 70%, 75%, 80%, 90%, 100%
+  # Left-to-right = dark-to-light = ascending staircase on waveform
+  
+  - name: "CV 0%"
+    color: [0.0, 0.0, 0.0]
+    pos: [0.01, 0.15]
+    size: *sz_ramp
+    
+  - name: "CV 10%"
+    color: [0.10, 0.10, 0.10]
+    pos: [0.085, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 20%"
+    color: [0.20, 0.20, 0.20]
+    pos: [0.16, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 25%"
+    color: [0.25, 0.25, 0.25]
+    pos: [0.235, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 30%"
+    color: [0.30, 0.30, 0.30]
+    pos: [0.31, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 40%"
+    color: [0.40, 0.40, 0.40]
+    pos: [0.385, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 50%"
+    color: [0.50, 0.50, 0.50]
+    pos: [0.46, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 60%"
+    color: [0.60, 0.60, 0.60]
+    pos: [0.535, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 70%"
+    color: [0.70, 0.70, 0.70]
+    pos: [0.61, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 75%"
+    color: [0.75, 0.75, 0.75]
+    pos: [0.685, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 80%"
+    color: [0.80, 0.80, 0.80]
+    pos: [0.76, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 90%"
+    color: [0.90, 0.90, 0.90]
+    pos: [0.835, 0.15]
+    size: *sz_ramp
+
+  - name: "CV 100%"
+    color: [1.0, 1.0, 1.0]
+    pos: [0.91, 0.15]
+    size: *sz_ramp_end
+
+  # === Gamma-invariant checkerboard patches (below ramp) ===
+  # These should read exactly 25%, 50%, 75% luminance regardless of display gamma
+  
+  - name: "25% Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_25
+    pos: [0.20, 0.60]
+    size: *sz_checker
+    
+  - name: "50% Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_50
+    pos: [0.41, 0.60]
+    size: *sz_checker
+    
+  - name: "75% Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_75
+    pos: [0.62, 0.60]
+    size: *sz_checker

@@ -5,7 +5,7 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 ## Architecture
 
 **Core Components**: C++ Core (`cpp/`) + Python Library (`bmd_sg/`) + CLI Tool + REST API  
-**Technology**: Python 3.13+, ctypes, NumPy, Typer, DeckLink SDK 14.4, UV package manager
+**Technology**: Python 3.12+, ctypes, NumPy, Typer, DeckLink SDK 14.4, UV package manager
 
 ## Key Files & Components
 

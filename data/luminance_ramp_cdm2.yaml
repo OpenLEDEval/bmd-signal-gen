@@ -1,0 +1,125 @@
+# cd/m² Linear Luminance Ramp for Spectroradiometer Measurement
+# Patches with evenly-spaced luminance in cd/m² (linear light output)
+# Single horizontal row for waveform display
+# XYZ colorspace with D65 neutral patches
+
+name: Luminance Ramp (cd/m² Linear)
+version: '1.0'
+
+colorimetry:
+  color_space: XYZ
+  illuminant: D65
+  white_point: [0.3127, 0.329]
+  reference_white_Y: 100.0  # cd/m² peak for SDR
+
+# Annotation stripes
+annotations:
+  top_stripe:
+    y_start: 0.03
+    y_end: 0.07
+  bottom_stripe:
+    y_start: 0.93
+    y_end: 0.97
+
+# Size constants for patch layout
+sizes:
+  ramp_patch: &sz_ramp [0.075, 0.40]
+  ramp_end: &sz_ramp_end [0.08, 0.40]
+  checker_surround: &sz_checker_surround [0.18, 0.28]
+  checker: &sz_checker [0.10, 0.10]
+
+patches:
+  # === Main grayscale ramp: single horizontal row for waveform display ===
+  # XYZ neutral (D65): X = Y * 0.9505, Z = Y * 1.0888
+  # 13 steps: 0, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100 cd/m²
+  
+  - name: "0 cd/m²"
+    color: [0.0, 0.0, 0.0]
+    pos: [0.01, 0.15]
+    size: *sz_ramp
+    
+  - name: "10 cd/m²"
+    color: [9.505, 10.0, 10.888]
+    pos: [0.085, 0.15]
+    size: *sz_ramp
+
+  - name: "20 cd/m²"
+    color: [19.01, 20.0, 21.776]
+    pos: [0.16, 0.15]
+    size: *sz_ramp
+
+  - name: "30 cd/m²"
+    color: [28.515, 30.0, 32.664]
+    pos: [0.31, 0.15]
+    size: *sz_ramp
+
+  - name: "40 cd/m²"
+    color: [38.02, 40.0, 43.552]
+    pos: [0.385, 0.15]
+    size: *sz_ramp
+
+  - name: "50 cd/m²"
+    color: [47.525, 50.0, 54.44]
+    pos: [0.46, 0.15]
+    size: *sz_ramp
+
+  - name: "60 cd/m²"
+    color: [57.03, 60.0, 65.328]
+    pos: [0.535, 0.15]
+    size: *sz_ramp
+
+  - name: "70 cd/m²"
+    color: [66.535, 70.0, 76.216]
+    pos: [0.61, 0.15]
+    size: *sz_ramp
+
+  - name: "80 cd/m²"
+    color: [76.04, 80.0, 87.104]
+    pos: [0.76, 0.15]
+    size: *sz_ramp
+
+  - name: "90 cd/m²"
+    color: [85.545, 90.0, 97.992]
+    pos: [0.835, 0.15]
+    size: *sz_ramp
+
+  - name: "100 cd/m²"
+    color: [95.05, 100.0, 108.88]
+    pos: [0.91, 0.15]
+    size: *sz_ramp_end
+
+  # === Gamma-invariant checkerboard patches (below ramp) ===
+  # Should measure 25, 50, 75 cd/m² respectively (with 100 cd/m² peak white)
+  
+  - name: "25 cd/m²"
+    color: [23.7625, 25.0, 27.22]
+    pos: [0.20, 0.60]
+    size: *sz_checker_surround
+
+  - name: "25 cd/m² Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_25
+    pos: [0.20, 0.60]
+    size: *sz_checker
+    
+  - name: "50 cd/m²"
+    color: [47.525, 50.0, 54.44]
+    pos: [0.41, 0.60]
+    size: *sz_checker_surround
+
+  - name: "50 cd/m² Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_50
+    pos: [0.41, 0.60]
+    size: *sz_checker
+    
+  - name: "75 cd/m²"
+    color: [71.2875, 75.0, 81.66]
+    pos: [0.62, 0.60]
+    size: *sz_checker_surround
+
+  - name: "75 cd/m² Checker"
+    color: [0.0, 0.0, 0.0]  # ignored for patterns
+    pattern: checkerboard_75
+    pos: [0.62, 0.60]
+    size: *sz_checker

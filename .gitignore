@@ -1,5 +1,5 @@
 # data files & outputs
-data/
+#data/
 *.tif
 *.png
 
