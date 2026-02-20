@@ -47,7 +47,7 @@ both capable of full 12-bit RGB output at 1080p30.
 
 - **macOS** (tested on macOS 15.5) or Windows
 - **Blackmagic Design Desktop Video drivers** (latest version)
-- **Blackmagic Design DeckLink SDK 14.4**
+- **Blackmagic Design DeckLink SDK 15.3**
 - **Python 3.12+**
 - **UV package manager**
   ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))

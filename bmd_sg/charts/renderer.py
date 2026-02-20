@@ -10,7 +10,6 @@ from numpy.typing import NDArray
 from PIL import Image, ImageDraw, ImageFont
 
 from bmd_sg.charts.color_types import (
-    AnnotationLayout,
     Canvas,
     ChartLayout,
     ColorSpace,
@@ -434,7 +433,9 @@ def _add_annotation_stripes(
     range_type = "Full"
 
     # Determine simulation status string
-    chart_illuminant = layout.colorimetry.illuminant if layout.colorimetry else Illuminant.D65
+    chart_illuminant = (
+        layout.colorimetry.illuminant if layout.colorimetry else Illuminant.D65
+    )
     if simulation_light_source is not None:
         # Active simulation
         sim_status = f"{simulation_light_source} sim"
@@ -451,7 +452,9 @@ def _add_annotation_stripes(
 
     # Bottom stripe: Chart metadata
     chart_name = layout.name if layout.name else "Unnamed Chart"
-    illuminant_name = layout.colorimetry.illuminant.value if layout.colorimetry else "D65"
+    illuminant_name = (
+        layout.colorimetry.illuminant.value if layout.colorimetry else "D65"
+    )
     white_info = f"Illuminant: {illuminant_name}  │  Ref White Y: {reference_white_Y}"
 
     bottom_text = f"{chart_name}  │  {white_info}"
@@ -479,4 +482,3 @@ def _add_annotation_stripes(
     result = (result_8bit.astype(np.uint16) << (bit_depth - 8)).astype(np.uint16)
 
     return result
-

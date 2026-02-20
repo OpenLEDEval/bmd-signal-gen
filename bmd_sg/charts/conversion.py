@@ -9,7 +9,13 @@ import colour
 import numpy as np
 from numpy.typing import NDArray
 
-from bmd_sg.charts.color_types import ColorSpace, ColorValue, Illuminant, LightSource, TransferFunction
+from bmd_sg.charts.color_types import (
+    ColorSpace,
+    ColorValue,
+    Illuminant,
+    LightSource,
+    TransferFunction,
+)
 
 
 def apply_chromatic_adaptation(
@@ -182,7 +188,9 @@ def xyz_to_display_rgb(
         # PQ expects absolute luminance in cd/m², need to scale
         # For now, assume reference_white maps to SDR white level
         encoded_rgb = colour.cctf_encoding(
-            linear_rgb, function="ST 2084", L_p=10000  # noqa: N803
+            linear_rgb,
+            function="ST 2084",
+            L_p=10000,
         )
     elif transfer_function == TransferFunction.HLG:
         encoded_rgb = colour.cctf_encoding(linear_rgb, function="HLG")

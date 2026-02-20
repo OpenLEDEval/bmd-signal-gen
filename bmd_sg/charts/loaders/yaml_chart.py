@@ -135,7 +135,11 @@ def load_chart(
     if canvas_data:
         surround_list = canvas_data.get("surround", [0.0, 0.0, 0.0])
         if len(surround_list) >= 3:
-            surround = (float(surround_list[0]), float(surround_list[1]), float(surround_list[2]))
+            surround = (
+                float(surround_list[0]),
+                float(surround_list[1]),
+                float(surround_list[2]),
+            )
         else:
             surround = (0.0, 0.0, 0.0)
 

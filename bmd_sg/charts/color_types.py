@@ -428,4 +428,3 @@ class ChartLayout:
     def add_patch(self, patch: Patch) -> None:
         """Add a patch to the layout."""
         self.patches.append(patch)
-

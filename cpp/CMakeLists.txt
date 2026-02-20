@@ -18,7 +18,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Platform-specific configuration
 if(APPLE)
     # macOS-specific settings
-    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 14.4/Mac/include")
+    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 15.3/Mac/include")
     set(OUTPUT_NAME "libdecklink.dylib")
     set(DECKLINK_FRAMEWORKS 
         CoreFoundation
@@ -27,12 +27,12 @@ if(APPLE)
     set(FRAMEWORK_SEARCH_PATH "/Library/Frameworks")
 elseif(WIN32)
     # Windows-specific settings
-    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 14.4/Win/include")
+    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 15.3/Win/include")
     set(OUTPUT_NAME "decklink.dll")
     # Windows will need different linking setup
 elseif(UNIX)
     # Linux-specific settings
-    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 14.4/Linux/include")
+    set(DECKLINK_SDK_PATH "Blackmagic DeckLink SDK 15.3/Linux/include")
     set(OUTPUT_NAME "libdecklink.so")
     # Linux will need different linking setup
 endif()

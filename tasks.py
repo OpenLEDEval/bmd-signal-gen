@@ -819,7 +819,7 @@ def cpp_lint(ctx: Context, fix: bool = False) -> None:
                 "--",
                 "-std=c++20",
                 "-I",
-                "cpp/Blackmagic DeckLink SDK 14.4/Mac/include",
+                "cpp/Blackmagic DeckLink SDK 15.3/Mac/include",
             ]
         )
 

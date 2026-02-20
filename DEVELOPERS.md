@@ -5,10 +5,10 @@ Setup instructions and development standards for the BMD Signal Generator projec
 ## Quick Start
 
 ### Prerequisites
-- **Python 3.12+**, **UV package manager**, **Desktop Video drivers**, **DeckLink SDK 14.4**, **clang++ with C++20**
+- **Python 3.12+**, **UV package manager**, **Desktop Video drivers**, **DeckLink SDK 15.3**, **clang++ with C++20**
 
 ### DeckLink SDK Setup
-1. Download DeckLink SDK 14.4 from [Blackmagic Design Support](https://www.blackmagicdesign.com/support/download/af37b96d1b9a4a1cbe3f5d4e3b7c8cdb/Mac%20OS%20X)
+1. Download DeckLink SDK 15.3 from [Blackmagic Design Support](https://www.blackmagicdesign.com/support/download/af37b96d1b9a4a1cbe3f5d4e3b7c8cdb/Mac%20OS%20X)
 2. Place headers: `mkdir -p cpp/include/DeckLinkAPI && cp /path/to/sdk/Mac/include/* cpp/include/DeckLinkAPI/`
 
 ### Project Setup

@@ -63,7 +63,7 @@
     "**/build/**",
     "**/dist/**",
     "**/__pycache__/**",
-    "**/cpp/Blackmagic DeckLink SDK 14.4/**",
+    "**/cpp/Blackmagic DeckLink SDK 15.3/**",
     "**/.memories/**",
     "**/docs/**",
     "**/sandbox/**",

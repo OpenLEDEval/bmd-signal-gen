@@ -28,7 +28,7 @@ _mock_config = {
     ],
     "hdr_support": True,
     "driver_version": "12.8.1",
-    "sdk_version": "14.4.0",
+    "sdk_version": "15.3.0",
 }
 
 
@@ -346,7 +346,7 @@ def reset_mock_state() -> None:
             ],
             "hdr_support": True,
             "driver_version": "12.8.1",
-            "sdk_version": "14.4.0",
+            "sdk_version": "15.3.0",
         }
     )
 

@@ -6,7 +6,7 @@ Writes 16-bit TIFF files with chart metadata in the ImageDescription tag.
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -94,7 +94,7 @@ def write_chart_tiff(
         transfer_function=transfer_function.value,
         bit_depth=bit_depth,
         reference_white_nits=reference_white_nits,
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
         patches=patch_info,
     )
 

@@ -8,7 +8,7 @@ Before installing BMD Signal Generator, ensure you have:
 
 * **Python 3.12+** installed
 * **Blackmagic Design Desktop Video drivers** (latest version)
-* **Blackmagic Design DeckLink SDK 14.4** 
+* **Blackmagic Design DeckLink SDK 15.3** 
 * **C++ compiler** with C++20 support
 
 System Dependencies
@@ -24,7 +24,7 @@ macOS
 2. Download and install Blackmagic Desktop Video drivers from the 
    `Blackmagic Design Support page <https://www.blackmagicdesign.com/support/>`_
 
-3. Download the DeckLink SDK 14.4 and extract headers to the project
+3. Download the DeckLink SDK 15.3 and extract headers to the project
 
 Linux
 ^^^^^

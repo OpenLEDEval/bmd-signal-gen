@@ -95,7 +95,7 @@ class PixelFormatType(str, Enum):
     """
 
     # This table is meant to be in line with "Enum BMDPixelFormat" in
-    # cpp/Blackmagic DeckLink SDK 14.4/Mac/include/DeckLinkAPIModes.h
+    # cpp/Blackmagic DeckLink SDK 15.3/Mac/include/DeckLinkAPIModes.h
     # TODO: Add field to indicate library support
     # TODO: Add human readable primary selections string and fall back on BMD
     # string in case the human readable string isn't set. Ensure parse can refer
@@ -1006,7 +1006,7 @@ def get_decklink_sdk_version() -> str:
     --------
     >>> version = get_decklink_sdk_version()
     >>> print(f"SDK version: {version}")
-    SDK version: 14.4.0
+    SDK version: 15.3.0
 
     Notes
     -----

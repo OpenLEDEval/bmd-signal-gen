@@ -84,9 +84,7 @@ def display_tiff_command(
     )
     settings.eotf = transfer_function_to_eotf(metadata.transfer_function)
 
-    console.print(
-        f"\n[bold]Configuring HDMI/SDI signaling from TIFF metadata:[/bold]"
-    )
+    console.print("\n[bold]Configuring HDMI/SDI signaling from TIFF metadata:[/bold]")
     console.print(f"  EOTF: {settings.eotf}")
     console.print(f"  Primaries: {metadata.colorspace}")
 

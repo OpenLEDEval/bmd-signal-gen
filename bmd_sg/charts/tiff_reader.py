@@ -112,7 +112,7 @@ def load_chart_tiff(
             if page.description:
                 try:
                     metadata = TiffMetadata.from_json(page.description)
-                except (json.JSONDecodeError, KeyError) as e:
+                except (json.JSONDecodeError, KeyError):
                     # Metadata parsing failed, use defaults
                     # This allows loading TIFFs without our custom metadata
                     pass

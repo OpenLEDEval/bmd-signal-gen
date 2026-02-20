@@ -163,7 +163,7 @@ The project uses a C++ core with Python bindings:
 **C++ Component:**
   * Located in ``cpp/`` directory
   * Compiles to ``libdecklink.dylib`` (macOS) or equivalent
-  * Uses DeckLink SDK 14.4
+  * Uses DeckLink SDK 15.3
   * Handles low-level device operations and pixel format conversion
 
 **Python Component:**

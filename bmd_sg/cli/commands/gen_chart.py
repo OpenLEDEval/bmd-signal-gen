@@ -13,7 +13,12 @@ import typer
 from PIL import Image, ImageDraw, ImageFont
 from rich.console import Console
 
-from bmd_sg.charts.color_types import ColorSpace, Illuminant, LightSource, TransferFunction
+from bmd_sg.charts.color_types import (
+    ColorSpace,
+    Illuminant,
+    LightSource,
+    TransferFunction,
+)
 from bmd_sg.charts.loaders import load_chart
 from bmd_sg.charts.renderer import render_chart
 from bmd_sg.charts.tiff_writer import write_chart_tiff
@@ -46,15 +51,21 @@ def gen_chart_command(
     ],
     output: Annotated[
         Path | None,
-        typer.Option("--output", "-o", help="Output TIFF file path (default: <source>.tif)"),
+        typer.Option(
+            "--output", "-o", help="Output TIFF file path (default: <source>.tif)"
+        ),
     ] = None,
     width: Annotated[
         int | None,
-        typer.Option("--width", "-w", help="Output frame width (default: chart canvas width)"),
+        typer.Option(
+            "--width", "-w", help="Output frame width (default: chart canvas width)"
+        ),
     ] = None,
     height: Annotated[
         int | None,
-        typer.Option("--height", "-h", help="Output frame height (default: chart canvas height)"),
+        typer.Option(
+            "--height", "-h", help="Output frame height (default: chart canvas height)"
+        ),
     ] = None,
     colorspace: Annotated[
         ColorSpaceOption,
@@ -70,7 +81,10 @@ def gen_chart_command(
     ] = 12,
     labels: Annotated[
         bool,
-        typer.Option("--labels/--no-labels", help="Add per-patch text labels (annotations always shown)"),
+        typer.Option(
+            "--labels/--no-labels",
+            help="Add per-patch text labels (annotations always shown)",
+        ),
     ] = True,
     white_nits: Annotated[
         float,
@@ -129,7 +143,9 @@ def gen_chart_command(
     # Validate and create light source for simulation
     simulation_light_source: LightSource | None = None
     if light_cct is not None and light_illuminant is not None:
-        console.print("[red]Error:[/red] Cannot specify both --light-cct and --light-illuminant")
+        console.print(
+            "[red]Error:[/red] Cannot specify both --light-cct and --light-illuminant"
+        )
         raise typer.Exit(1)
 
     if light_cct is not None:
@@ -270,7 +286,16 @@ def _write_preview_png(
 
     # Draw black outline (stroke) by drawing text offset in all directions
     outline_color = (0, 0, 0, 200)
-    for ox, oy in [(-2, -2), (-2, 2), (2, -2), (2, 2), (-2, 0), (2, 0), (0, -2), (0, 2)]:
+    for ox, oy in [
+        (-2, -2),
+        (-2, 2),
+        (2, -2),
+        (2, 2),
+        (-2, 0),
+        (2, 0),
+        (0, -2),
+        (0, 2),
+    ]:
         txt_draw.text((tx + ox, ty + oy), watermark_text, font=font, fill=outline_color)
 
     # Draw red text on top
