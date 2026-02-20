@@ -3,11 +3,11 @@ name = "bmd-signal-generator"
 version = "0.2.0"
 description = "Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with HDR metadata support"
 authors = [
-    { name = "Ritchie Argue", email = "ritchie@doequalsglory.com" },
+    { name = "Ritchie Argue", email = "4462072+repentsinner@users.noreply.github.com" },
     { name = "Tucker Downs", email = "tucker@tjdcs.dev" },
 ]
 maintainers = [
-    { name = "Ritchie Argue", email = "doequalsglory@gmail.com" },
+    { name = "Ritchie Argue", email = "4462072+repentsinner@users.noreply.github.com" },
     { name = "Tucker Downs", email = "tucker@tjdcs.dev" },
 ]
 readme = "README.md"
@@ -53,7 +53,7 @@ dependencies = [
     "requests>=2.32.4",
     "colour-science>=0.4.6",
     "tifffile>=2024.8.30",
-    "pillow>=11.0.0",
+    "pillow>=12.1.1",
     "scipy>=1.16.3",
 ]
 
