@@ -3,8 +3,17 @@
 *.tif
 *.png
 
-# Libraries
-Blackmagic\ DeckLink\ SDK\ */
+# Libraries - ignore SDK except platform include directories
+**/Blackmagic\ DeckLink\ SDK\ */*
+!**/Blackmagic\ DeckLink\ SDK\ */Linux/
+!**/Blackmagic\ DeckLink\ SDK\ */Mac/
+!**/Blackmagic\ DeckLink\ SDK\ */Win/
+**/Blackmagic\ DeckLink\ SDK\ */Linux/*
+**/Blackmagic\ DeckLink\ SDK\ */Mac/*
+**/Blackmagic\ DeckLink\ SDK\ */Win/*
+!**/Blackmagic\ DeckLink\ SDK\ */Linux/include/
+!**/Blackmagic\ DeckLink\ SDK\ */Mac/include/
+!**/Blackmagic\ DeckLink\ SDK\ */Win/include/
 .toolchain/
 
 # BEGIN gitignore.io GENERATED IGNORE 
