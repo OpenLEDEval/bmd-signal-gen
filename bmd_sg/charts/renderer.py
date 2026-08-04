@@ -170,8 +170,11 @@ def _render_chart_content(
             # Need cross-colorspace conversion - for now just use values directly
             rgb = patch.color.values
 
-        # Fill patch area based on pattern type
-        _fill_patch_region(image, x0, y0, x1, y1, rgb, patch.pattern)
+        # Fill patch area based on pattern type. asarray normalizes the
+        # dtype across the conversion branches (colour-science returns
+        # loosely-typed arrays).
+        rgb_f64 = np.asarray(rgb, dtype=np.float64)
+        _fill_patch_region(image, x0, y0, x1, y1, rgb_f64, patch.pattern)
 
     # Convert to uint16
     image_uint16 = np.clip(image * max_value, 0, max_value).astype(np.uint16)
@@ -208,7 +211,7 @@ def _fill_patch_region(
     """
     Fill a patch region with solid color or checkerboard pattern.
 
-    For checkerboard patterns, generates 2×2 pixel repeating patterns
+    For checkerboard patterns, generates 2x2 pixel repeating patterns
     using 100% white and 0% black to produce gamma-invariant luminance.
 
     Parameters
@@ -242,8 +245,8 @@ def _fill_patch_region(
         y_coords = np.arange(height).reshape(-1, 1)
         x_coords = np.arange(width).reshape(1, -1)
 
-        # Compute parity for each pixel (0-3 for 2×2 pattern)
-        # Position in 2×2 tile: (y % 2) * 2 + (x % 2)
+        # Compute parity for each pixel (0-3 for 2x2 pattern)
+        # Position in 2x2 tile: (y % 2) * 2 + (x % 2)
         tile_pos = (y_coords % 2) * 2 + (x_coords % 2)
 
         # Define which positions are white for each pattern

@@ -7,6 +7,7 @@ that outputs test patterns with HDR metadata support.
 
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
+    DeckLinkOutput,
     DecklinkSettings,
     EOTFType,
     GamutChromaticities,
@@ -23,6 +24,7 @@ __all__ = [
     "ROI",
     "BMDDeckLink",
     "ColorRangeError",
+    "DeckLinkOutput",
     "DecklinkSettings",
     "EOTFType",
     "GamutChromaticities",

@@ -17,6 +17,8 @@ from bmd_sg.cli.commands.checkerboard_commands import (
     checkerboard4_command,
 )
 from bmd_sg.cli.commands.device_details import device_details_command
+from bmd_sg.cli.commands.display_tiff import display_tiff_command
+from bmd_sg.cli.commands.gen_chart import gen_chart_command
 from bmd_sg.cli.commands.solid import solid_command
 from bmd_sg.decklink.bmd_decklink import (
     DecklinkSettings,
@@ -206,9 +208,6 @@ def main(
     # Store mock device flag for CLI commands
     ctx.obj["mock_device"] = mock_device
 
-
-from bmd_sg.cli.commands.display_tiff import display_tiff_command
-from bmd_sg.cli.commands.gen_chart import gen_chart_command
 
 app.command(name="solid")(solid_command)
 app.command(name="pat2")(checkerboard2_command)

@@ -11,6 +11,7 @@ without requiring physical hardware.
 # Main DeckLink exports
 from bmd_sg.decklink.bmd_decklink import (
     BMDDeckLink,
+    DeckLinkOutput,
     DecklinkSettings,
     EOTFType,
     HDRMetadata,
@@ -22,6 +23,7 @@ from bmd_sg.decklink.bmd_decklink import (
 
 __all__ = [
     "BMDDeckLink",
+    "DeckLinkOutput",
     "DecklinkSettings",
     "EOTFType",
     "HDRMetadata",

@@ -210,7 +210,7 @@ class PatternType(Enum):
     Defines how a patch should be rendered - either as a solid color
     or as a checkerboard pattern for gamma-invariant luminance measurement.
 
-    Checkerboard patterns use 2×2 pixel repeating patterns of 100% white
+    Checkerboard patterns use 2x2 pixel repeating patterns of 100% white
     and 0% black to produce gamma-invariant luminance values:
     - CHECKERBOARD_25: 1 white + 3 black pixels = 25% luminance
     - CHECKERBOARD_50: 2 white + 2 black pixels = 50% luminance
@@ -218,9 +218,9 @@ class PatternType(Enum):
     """
 
     SOLID = "solid"
-    CHECKERBOARD_25 = "checkerboard_25"  # 2×2: 1 white, 3 black
-    CHECKERBOARD_50 = "checkerboard_50"  # 2×2: 2 white, 2 black (diagonal)
-    CHECKERBOARD_75 = "checkerboard_75"  # 2×2: 3 white, 1 black
+    CHECKERBOARD_25 = "checkerboard_25"  # 2x2: 1 white, 3 black
+    CHECKERBOARD_50 = "checkerboard_50"  # 2x2: 2 white, 2 black (diagonal)
+    CHECKERBOARD_75 = "checkerboard_75"  # 2x2: 3 white, 1 black
 
     @classmethod
     def parse(cls, value: str) -> "PatternType":

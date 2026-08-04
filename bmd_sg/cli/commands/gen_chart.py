@@ -140,28 +140,7 @@ def gen_chart_command(
     target_space = cs_map[colorspace]
     transfer_func = tf_map[transfer]
 
-    # Validate and create light source for simulation
-    simulation_light_source: LightSource | None = None
-    if light_cct is not None and light_illuminant is not None:
-        console.print(
-            "[red]Error:[/red] Cannot specify both --light-cct and --light-illuminant"
-        )
-        raise typer.Exit(1)
-
-    if light_cct is not None:
-        try:
-            simulation_light_source = LightSource(cct=light_cct)
-        except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(1) from e
-
-    if light_illuminant is not None:
-        try:
-            illum = Illuminant.parse(light_illuminant)
-            simulation_light_source = LightSource(illuminant=illum)
-        except ValueError as e:
-            console.print(f"[red]Error:[/red] {e}")
-            raise typer.Exit(1) from e
+    simulation_light_source = _resolve_light_source(light_cct, light_illuminant)
 
     # Derive output path from source if not specified
     if output is None:
@@ -231,6 +210,47 @@ def gen_chart_command(
     _write_preview_png(image, preview_path, bit_depth, out_width, out_height)
 
     console.print("[green]✓[/green] Chart generated successfully!")
+
+
+def _resolve_light_source(
+    light_cct: int | None,
+    light_illuminant: str | None,
+) -> LightSource | None:
+    """
+    Validate and build the simulation light source from CLI options.
+
+    Parameters
+    ----------
+    light_cct : int | None
+        Correlated color temperature in Kelvin, or None.
+    light_illuminant : str | None
+        D-series illuminant name (D50, D55, D65, A, E), or None.
+
+    Returns
+    -------
+    LightSource | None
+        The light source to simulate, or None when neither option is set.
+
+    Raises
+    ------
+    typer.Exit
+        If both options are given or a value fails to parse.
+    """
+    if light_cct is not None and light_illuminant is not None:
+        console.print(
+            "[red]Error:[/red] Cannot specify both --light-cct and --light-illuminant"
+        )
+        raise typer.Exit(1)
+
+    try:
+        if light_cct is not None:
+            return LightSource(cct=light_cct)
+        if light_illuminant is not None:
+            return LightSource(illuminant=Illuminant.parse(light_illuminant))
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from e
+    return None
 
 
 def _write_preview_png(

@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Typo in pyright configuration (`reportUnnecessaryTypeIgnoreComment`)
+- All ruff and pyright findings resolved; static analysis is clean
+- Removed unused `aenum` and `requests` dependencies and stray committed
+  files (`activate`, empty `.claude/settings.json`)
+- `DeckLinkOutput` exported from `bmd_sg` and `bmd_sg.decklink`
 - ARGB output byte order: the retired C++ packer emitted RGBA memory order
   for `bmdFormat8BitARGB`; pydecklink packs A,R,G,B per the SDK. The broken
   path was unreachable from the CLI (8-bit formats are filtered out)
