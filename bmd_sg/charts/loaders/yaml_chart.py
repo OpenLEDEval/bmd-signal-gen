@@ -200,9 +200,7 @@ def _parse_patch_color(
     color = ColorValue.from_rgb(*color_values, space=color_space)
     # Approximate luminance for labels
     y_val = (
-        0.2126 * color_values[0]
-        + 0.7152 * color_values[1]
-        + 0.0722 * color_values[2]
+        0.2126 * color_values[0] + 0.7152 * color_values[1] + 0.0722 * color_values[2]
     )
     return color, y_val, None, None  # Chromaticity not applicable for RGB
 
