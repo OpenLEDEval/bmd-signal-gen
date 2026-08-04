@@ -48,13 +48,13 @@ dependencies = [
     "uvicorn>=0.35.0",
     "typer>=0.16,<0.17",
     "rich>=14.0.0",
-    "aenum>=3.1.16",
-    "requests>=2.32.4",
     "colour-science>=0.4.6",
     "tifffile>=2024.8.30",
     "pillow>=12.1.1",
-    "scipy>=1.16.3",
     "pydecklink>=0.6.1",
+    # Not imported directly: colour-science uses scipy opportunistically
+    # (CCT/chromatic adaptation) and warns at import when it is absent.
+    "scipy>=1.16.3",
 ]
 
 [project.urls]
