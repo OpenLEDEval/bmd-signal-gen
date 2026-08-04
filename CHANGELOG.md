@@ -10,9 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial test suite infrastructure with pytest fixtures
 - PEP 561 `py.typed` marker for type checker support
+- `DeckLinkOutput` protocol describing the device output surface; satisfied
+  by both `BMDDeckLink` (hardware) and `MockBMDDeckLink` (`--mock-device`)
+- SPEC.md and ROADMAP.md governance documents
+
+### Changed
+- DeckLink device layer now uses [pydecklink](https://github.com/Fuse-Technical-Group/pydecklink)
+  (>= 0.6.1, PyPI) instead of the private ctypes wrapper. 12-bit RGB (R12L),
+  r210, and BGRA packing verified byte-identical to the retired
+  implementation; HDR metadata signalling verified on the wire
+- `HDRMetadata` and `GamutChromaticities` are plain Python classes
+  (identical constructors and attributes; no longer `ctypes.Structure`)
+- `get_decklink_sdk_version()` reports the driver API version (pydecklink
+  links the DeckLink SDK dynamically)
+
+### Removed
+- `cpp/` tree: ctypes wrapper, pixel packing, CMake build, and vendored
+  DeckLink SDK 15.3 — a fresh clone runs after `uv sync` with no native build
+- `bmd_sg/decklink/decklink_types.py` and `libdecklink.dylib` packaging
+- CMake/LLVM toolchain setup tasks from `tasks.py`
 
 ### Fixed
 - Typo in pyright configuration (`reportUnnecessaryTypeIgnoreComment`)
+- ARGB output byte order: the retired C++ packer emitted RGBA memory order
+  for `bmdFormat8BitARGB`; pydecklink packs A,R,G,B per the SDK. The broken
+  path was unreachable from the CLI (8-bit formats are filtered out)
 
 ## [0.1.0] - 2025-07-14
 
