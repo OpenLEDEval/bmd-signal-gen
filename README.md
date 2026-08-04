@@ -47,30 +47,23 @@ both capable of full 12-bit RGB output at 1080p30.
 
 - **macOS** (tested on macOS 15.5) or Windows
 - **Blackmagic Design Desktop Video drivers** (latest version)
-- **Blackmagic Design DeckLink SDK 15.3**
 - **Python 3.12+**
 - **UV package manager**
   ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
-- **clang++** with C++20 support (macOS) or equivalent C++ compiler
+
+DeckLink access comes from
+[pydecklink](https://github.com/Fuse-Technical-Group/pydecklink), installed
+from PyPI. No SDK download or C++ toolchain is required.
 
 ### Installation
 
-1. **Get the DeckLink SDK** (see [DEVELOPERS.md](DEVELOPERS.md) for detailed
-   instructions):
-
-   ```bash
-   mkdir -p cpp/include/DeckLinkAPI
-   cp /path/to/decklink-sdk/Mac/include/* cpp/include/DeckLinkAPI/
-   ```
-
-2. **Install dependencies and build**:
+1. **Install dependencies**:
 
    ```bash
    uv sync
-   uv run invoke build
    ```
 
-3. **Verify installation**:
+2. **Verify installation**:
    ```bash
    uv run bmd-signal-gen --help
    ```
@@ -188,18 +181,12 @@ bmd-signal-gen/
 │   │   ├── main.py                   # Main CLI application
 │   │   ├── shared.py                 # Common utilities and device management
 │   │   └── commands/                 # Pattern-specific commands
-│   ├── decklink/                     # DeckLink SDK wrapper
-│   │   ├── bmd_decklink.py           # Main wrapper with HDR support
-│   │   ├── decklink_types.py         # Type definitions and protocols
-│   │   ├── libdecklink.dylib         # Compiled C++ library
+│   ├── decklink/                     # DeckLink device layer (pydecklink)
+│   │   ├── bmd_decklink.py           # DeckLinkOutput protocol and adapter
 │   │   └── mock/                     # Mock device implementation
 │   ├── image_generators/             # Pattern generation
 │   │   └── checkerboard.py           # Checkerboard pattern generator
 │   └── utilities/                    # System utilities
-├── cpp/                              # C++ DeckLink SDK wrapper
-│   ├── include/DeckLinkAPI/          # DeckLink SDK headers
-│   ├── decklink_wrapper.cpp          # C++ implementation
-│   └── Makefile                      # Build configuration
 ├── docs/                             # Sphinx-compatible documentation source
 ├── examples/                         # Demo and test scripts
 ├── postman/                          # API testing collections
@@ -210,8 +197,7 @@ bmd-signal-gen/
 ### Build Commands
 
 ```bash
-uv run invoke setup     # Set up toolchain (llvm, cmake)
-uv run invoke build     # Build C++ library and Python package
+uv run invoke build     # Build the Python package
 uv run invoke check     # Run all checks (lint, format, typecheck)
 uv run invoke fix       # Auto-fix issues and format code
 uv run invoke test      # Run pytest test suite
@@ -228,8 +214,6 @@ The project maintains high code quality standards:
 - **Pyright** for type checking
 - **NumPy-style docstrings** with comprehensive examples
 - **Type hints** throughout the codebase
-- **clang-tidy** for c++ linting
-- **clang-format** for c++ formatting
 - **Pre-commit hooks** for automated quality checks
 
 ## Contributing

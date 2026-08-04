@@ -5,14 +5,14 @@ system does and why. See ROADMAP.md for work remaining.
 
 ## DeckLink Output Backend §spec:decklink-backend
 
-*Status: in progress*
+*Status: complete*
 
 ### Problem
 
-The DeckLink device layer is a private ctypes wrapper: `bmd_sg/decklink/
+The DeckLink device layer was a private ctypes wrapper: `bmd_sg/decklink/
 bmd_decklink.py` over `cpp/decklink_wrapper.cpp` and `cpp/pixel_packing.cpp`,
-~2,850 lines. It is macOS-only, requires an in-repo C++ build
-(`libdecklink.dylib`) before anything runs, and duplicates
+~2,850 lines. It was macOS-only, required an in-repo C++ build
+(`libdecklink.dylib`) before anything ran, and duplicated
 [pydecklink](https://github.com/Fuse-Technical-Group/pydecklink), which binds
 the same SDK with nanobind, ships prebuilt wheels for macOS/Linux/Windows, and
 already absorbed this repo's pixel packing and HDR metadata code as its

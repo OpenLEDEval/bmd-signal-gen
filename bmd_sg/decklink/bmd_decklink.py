@@ -92,8 +92,9 @@ class PixelFormatType(str, Enum):
     12BIT_RGB
     """
 
-    # This table is meant to be in line with "Enum BMDPixelFormat" in
-    # cpp/Blackmagic DeckLink SDK 15.3/Mac/include/DeckLinkAPIModes.h
+    # This table is meant to be in line with "Enum BMDPixelFormat" in the
+    # DeckLink SDK (DeckLinkAPIModes.h); pydecklink.PixelFormat shares the
+    # same fourcc values.
     # TODO: Add field to indicate library support
     # TODO: Add human readable primary selections string and fall back on BMD
     # string in case the human readable string isn't set. Ensure parse can refer

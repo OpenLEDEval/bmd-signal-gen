@@ -4,14 +4,13 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 
 ## Architecture
 
-**Core Components**: C++ Core (`cpp/`) + Python Library (`bmd_sg/`) + CLI Tool + REST API  
-**Technology**: Python 3.12+, ctypes, NumPy, Typer, DeckLink SDK 15.3, UV package manager
+**Core Components**: Python Library (`bmd_sg/`) over pydecklink + CLI Tool + REST API  
+**Technology**: Python 3.12+, pydecklink, NumPy, Typer, UV package manager
 
 ## Key Files & Components
 
 ### `/bmd_sg/decklink/`
-**`bmd_decklink.py`**: Main SDK wrapper with `BMDDeckLink` class (RAII), `HDRMetadata` structure, pixel format enums, device enumeration. Default HDR: MaxCLL=10000 nits, PQ EOTF, Rec.2020 primaries  
-**`decklink_types.py`**: Protocol definitions and type safety for ctypes wrapper
+**`bmd_decklink.py`**: `DeckLinkOutput` protocol, `BMDDeckLink` adapter over `pydecklink.Device` (RAII), `HDRMetadata` structure, pixel format enums, device enumeration. Default HDR: MaxCLL=10000 nits, PQ EOTF, Rec.2020 primaries
 
 ### `/bmd_sg/cli/`
 **`main.py`**: Typer app with global parameters, rich help panels, command registration  
@@ -22,7 +21,7 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 **`checkerboard.py`**: `PatternGenerator` class with ROI support, NumPy-based pattern generation, color expansion (1-4 colors), bit-depth validation, `ColorRangeError` exception
 
 ### `/bmd_sg/utilities/`
-**`__init__.py`**: `suppress_cpp_output()` context manager for C++ library output redirection
+**`__init__.py`**: `suppress_cpp_output()` context manager for native library output redirection
 
 ## Key Features & Capabilities
 
@@ -37,7 +36,7 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 ## Development Standards
 
 **Code Quality**: NumPy-style docstrings with examples, type hints throughout, DRY principle enforcement, centralized utilities
-**Testing & Build**: UV package manager, invoke task automation, ruff/pyright quality checks, pre-commit hooks, C++ compilation integration
+**Testing & Build**: UV package manager, invoke task automation, ruff/pyright quality checks, pre-commit hooks
 **Error Handling**: Specific exception types, hardware validation, SDK error translation with context
 
 ## Configuration Defaults
@@ -48,8 +47,8 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 
 ## Dependencies & Implementation
 
-**Core**: ctypes (C++ integration), numpy (array operations), typer (CLI), dataclasses (configuration)  
-**External**: Desktop Video drivers, DeckLink SDK 15.3 headers, libdecklink.dylib, clang++ with C++20  
-**Performance**: NumPy advanced indexing, contiguous memory layout, efficient ctypes buffers, minimal copying  
-**Safety**: RAII/context managers, color validation, SDK signature verification, error context preservation  
+**Core**: pydecklink (DeckLink binding + pixel packing), numpy (array operations), typer (CLI), dataclasses (configuration)  
+**External**: Desktop Video drivers  
+**Performance**: NumPy advanced indexing, contiguous memory layout, minimal copying  
+**Safety**: RAII/context managers, color validation, error context preservation  
 **Extensibility**: Protocol-based type system, dataclass configuration, modular pattern generation, pluggable color spaces

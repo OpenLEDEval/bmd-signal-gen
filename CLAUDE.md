@@ -16,7 +16,7 @@ information, see `.memories/PROJECT_SUMMARY.md`.
 
 ## Common Commands
 
-**Build:** `uv run invoke build` - Builds C++ library and Python package
+**Build:** `uv run invoke build` - Builds the Python package
 
 **Quality:** `uv run invoke ai-developer-quality` (AI agents), `check` (all), `fix` (auto-fix), `dev` (fix+test)
 
@@ -49,18 +49,15 @@ Use `uv run invoke test` to run the test suite. See the Common Commands section 
 
 ## Common Issues
 
-- **Library Loading**: Ensure `libdecklink.dylib` is built and in correct
-  location
 - **Device Access**: Requires BMD Desktop Video drivers and proper device
-  connection
+  connection. Another app holding the DeckLink (e.g. DaVinci Resolve)
+  blocks output with HRESULT 0x80000009
 - **Pixel Format**: Some formats may not be supported by all devices
 - **HDR Metadata**: Complete metadata structure required for proper HDR output
 
 ## Troubleshooting
 
-**Build fails**: Ensure DeckLink SDK headers in `cpp/include/DeckLinkAPI/`, clang++ with C++20, Desktop Video drivers
-
-**Library not found**: Run `uv run invoke build`, check `bmd_sg/decklink/libdecklink.dylib` exists
+**Import fails**: Run `uv sync` (installs pydecklink from PyPI), ensure Desktop Video drivers installed
 
 **No devices found**: Use `--mock-device` for testing, check connections/drivers, try `device-details` command
 
@@ -72,8 +69,7 @@ Use `uv run invoke test` to run the test suite. See the Common Commands section 
 
 ## Dependencies
 
-See DEVELOPERS.md for complete setup instructions including prerequisites and
-SDK installation.
+See DEVELOPERS.md for complete setup instructions and prerequisites.
 
 ## Claude Code Guidelines
 
@@ -118,5 +114,5 @@ SDK installation.
 - Read `DEVELOPERS.md` for setup and development standards
 - Check `.memories/PROJECT_SUMMARY.md` for architecture details  
 - Search `.memories/DesktopVideoSDKManual.md` for BMD SDK documentation
-- Use `cpp/Blackmagic\ DeckLink\ SDK\ 15.3/Mac/Samples/SignalGenHDR` as known-good example code
+- DeckLink output goes through [pydecklink](https://github.com/Fuse-Technical-Group/pydecklink); see its SPEC.md for binding semantics
 - don't document hidden directories or CLAUDE.md files in the README.md project structure

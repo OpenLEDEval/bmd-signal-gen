@@ -158,16 +158,15 @@ Coding Standards
 Build System
 -------------
 
-The project uses a C++ core with Python bindings:
+The project is pure Python over the pydecklink binding:
 
-**C++ Component:**
-  * Located in ``cpp/`` directory
-  * Compiles to ``libdecklink.dylib`` (macOS) or equivalent
-  * Uses DeckLink SDK 15.3
-  * Handles low-level device operations and pixel format conversion
+**Device Layer:**
+  * `pydecklink <https://github.com/Fuse-Technical-Group/pydecklink>`_,
+    installed from PyPI
+  * Ships prebuilt wheels; no local SDK or C++ toolchain required
+  * Handles low-level device operations and pixel packing
 
 **Python Component:**
-  * Uses ctypes for C++ library integration
   * High-level API in ``bmd_sg/`` package
   * CLI interface with Typer framework
 
@@ -177,9 +176,7 @@ The project uses a C++ core with Python bindings:
 
 This command:
   1. Cleans previous artifacts
-  2. Compiles C++ library
-  3. Builds Python package
-  4. Validates build success
+  2. Builds the Python package
 
 Contributing
 ------------
@@ -212,11 +209,10 @@ Project Structure
 
     bmd-signal-gen/
     ├── bmd_sg/                    # Main Python package
-    │   ├── decklink/              # DeckLink SDK interface
+    │   ├── decklink/              # DeckLink device layer (pydecklink)
     │   ├── image_generators/      # Pattern generation
     │   ├── cli/                   # Command-line interface
     │   └── utilities/             # Helper functions
-    ├── cpp/                       # C++ core library
     ├── docs/                      # Sphinx documentation
     ├── tests/                     # Test suite
     ├── examples/                  # Usage examples

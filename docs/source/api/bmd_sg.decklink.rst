@@ -18,14 +18,6 @@ bmd_sg.decklink.bmd_decklink module
    :undoc-members:
    :show-inheritance:
 
-bmd_sg.decklink.decklink_types module
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: bmd_sg.decklink.decklink_types
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

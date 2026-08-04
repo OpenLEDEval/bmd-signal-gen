@@ -27,14 +27,14 @@ System Architecture
     │            DeckLink Interface Layer                 │
     ├─────────────────┬───────────────────┬───────────────┤
     │ Device Mgmt     │ Pixel Formats     │ HDR Metadata  │
-    │ (RAII/ctypes)   │ (Format Types)    │ (SMPTE/CEA)   │
+    │ (RAII/adapter)  │ (Format Types)    │ (SMPTE/CEA)   │
     └─────────────────┴───────────────────┴───────────────┘
                                 │
     ┌─────────────────────────────────────────────────────┐
-    │              C++ Core Library                       │
+    │            pydecklink (nanobind binding)            │
     ├─────────────────┬───────────────────┬───────────────┤
-    │ DeckLink SDK    │ Pixel Packing     │ Memory Mgmt   │
-    │ (C++ Wrapper)   │ (Bit Conversion)  │ (RAII)        │
+    │ DeckLink SDK    │ Pixel Packing     │ Frame Mgmt    │
+    │ (Device/Frame)  │ (packing module)  │ (MutableFrame)│
     └─────────────────┴───────────────────┴───────────────┘
                                 │
     ┌─────────────────────────────────────────────────────┐
@@ -45,28 +45,16 @@ System Architecture
 Core Components
 ---------------
 
-C++ Core Library (``cpp/``)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydecklink Device Binding
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Purpose:** Low-level hardware interface and performance-critical operations.
 
-**Key Files:**
-  * ``decklink_wrapper.cpp/.h`` - DeckLink SDK C++ wrapper
-  * ``pixel_packing.cpp/.h`` - Bit-depth conversion and pixel format handling
-  * ``Makefile`` - Build configuration
-
-**Responsibilities:**
-  * Direct DeckLink SDK integration
-  * Memory management with RAII patterns
-  * Pixel format conversion (8/10/12-bit, RGB/YUV)
-  * Frame buffer management
-  * Hardware-specific optimizations
-
-**Design Patterns:**
-  * RAII for automatic resource cleanup
-  * Exception safety for error handling
-  * Template-based pixel format conversion
-  * Const-correctness throughout
+`pydecklink <https://github.com/Fuse-Technical-Group/pydecklink>`_ binds the
+DeckLink SDK with nanobind and ships prebuilt wheels. It supplies device
+enumeration, synchronous and scheduled output, frame-level HDR metadata, and
+byte-exact pixel packing (``pydecklink.packing``). See its SPEC.md for
+binding semantics; this project documents only its own usage.
 
 Python DeckLink Interface (``bmd_sg/decklink/``)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -74,18 +62,19 @@ Python DeckLink Interface (``bmd_sg/decklink/``)
 **Purpose:** High-level Python interface to DeckLink functionality.
 
 **Key Modules:**
-  * ``bmd_decklink.py`` - Main interface classes and device management
-  * ``decklink_types.py`` - Type definitions and protocol specifications
+  * ``bmd_decklink.py`` - Protocol, adapter, and device management
 
 **Core Classes:**
-  * ``BMDDeckLink`` - RAII device wrapper with context manager support
+  * ``DeckLinkOutput`` - Protocol for output devices (hardware and mock)
+  * ``BMDDeckLink`` - RAII adapter over ``pydecklink.Device`` with context
+    manager support
   * ``HDRMetadata`` - Complete HDR metadata structure (SMPTE ST 2086, CEA-861.3)
   * ``DecklinkSettings`` - Unified configuration dataclass
   * ``PixelFormatType`` / ``EOTFType`` - Type-safe enumerations
 
 **Design Features:**
   * Context manager protocol for safe device access
-  * Automatic function signature configuration for ctypes
+  * Device-level HDR metadata attached per frame by the adapter
   * Comprehensive type hints throughout
   * Default HDR values optimized for professional use
 
@@ -171,7 +160,7 @@ Error Handling Strategy
 -----------------------
 
 **Layered Error Handling:**
-  1. **Hardware Level** (C++): SDK errors translated to exceptions
+  1. **Hardware Level** (pydecklink): SDK errors translated to exceptions
   2. **Interface Level** (Python): Device validation and format checking  
   3. **Application Level** (CLI): User-friendly error messages with context
   4. **User Level**: Clear guidance on resolution steps
