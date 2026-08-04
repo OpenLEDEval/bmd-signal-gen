@@ -158,7 +158,6 @@ def load_chart(
             patch_data,
             color_space=color_space,
             include_labels=include_labels,
-            reference_white_Y=reference_white_Y,
         )
         if patch:
             patches.append(patch)
@@ -173,22 +172,18 @@ def load_chart(
     )
 
 
-def _parse_patch(
-    data: dict[str, Any],
+def _parse_patch_color(
+    color_values: list[float],
     color_space: ColorSpace,
-    include_labels: bool,
-    reference_white_Y: float,
-) -> Patch | None:
-    """Parse a single patch from YAML data."""
-    name = data.get("name", "")
-    if not name:
-        return None
+) -> tuple[ColorValue, float, float | None, float | None]:
+    """
+    Build the patch color and label metrics from raw YAML values.
 
-    # Parse color
-    color_values = data.get("color")
-    if color_values is None or len(color_values) != 3:
-        return None
-
+    Returns
+    -------
+    tuple[ColorValue, float, float | None, float | None]
+        (color, y_value, cie_x, cie_y). Chromaticity is None for RGB input.
+    """
     if color_space == ColorSpace.XYZ:
         color = ColorValue.from_xyz(*color_values)
         y_val = color_values[1]
@@ -200,15 +195,51 @@ def _parse_patch(
             cie_y = y_xyz / xyz_sum
         else:
             cie_x = cie_y = 0.0
-    else:
-        color = ColorValue.from_rgb(*color_values, space=color_space)
-        # Approximate luminance for labels
-        y_val = (
-            0.2126 * color_values[0]
-            + 0.7152 * color_values[1]
-            + 0.0722 * color_values[2]
-        )
-        cie_x = cie_y = None  # Not applicable for RGB input
+        return color, y_val, cie_x, cie_y
+
+    color = ColorValue.from_rgb(*color_values, space=color_space)
+    # Approximate luminance for labels
+    y_val = (
+        0.2126 * color_values[0]
+        + 0.7152 * color_values[1]
+        + 0.0722 * color_values[2]
+    )
+    return color, y_val, None, None  # Chromaticity not applicable for RGB
+
+
+def _format_patch_label(
+    name: str,
+    color_space: ColorSpace,
+    y_val: float,
+    cie_x: float | None,
+    cie_y: float | None,
+) -> str:
+    """Format the on-patch label for a color space and its label metrics."""
+    if color_space == ColorSpace.XYZ:
+        # Greyscale patches (name starts with "GS"): just show Y value
+        if name.strip().upper().startswith("GS"):
+            return f"{name}\nY={y_val:.1f}"
+        # Chromatic: show only CIE x,y coordinates
+        return f"{name}\nx={cie_x:.4f}\ny={cie_y:.4f}"
+    return f"{name}\nL={y_val:.2f}"
+
+
+def _parse_patch(
+    data: dict[str, Any],
+    color_space: ColorSpace,
+    include_labels: bool,
+) -> Patch | None:
+    """Parse a single patch from YAML data."""
+    name = data.get("name", "")
+    if not name:
+        return None
+
+    # Parse color
+    color_values = data.get("color")
+    if color_values is None or len(color_values) != 3:
+        return None
+
+    color, y_val, cie_x, cie_y = _parse_patch_color(color_values, color_space)
 
     # Parse position and size
     pos = data.get("pos", [0, 0])
@@ -221,21 +252,9 @@ def _parse_patch(
     left, top = pos
     width, height = size
 
-    # Label text
     label_text = None
     if include_labels:
-        # Check if this is a greyscale patch (name starts with "GS")
-        is_greyscale = name.strip().upper().startswith("GS")
-
-        if color_space == ColorSpace.XYZ:
-            if is_greyscale:
-                # Greyscale: just show Y value
-                label_text = f"{name}\nY={y_val:.1f}"
-            else:
-                # Chromatic: show only CIE x,y coordinates
-                label_text = f"{name}\nx={cie_x:.4f}\ny={cie_y:.4f}"
-        else:
-            label_text = f"{name}\nL={y_val:.2f}"
+        label_text = _format_patch_label(name, color_space, y_val, cie_x, cie_y)
 
     # Parse pattern type (default to solid)
     pattern_str = data.get("pattern", "solid")

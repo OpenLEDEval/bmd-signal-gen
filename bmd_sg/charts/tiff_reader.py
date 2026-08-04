@@ -5,6 +5,7 @@ Loads 16-bit TIFF files written by tiff_writer and returns the raw
 numpy array data without any manipulation.
 """
 
+import contextlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -108,13 +109,13 @@ def load_chart_tiff(
         # Try to extract metadata from ImageDescription
         metadata = TiffMetadata()
         if tif.pages:
-            page = tif.pages[0]
-            if page.description:
-                try:
-                    metadata = TiffMetadata.from_json(page.description)
-                except (json.JSONDecodeError, KeyError):
-                    # Metadata parsing failed, use defaults
-                    # This allows loading TIFFs without our custom metadata
-                    pass
+            # pages[0] may be typed as TiffFrame, which lacks description;
+            # at runtime the first page is a TiffPage
+            description = getattr(tif.pages[0], "description", "")
+            if description:
+                # Parsing failure falls back to defaults, allowing TIFFs
+                # without our custom metadata
+                with contextlib.suppress(json.JSONDecodeError, KeyError):
+                    metadata = TiffMetadata.from_json(description)
 
     return image, metadata
