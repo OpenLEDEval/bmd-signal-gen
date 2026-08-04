@@ -36,7 +36,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Programming Language :: C++",
     "Topic :: Multimedia :: Video",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Hardware :: Hardware Drivers",
@@ -55,6 +54,7 @@ dependencies = [
     "tifffile>=2024.8.30",
     "pillow>=12.1.1",
     "scipy>=1.16.3",
+    "pydecklink>=0.6.1",
 ]
 
 [project.urls]
@@ -73,8 +73,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["bmd_sg"]
-include = ["LICENSE", "bmd_sg/decklink/libdecklink.dylib"]
-exclude = ["data/", "cpp/", "tests/", "**/*CLAUDE.md", "bmd_sg/**/tests"]
+include = ["LICENSE"]
+exclude = ["data/", "tests/", "**/*CLAUDE.md", "bmd_sg/**/tests"]
 
 [dependency-groups]
 dev = [

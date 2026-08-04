@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/Users/fuse/Development/bmd-signal-gen/cpp/build",
+  "command": "/usr/bin/c++ -Ddecklink_lib_EXPORTS -I\"/Users/fuse/Development/bmd-signal-gen/cpp/Blackmagic DeckLink SDK 15.3/Mac/include\" -O3 -DNDEBUG -std=c++20 -arch arm64 -fPIC -Wall -O2 -fPIC -o CMakeFiles/decklink_lib.dir/decklink_wrapper.cpp.o -c /Users/fuse/Development/bmd-signal-gen/cpp/decklink_wrapper.cpp",
+  "file": "/Users/fuse/Development/bmd-signal-gen/cpp/decklink_wrapper.cpp",
+  "output": "CMakeFiles/decklink_lib.dir/decklink_wrapper.cpp.o"
+},
+{
+  "directory": "/Users/fuse/Development/bmd-signal-gen/cpp/build",
+  "command": "/usr/bin/c++ -Ddecklink_lib_EXPORTS -I\"/Users/fuse/Development/bmd-signal-gen/cpp/Blackmagic DeckLink SDK 15.3/Mac/include\" -O3 -DNDEBUG -std=c++20 -arch arm64 -fPIC -Wall -O2 -fPIC -o CMakeFiles/decklink_lib.dir/pixel_packing.cpp.o -c /Users/fuse/Development/bmd-signal-gen/cpp/pixel_packing.cpp",
+  "file": "/Users/fuse/Development/bmd-signal-gen/cpp/pixel_packing.cpp",
+  "output": "CMakeFiles/decklink_lib.dir/pixel_packing.cpp.o"
+}
+]

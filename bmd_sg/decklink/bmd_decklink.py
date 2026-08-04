@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Python wrapper for Blackmagic Design DeckLink SDK.
+DeckLink device layer for BMD signal generation.
 
-This module provides a Python interface to the Blackmagic Design DeckLink SDK,
-enabling direct control of DeckLink devices for professional video output.
-The module supports HDR metadata, various pixel formats, and comprehensive
-device management.
+This module exposes DeckLink devices for professional video output through
+`pydecklink <https://github.com/Fuse-Technical-Group/pydecklink>`_, the
+nanobind-based binding of the Blackmagic Design DeckLink SDK. It supports
+HDR metadata, various pixel formats, and comprehensive device management.
 
 The module includes:
-- ctypes-based wrapper for the DeckLink SDK C++ library
+- ``DeckLinkOutput`` protocol describing the device output surface
+- ``BMDDeckLink`` adapter over ``pydecklink.Device``
 - HDR metadata structures with standard color space definitions
 - Device enumeration and management
 - Frame data handling with numpy integration
-- Complete type definitions for better IDE support
 - Unified DecklinkSettings configuration class
 
 Examples
@@ -38,23 +38,21 @@ Unified settings configuration:
 
 Notes
 -----
-This module requires the Blackmagic Design Desktop Video drivers and
-a compiled libdecklink.dylib library in the same directory.
+This module requires the Blackmagic Design Desktop Video drivers.
 
 See Also
 --------
-bmd_sg.decklink.decklink_types : Type definitions for the SDK wrapper
-bmd_sg.decklink_control : High-level device control interface
+bmd_sg.decklink.mock : Mock implementation for development without hardware
 """
 
-import ctypes
-import re
+import contextlib
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import Any, Protocol, Self, runtime_checkable
 
 import numpy as np
+import pydecklink
+from pydecklink import packing
 
 
 class PixelFormatType(str, Enum):
@@ -94,8 +92,9 @@ class PixelFormatType(str, Enum):
     12BIT_RGB
     """
 
-    # This table is meant to be in line with "Enum BMDPixelFormat" in
-    # cpp/Blackmagic DeckLink SDK 15.3/Mac/include/DeckLinkAPIModes.h
+    # This table is meant to be in line with "Enum BMDPixelFormat" in the
+    # DeckLink SDK (DeckLinkAPIModes.h); pydecklink.PixelFormat shares the
+    # same fourcc values.
     # TODO: Add field to indicate library support
     # TODO: Add human readable primary selections string and fall back on BMD
     # string in case the human readable string isn't set. Ensure parse can refer
@@ -353,8 +352,8 @@ class EOTFType(str, Enum):
         raise ValueError(f"Invalid EOTF value: {value}. Use one of: {valid}")
 
 
-# Complete HDR metadata structures (matching C++ implementation)
-class GamutChromaticities(ctypes.Structure):
+# Complete HDR metadata structures (SMPTE ST 2086 / CTA-861.3)
+class GamutChromaticities:
     """
     Chromaticity coordinates for display primaries and white point.
 
@@ -403,17 +402,6 @@ class GamutChromaticities(ctypes.Structure):
     and must be within the valid range [0, 1].
     """
 
-    _fields_: ClassVar = [
-        ("RedX", ctypes.c_double),
-        ("RedY", ctypes.c_double),
-        ("GreenX", ctypes.c_double),
-        ("GreenY", ctypes.c_double),
-        ("BlueX", ctypes.c_double),
-        ("BlueY", ctypes.c_double),
-        ("WhiteX", ctypes.c_double),
-        ("WhiteY", ctypes.c_double),
-    ]
-
     def __init__(
         self,
         red_xy: tuple[float, float],
@@ -421,7 +409,6 @@ class GamutChromaticities(ctypes.Structure):
         blue_xy: tuple[float, float],
         white_xy: tuple[float, float],
     ) -> None:
-        super().__init__()
         self.RedX = red_xy[0]
         self.RedY = red_xy[1]
         self.GreenX = green_xy[0]
@@ -537,7 +524,7 @@ def transfer_function_to_eotf(transfer_value: str) -> "EOTFType":
         return EOTFType.SDR
 
 
-class HDRMetadata(ctypes.Structure):
+class HDRMetadata:
     """
     Complete HDR metadata structure for DeckLink output.
 
@@ -604,15 +591,6 @@ class HDRMetadata(ctypes.Structure):
     - 3: HLG (ITU-R BT.2100, broadcast HDR)
     """
 
-    _fields_: ClassVar = [
-        ("EOTF", ctypes.c_int64),
-        ("referencePrimaries", GamutChromaticities),
-        ("maxDisplayMasteringLuminance", ctypes.c_double),
-        ("minDisplayMasteringLuminance", ctypes.c_double),
-        ("maxCLL", ctypes.c_double),
-        ("maxFALL", ctypes.c_double),
-    ]
-
     def __init__(
         self,
         eotf: EOTFType = EOTFType.PQ,
@@ -621,7 +599,6 @@ class HDRMetadata(ctypes.Structure):
         max_cll: float = 1000.0,
         max_fall: float = 50.0,
     ) -> None:
-        super().__init__()
         self.EOTF = eotf.int_value
         self.maxDisplayMasteringLuminance = max_display_luminance
         self.minDisplayMasteringLuminance = min_display_luminance
@@ -794,265 +771,130 @@ class DecklinkSettings:
     gamut_chromaticities: GamutChromaticities = Gamut_Chromaticities_REC2020
 
 
-def _configure_function_signatures(lib: ctypes.CDLL) -> None:  # noqa: C901
-    """Configure ctypes function signatures for all DeckLink SDK functions.
+# =============================================================================
+# pydecklink bridging
+# =============================================================================
 
-    Sets up argument types and return types for all C functions in the DeckLink
-    SDK library to ensure proper type safety and memory management when calling
-    from Python.
+# All output uses the synchronous single-frame path at this fixed mode,
+# matching the retired C++ wrapper (bmdModeHD1080p30).
+DEFAULT_DISPLAY_MODE = pydecklink.DisplayMode.HD1080p30
+
+# RGB formats that require SDI 4:4:4 output, per the SignalGenHDR sample.
+# YUV formats use the 4:2:2 default.
+_RGB_444_FORMATS = frozenset(
+    {
+        PixelFormatType.FORMAT_10BIT_RGB,
+        PixelFormatType.FORMAT_12BIT_RGB,
+        PixelFormatType.FORMAT_12BIT_RGBLE,
+        PixelFormatType.FORMAT_10BIT_RGBXLE,
+        PixelFormatType.FORMAT_10BIT_RGBX,
+        PixelFormatType.FORMAT_8BIT_ARGB,
+        PixelFormatType.FORMAT_8BIT_BGRA,
+    }
+)
+
+
+def _to_pydecklink_pixel_format(
+    pixel_format_type: PixelFormatType,
+) -> pydecklink.PixelFormat:
+    """
+    Convert a PixelFormatType to the pydecklink PixelFormat enum.
 
     Parameters
     ----------
-    lib : ctypes.CDLL
-        The loaded DeckLink SDK library instance.
-
-    Notes
-    -----
-    This function configures signatures for:
-    - Device enumeration (count, names)
-    - Device management (open, close, start, stop)
-    - Pixel format management
-    - HDR metadata handling
-    - Frame data operations
-    - Version information
-    """
-
-    # Device enumeration functions
-    if hasattr(lib, "decklink_get_device_count"):
-        lib.decklink_get_device_count.argtypes = []
-        lib.decklink_get_device_count.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_get_device_name_by_index"):
-        lib.decklink_get_device_name_by_index.argtypes = [
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_int,
-        ]
-        lib.decklink_get_device_name_by_index.restype = ctypes.c_int
-
-    # Device management functions
-    if hasattr(lib, "decklink_open_output_by_index"):
-        lib.decklink_open_output_by_index.argtypes = [ctypes.c_int]
-        lib.decklink_open_output_by_index.restype = ctypes.c_void_p
-
-    if hasattr(lib, "decklink_close"):
-        lib.decklink_close.argtypes = [ctypes.c_void_p]
-        lib.decklink_close.restype = None
-
-    # Output control functions
-    if hasattr(lib, "decklink_start_output"):
-        lib.decklink_start_output.argtypes = [ctypes.c_void_p]
-        lib.decklink_start_output.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_start_output_with_mode"):
-        lib.decklink_start_output_with_mode.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        lib.decklink_start_output_with_mode.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_stop_output"):
-        lib.decklink_stop_output.argtypes = [ctypes.c_void_p]
-        lib.decklink_stop_output.restype = ctypes.c_int
-
-    # Pixel format functions
-    if hasattr(lib, "decklink_get_supported_pixel_format_count"):
-        lib.decklink_get_supported_pixel_format_count.argtypes = [ctypes.c_void_p]
-        lib.decklink_get_supported_pixel_format_count.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_get_supported_pixel_format_name"):
-        lib.decklink_get_supported_pixel_format_name.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_int,
-        ]
-        lib.decklink_get_supported_pixel_format_name.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_set_pixel_format"):
-        lib.decklink_set_pixel_format.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_uint32,
-        ]
-        lib.decklink_set_pixel_format.restype = ctypes.c_int
-
-    if hasattr(lib, "decklink_get_pixel_format"):
-        lib.decklink_get_pixel_format.argtypes = [ctypes.c_void_p]
-        lib.decklink_get_pixel_format.restype = ctypes.c_uint32
-
-    # HDR metadata functions
-    if hasattr(lib, "decklink_set_hdr_metadata"):
-        lib.decklink_set_hdr_metadata.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(HDRMetadata),
-        ]
-        lib.decklink_set_hdr_metadata.restype = ctypes.c_int
-
-    # Frame data management functions
-    if hasattr(lib, "decklink_set_frame_data"):
-        lib.decklink_set_frame_data.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_uint16),
-            ctypes.c_int,
-            ctypes.c_int,
-        ]
-        lib.decklink_set_frame_data.restype = ctypes.c_int
-
-    # Frame management functions
-    if hasattr(lib, "decklink_create_frame_from_data"):
-        lib.decklink_create_frame_from_data.argtypes = [ctypes.c_void_p]
-        lib.decklink_create_frame_from_data.restype = ctypes.c_int
-
-    # Synchronous display function
-    if hasattr(lib, "decklink_display_frame_sync"):
-        lib.decklink_display_frame_sync.argtypes = [ctypes.c_void_p]
-        lib.decklink_display_frame_sync.restype = ctypes.c_int
-
-    # HDR capability detection functions
-    if hasattr(lib, "decklink_device_supports_hdr"):
-        lib.decklink_device_supports_hdr.argtypes = [ctypes.c_void_p]
-        lib.decklink_device_supports_hdr.restype = ctypes.c_bool
-
-    # Version info functions
-    if hasattr(lib, "decklink_get_driver_version"):
-        lib.decklink_get_driver_version.argtypes = []
-        lib.decklink_get_driver_version.restype = ctypes.c_char_p
-
-    if hasattr(lib, "decklink_get_sdk_version"):
-        lib.decklink_get_sdk_version.argtypes = []
-        lib.decklink_get_sdk_version.restype = ctypes.c_char_p
-
-
-def _try_load_decklink_sdk() -> ctypes.CDLL:
-    """Load the DeckLink SDK library and configure function signatures.
-
-    Attempts to load the compiled libdecklink.dylib from the same directory
-    as this Python module, then configures all ctypes function signatures
-    for type safety.
+    pixel_format_type : PixelFormatType
+        Pixel format to convert. Its ``sdk_format_code`` is the BMD fourcc
+        shared by both enums.
 
     Returns
     -------
-    ctypes.CDLL
-        The loaded and configured DeckLink SDK library instance.
+    pydecklink.PixelFormat
+        The corresponding pydecklink enum member.
 
     Raises
     ------
-    FileNotFoundError
-        If libdecklink.dylib cannot be found in the expected location.
-    OSError
-        If the library exists but cannot be loaded (e.g., architecture mismatch,
-        missing dependencies, or permission issues).
-
-    Notes
-    -----
-    The library file must be built from the C++ source in the cpp/ directory
-    and placed in the same directory as this module.
+    ValueError
+        If the format has no pydecklink equivalent.
     """
-    lib_path = Path(__file__).parent.joinpath("libdecklink.dylib")
-    try:
-        # Try to load from the lib directory relative to this script
-        if lib_path.exists() and lib_path.is_file():
-            decklink_lib = ctypes.CDLL(lib_path)
-        else:
-            raise FileNotFoundError(
-                f"Could not find libdecklink.dylib in Python project: {lib_path.absolute()}"
-            )
-    except OSError as error:
-        raise OSError(
-            f"Failed to load DeckLink library from {lib_path.absolute()}"
-        ) from error
-
-    # Configure all function signatures
-    _configure_function_signatures(decklink_lib)
-
-    return decklink_lib
+    return pydecklink.PixelFormat(pixel_format_type.sdk_format_code)
 
 
-DecklinkSDKWrapper: ctypes.CDLL = _try_load_decklink_sdk()
+def _to_pydecklink_hdr_metadata(
+    metadata: HDRMetadata,
+) -> pydecklink.HDRMetadata:
+    """
+    Convert an HDRMetadata structure to pydecklink's frame-level metadata.
+
+    Parameters
+    ----------
+    metadata : HDRMetadata
+        Device-level HDR metadata as configured by callers.
+
+    Returns
+    -------
+    pydecklink.HDRMetadata
+        Equivalent metadata for attachment to an output frame. The
+        colorspace field keeps pydecklink's Rec.2020 default; the actual
+        gamut is carried by the primaries.
+    """
+    converted = pydecklink.HDRMetadata()
+    converted.eotf = pydecklink.EOTF(metadata.EOTF)
+    primaries = metadata.referencePrimaries
+    converted.red_x = primaries.RedX
+    converted.red_y = primaries.RedY
+    converted.green_x = primaries.GreenX
+    converted.green_y = primaries.GreenY
+    converted.blue_x = primaries.BlueX
+    converted.blue_y = primaries.BlueY
+    converted.white_x = primaries.WhiteX
+    converted.white_y = primaries.WhiteY
+    converted.max_display_mastering_luminance = metadata.maxDisplayMasteringLuminance
+    converted.min_display_mastering_luminance = metadata.minDisplayMasteringLuminance
+    converted.max_cll = metadata.maxCLL
+    converted.max_fall = metadata.maxFALL
+    return converted
 
 
 def get_decklink_driver_version() -> str:
     """
-    Get the DeckLink driver version string.
+    Get the DeckLink driver API version string.
 
     Returns
     -------
     str
-        The version string of the installed DeckLink driver.
+        The version string reported by the installed DeckLink driver.
 
     Examples
     --------
     >>> version = get_decklink_driver_version()
     >>> print(f"Driver version: {version}")
-    Driver version: 12.8.1
+    Driver version: 15.3.1
 
     Notes
     -----
     Requires DeckLink Desktop Video drivers to be installed.
     """
-    return DecklinkSDKWrapper.decklink_get_driver_version().decode("utf-8")
+    return pydecklink.api_version().string
 
 
 def get_decklink_sdk_version() -> str:
     """
-    Get the DeckLink SDK version string.
+    Get the DeckLink SDK API version string.
 
     Returns
     -------
     str
-        The version string of the DeckLink SDK library.
+        The DeckLink API version reported by the installed driver.
+        pydecklink links the SDK dynamically, so the driver's API version
+        is the effective SDK version.
 
     Examples
     --------
     >>> version = get_decklink_sdk_version()
     >>> print(f"SDK version: {version}")
-    SDK version: 15.3.0
-
-    Notes
-    -----
-    This returns the version of the compiled libdecklink.dylib library.
+    SDK version: 15.3.1
     """
-    return DecklinkSDKWrapper.decklink_get_sdk_version().decode("utf-8")
-
-
-def ndarray_to_bmd_frame_buffer(
-    frame_data: np.ndarray,
-) -> tuple[Any, int, int]:
-    """
-    Convert numpy array to BMD-compatible frame buffer.
-
-    Parameters
-    ----------
-    frame_data : numpy.ndarray
-        Frame data with shape (height, width, channels) or (height, width)
-
-    Returns
-    -------
-    tuple[ctypes.POINTER(ctypes.c_uint16), int, int]
-        Tuple containing (data_ptr, width, height)
-
-    Raises
-    ------
-    ValueError
-        If frame_data is not a valid numpy array or has invalid dimensions
-    """
-    if not isinstance(frame_data, np.ndarray):
-        raise ValueError("frame_data must be a numpy array")
-
-    # Get dimensions
-    if frame_data.ndim == 2:
-        height, width = frame_data.shape
-    elif frame_data.ndim == 3:
-        height, width, _ = frame_data.shape
-    else:
-        raise ValueError("frame_data must be 2D or 3D array")
-
-    # Note: frame_data should already be uint16 and contiguous
-    # These conversions are handled in display_frame() before calling this function
-
-    # Get pointer to data
-    data_ptr = frame_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint16))
-    return data_ptr, height, width
+    return pydecklink.api_version().string
 
 
 def get_decklink_devices() -> list[str]:
@@ -1080,22 +922,67 @@ def get_decklink_devices() -> list[str]:
     Devices are returned in the order they are detected by the system.
     The index corresponds to the device_index parameter used in BMDDeckLink.
     """
-    count = DecklinkSDKWrapper.decklink_get_device_count()
-    devices = []
-    for i in range(count):
-        name = ctypes.create_string_buffer(256)
-        if DecklinkSDKWrapper.decklink_get_device_name_by_index(i, name, 256) == 0:
-            devices.append(name.value.decode("utf-8"))
-    return devices
+    return [info.display_name for info in pydecklink.list_devices()]
+
+
+@runtime_checkable
+class DeckLinkOutput(Protocol):
+    """
+    Protocol for DeckLink output devices (§spec:decklink-backend).
+
+    Describes the device surface that pattern-output callers depend on.
+    ``BMDDeckLink`` satisfies it over real hardware via pydecklink;
+    ``MockBMDDeckLink`` satisfies it with no hardware for ``--mock-device``.
+
+    See Also
+    --------
+    BMDDeckLink : Hardware implementation over pydecklink.Device
+    bmd_sg.decklink.mock.MockBMDDeckLink : Hardware-free implementation
+    """
+
+    def close(self) -> None:
+        """Close the device and free resources. Idempotent."""
+        ...
+
+    @property
+    def is_open(self) -> bool:
+        """Whether the device is currently open."""
+        ...
+
+    def start_playback(self) -> None:
+        """Start playback output."""
+        ...
+
+    def stop_playback(self) -> None:
+        """Stop playback output. Idempotent."""
+        ...
+
+    def get_supported_pixel_formats(self) -> list[PixelFormatType]:
+        """List pixel formats the device supports."""
+        ...
+
+    @property
+    def supports_hdr(self) -> bool:
+        """Whether the device supports HDR metadata output."""
+        ...
+
+    def set_hdr_metadata(self, metadata: HDRMetadata) -> None:
+        """Set HDR metadata applied to all subsequent frames."""
+        ...
+
+    def display_frame(self, frame_data: np.ndarray) -> None:
+        """Display a single frame synchronously."""
+        ...
 
 
 class BMDDeckLink:
     """
-    RAII wrapper for DeckLink device management.
+    DeckLink output device adapter over pydecklink.
 
-    This class provides Resource Acquisition Is Initialization (RAII) semantics
-    for DeckLink devices, ensuring proper cleanup when the object is destroyed.
-    The device is opened on initialization and automatically closed on destruction.
+    This class provides Resource Acquisition Is Initialization (RAII)
+    semantics for DeckLink devices, ensuring proper cleanup when the object
+    is destroyed. The device is opened on initialization and automatically
+    closed on destruction. It satisfies the ``DeckLinkOutput`` protocol.
 
     Parameters
     ----------
@@ -1104,12 +991,10 @@ class BMDDeckLink:
 
     Attributes
     ----------
-    handle : ctypes.c_void_p or None
-        Handle to the opened DeckLink device
     device_index : int
         Index of the device that was opened
-    _output_started : bool
-        Internal flag tracking output state
+    started : bool
+        Whether playback output is currently enabled
 
     Examples
     --------
@@ -1118,12 +1003,6 @@ class BMDDeckLink:
     >>> with BMDDeckLink(device_index=0) as device:
     ...     device.start_playback()
     ...     # Device automatically closed when exiting the with block
-
-    Basic usage with automatic cleanup:
-
-    >>> device = BMDDeckLink(device_index=0)
-    >>> device.start_playback()
-    >>> # Device automatically closed when object goes out of scope
 
     Manual cleanup if needed:
 
@@ -1138,18 +1017,29 @@ class BMDDeckLink:
 
     Notes
     -----
-    The device is automatically closed when the object is destroyed via __del__.
-    For guaranteed cleanup timing, use the close() method explicitly.
+    HDR metadata is stored device-level and attached to every frame this
+    adapter builds, because the SDK (and pydecklink) carry HDR10 metadata
+    per frame. Callers keep the simpler device-level model.
+
+    Output uses the synchronous single-frame path at HD 1080p30
+    (``DEFAULT_DISPLAY_MODE``), matching the retired C++ wrapper.
     """
 
     def __init__(self, device_index: int = 0) -> None:
         self.device_index = device_index
-        self.handle = DecklinkSDKWrapper.decklink_open_output_by_index(device_index)
-        if not self.handle:
+        # Assigned before Device construction so __del__ is safe if it raises.
+        self._device: pydecklink.Device | None = None
+        try:
+            self._device = pydecklink.Device(device_index)
+        except (IndexError, RuntimeError) as error:
             raise RuntimeError(
                 f"No DeckLink output device found at index {device_index}"
-            )
+            ) from error
         self.started = False
+        # Defaults match the retired C++ wrapper (bmdFormat12BitRGBLE, no
+        # HDR metadata until explicitly set).
+        self._pixel_format = PixelFormatType.FORMAT_12BIT_RGBLE
+        self._hdr_metadata: HDRMetadata | None = None
 
     def __del__(self) -> None:
         """Destructor - automatically close device on object destruction."""
@@ -1163,12 +1053,6 @@ class BMDDeckLink:
         -------
         Self
             The BMDDeckLink instance for use in the with statement
-
-        Examples
-        --------
-        >>> with BMDDeckLink(0) as device:
-        ...     device.start_playback()
-        ...     # Device automatically closed when exiting the with block
         """
         return self
 
@@ -1208,11 +1092,10 @@ class BMDDeckLink:
         -----
         This method is automatically called when the object is destroyed.
         """
-        if self.handle:
+        if self._device is not None:
             if self.started:
                 self.stop_playback()
-            DecklinkSDKWrapper.decklink_close(self.handle)
-            self.handle = None
+            self._device = None
 
     @property
     def is_open(self) -> bool:
@@ -1224,24 +1107,53 @@ class BMDDeckLink:
         bool
             True if the device is open, False otherwise
         """
-        return self.handle is not None
+        return self._device is not None
+
+    def _require_device(self) -> pydecklink.Device:
+        """
+        Return the open pydecklink device or raise.
+
+        Returns
+        -------
+        pydecklink.Device
+            The open device handle.
+
+        Raises
+        ------
+        RuntimeError
+            If the device is not open.
+        """
+        if self._device is None:
+            raise RuntimeError("Device not open")
+        return self._device
 
     def start_playback(self) -> None:
         """
         Start playback output to the DeckLink device.
+
+        Configures SDI 4:4:4 output for RGB pixel formats (following the
+        BMD SignalGenHDR sample), then enables video output at
+        ``DEFAULT_DISPLAY_MODE``.
 
         Raises
         ------
         RuntimeError
             If the device is not open or if starting playback fails
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
+        device = self._require_device()
         if self.started:
             return
-        res = DecklinkSDKWrapper.decklink_start_output(self.handle)
-        if res != 0:
-            raise RuntimeError(f"Failed to start playback output (error {res})")
+        # Best-effort: devices without SDI output (e.g. HDMI-only) reject
+        # this flag; output still works at their default.
+        with contextlib.suppress(RuntimeError):
+            device.set_config_flag(
+                pydecklink.ConfigurationID.Config444SDIVideoOutput,
+                self._pixel_format in _RGB_444_FORMATS,
+            )
+        try:
+            device.enable_video_output(DEFAULT_DISPLAY_MODE)
+        except RuntimeError as error:
+            raise RuntimeError(f"Failed to start playback output ({error})") from error
         self.started = True
 
     def stop_playback(self) -> None:
@@ -1250,14 +1162,16 @@ class BMDDeckLink:
 
         This method is idempotent - it can be called multiple times safely.
         """
-        if not self.handle or not self.started:
+        if self._device is None or not self.started:
             return
-        DecklinkSDKWrapper.decklink_stop_output(self.handle)
+        self._device.disable_video_output()
         self.started = False
 
     def get_supported_pixel_formats(self) -> list[PixelFormatType]:
         """
         Get list of supported pixel format enum values.
+
+        Queries the device for each known format at ``DEFAULT_DISPLAY_MODE``.
 
         Returns
         -------
@@ -1268,68 +1182,41 @@ class BMDDeckLink:
         ------
         RuntimeError
             If the device is not open
-
-        Notes
-        -----
-        If a pixel format string cannot be parsed to a known enum value, a warning
-        is printed asking the user to report the unknown format as a GitHub issue.
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-
-        count = DecklinkSDKWrapper.decklink_get_supported_pixel_format_count(
-            self.handle
-        )
-        formats = []
-        for i in range(count):
-            name = ctypes.create_string_buffer(256)
-            if (
-                DecklinkSDKWrapper.decklink_get_supported_pixel_format_name(
-                    self.handle, i, name, 256
-                )
-                == 0
+        device = self._require_device()
+        supported = []
+        for pixel_format_type in PixelFormatType:
+            if pixel_format_type.sdk_format_code == 0:
+                continue
+            try:
+                pd_format = _to_pydecklink_pixel_format(pixel_format_type)
+            except ValueError:
+                # Format known to this project but not bound by pydecklink
+                continue
+            if device.does_support_video_mode(
+                pydecklink.VideoConnection.Unspecified,
+                DEFAULT_DISPLAY_MODE,
+                pd_format,
             ):
-                format_string = name.value.decode("utf-8")
-                try:
-                    # Try to parse the format string to a PixelFormatType enum
-                    # First try direct parsing, then try extracting format codes from parentheses
-                    try:
-                        pixel_format = PixelFormatType.parse(format_string)
-                    except ValueError as e:
-                        # Try to extract format code from strings like "8Bit ARGB (32)" or "12Bit RGB LE ('R12L')"
-                        # Look for format codes in parentheses, both with and without quotes
-                        match = re.search(r"\((?:'([^']+)'|([^)]+))\)", format_string)
-                        if match:
-                            format_code = match.group(1) or match.group(2)
-                            pixel_format = PixelFormatType.parse(format_code)
-                        else:
-                            raise ValueError(
-                                f"Could not extract format code from: {format_string}"
-                            ) from e
-
-                    formats.append(pixel_format)
-                except ValueError:
-                    # Print warning and ask user to report unknown format
-                    print(
-                        f"⚠️  WARNING: Unknown pixel format detected: '{format_string}'"
-                    )
-                    print(
-                        "📝 Please help improve this project by reporting this unknown format:"
-                    )
-                    print(f"   1. Copy this exact string: '{format_string}'")
-                    print(
-                        "   2. Create a new issue at: https://github.com/OpenLEDEval/bmd-signal-gen/issues"
-                    )
-                    print(
-                        "   3. Include your device model and the unknown format string"
-                    )
-                    print("   This format will be skipped for now.")
-                    print()
-        return formats
+                supported.append(pixel_format_type)
+        return supported
 
     @property
     def supports_hdr(self) -> bool:
-        return DecklinkSDKWrapper.decklink_device_supports_hdr(self.handle)
+        """
+        Check if the device supports HDR metadata output.
+
+        Returns
+        -------
+        bool
+            True if the device supports HDR metadata, False otherwise
+
+        Raises
+        ------
+        RuntimeError
+            If the device is not open
+        """
+        return bool(self._require_device().supports_hdr)
 
     @property
     def pixel_format(self) -> PixelFormatType:
@@ -1345,18 +1232,17 @@ class BMDDeckLink:
         ------
         RuntimeError
             If the device is not open
-        ValueError
-            If the SDK format code cannot be matched to a known PixelFormatType
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        sdk_format_code = DecklinkSDKWrapper.decklink_get_pixel_format(self.handle)
-        return PixelFormatType.parse(sdk_format_code)
+        self._require_device()
+        return self._pixel_format
 
     @pixel_format.setter
     def pixel_format(self, pixel_format_type: PixelFormatType) -> None:
         """
         Set the pixel format using a PixelFormatType enum.
+
+        The format takes effect when playback starts; frames are packed to
+        this format by ``display_frame``.
 
         Parameters
         ----------
@@ -1366,21 +1252,33 @@ class BMDDeckLink:
         Raises
         ------
         RuntimeError
-            If the device is not open or setting the format fails
+            If the device is not open or the device does not support the
+            format
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        res = DecklinkSDKWrapper.decklink_set_pixel_format(
-            self.handle, pixel_format_type.sdk_format_code
-        )
-        if res != 0:
+        device = self._require_device()
+        try:
+            pd_format = _to_pydecklink_pixel_format(pixel_format_type)
+        except ValueError as error:
             raise RuntimeError(
-                f"Failed to set pixel format {pixel_format_type.name} (error {res})"
+                f"Failed to set pixel format {pixel_format_type.name} ({error})"
+            ) from error
+        if not device.does_support_video_mode(
+            pydecklink.VideoConnection.Unspecified,
+            DEFAULT_DISPLAY_MODE,
+            pd_format,
+        ):
+            raise RuntimeError(
+                f"Failed to set pixel format {pixel_format_type.name} "
+                "(not supported by device)"
             )
+        self._pixel_format = pixel_format_type
 
     def set_hdr_metadata(self, metadata: HDRMetadata) -> None:
         """
         Set complete HDR metadata for all future frames.
+
+        The metadata is attached to every frame built by ``display_frame``
+        (the SDK carries HDR10 metadata per frame).
 
         Parameters
         ----------
@@ -1390,19 +1288,17 @@ class BMDDeckLink:
         Raises
         ------
         RuntimeError
-            If the device is not open or setting metadata fails
+            If the device is not open
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
-        res = DecklinkSDKWrapper.decklink_set_hdr_metadata(
-            self.handle, ctypes.byref(metadata)
-        )
-        if res != 0:
-            raise RuntimeError(f"Failed to set HDR metadata (error {res})")
+        self._require_device()
+        self._hdr_metadata = metadata
 
     def display_frame(self, frame_data: np.ndarray) -> None:
         """
         Display a single frame synchronously.
+
+        Packs the frame to the configured pixel format, attaches any HDR
+        metadata, and displays it via the synchronous single-frame path.
 
         Parameters
         ----------
@@ -1416,26 +1312,23 @@ class BMDDeckLink:
         ValueError
             If frame_data is not a valid numpy array
         """
-        if not self.handle:
-            raise RuntimeError("Device not open")
+        device = self._require_device()
+        if not isinstance(frame_data, np.ndarray):
+            raise ValueError("frame_data must be a numpy array")
+        if frame_data.ndim == 2:
+            frame_data = np.stack([frame_data] * 3, axis=-1)
+        elif frame_data.ndim != 3:
+            raise ValueError("frame_data must be 2D or 3D array")
+        frame_data = np.ascontiguousarray(frame_data.astype(np.uint16))
+        height, width = frame_data.shape[:2]
 
-        frame_data = np.astype(frame_data, np.uint16, copy=True)
-        frame_data = np.ascontiguousarray(frame_data)
-
-        # Set frame data
-        data_ptr, height, width = ndarray_to_bmd_frame_buffer(frame_data)
-        res = DecklinkSDKWrapper.decklink_set_frame_data(
-            self.handle, data_ptr, width, height
-        )
-        if res != 0:
-            raise RuntimeError(f"Failed to set frame data (error {res})")
-
-        # Create frame
-        res = DecklinkSDKWrapper.decklink_create_frame_from_data(self.handle)
-        if res != 0:
-            raise RuntimeError(f"Failed to create frame (error {res})")
-
-        # Display frame synchronously
-        res = DecklinkSDKWrapper.decklink_display_frame_sync(self.handle)
-        if res != 0:
-            raise RuntimeError(f"Failed to display frame synchronously (error {res})")
+        pd_format = _to_pydecklink_pixel_format(self._pixel_format)
+        try:
+            row_bytes = pydecklink.get_row_bytes(pd_format, width)
+            frame = device.create_video_frame(width, height, row_bytes, pd_format)
+            frame.data[:] = packing.pack(frame_data, pd_format, frame.row_bytes)
+            if self._hdr_metadata is not None:
+                frame.set_hdr_metadata(_to_pydecklink_hdr_metadata(self._hdr_metadata))
+            device.display_frame_sync_frame(frame)
+        except RuntimeError as error:
+            raise RuntimeError(f"Failed to display frame ({error})") from error

@@ -382,8 +382,6 @@ def patch_decklink_module():
             "bmd_sg.decklink.bmd_decklink.get_decklink_sdk_version",
             mock_get_decklink_sdk_version,
         ),
-        # Also patch the SDK wrapper to prevent real library loading
-        patch("bmd_sg.decklink.bmd_decklink.DecklinkSDKWrapper", MagicMock()),
     ]
 
     with contextlib.ExitStack() as stack:
