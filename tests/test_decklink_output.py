@@ -84,7 +84,7 @@ class TestHDRMetadataStructure:
         from bmd_sg.decklink.bmd_decklink import EOTFType
 
         metadata = HDRMetadata(eotf=EOTFType.PQ, max_cll=10000.0, max_fall=400.0)
-        assert metadata.EOTF == EOTFType.PQ.int_value
+        assert EOTFType.PQ.int_value == metadata.EOTF
         assert metadata.maxCLL == 10000.0
         assert metadata.maxFALL == 400.0
 
