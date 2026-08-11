@@ -46,8 +46,16 @@ class TestBackend:
         assert hasattr(bmd_decklink_module, "pydecklink")
 
     def test_get_decklink_devices_returns_names(self) -> None:
-        """Device enumeration returns a list of device name strings."""
-        devices = get_decklink_devices()
+        """Device enumeration returns a list of device name strings.
+
+        Enumeration needs the Desktop Video driver but no connected
+        device; on a driverless host (CI runners) it raises, so skip
+        there rather than fail.
+        """
+        try:
+            devices = get_decklink_devices()
+        except RuntimeError as error:
+            pytest.skip(f"DeckLink driver unavailable: {error}")
         assert isinstance(devices, list)
         assert all(isinstance(name, str) for name in devices)
 
