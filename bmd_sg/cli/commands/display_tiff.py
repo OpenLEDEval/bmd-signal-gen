@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from display_patterns.charts.tiff_reader import load_chart_tiff
 from rich.console import Console
 
 from bmd_sg.cli.shared import (
@@ -53,6 +52,9 @@ def display_tiff_command(
         bmd-signal-gen display-tiff chart.tif --duration 10
         bmd-signal-gen --device 1 display-tiff pattern.tif
     """
+    # Deferred import: tifffile stays off the CLI startup path.
+    from display_patterns.charts.tiff_reader import load_chart_tiff
+
     # Check file exists
     if not tiff_path.exists():
         console.print(f"[red]Error:[/red] File not found: {tiff_path}")
