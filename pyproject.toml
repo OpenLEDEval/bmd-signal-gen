@@ -41,6 +41,7 @@ classifiers = [
     "Topic :: System :: Hardware :: Hardware Drivers",
 ]
 dependencies = [
+    "display-patterns[charts,io]",
     "numpy>=2.3.1",
     "fastapi>=0.111.0",
     "pydantic>=2.12",
@@ -66,6 +67,9 @@ Changelog = "https://github.com/OpenLEDEval/bmd-signal-gen/blob/main/CHANGELOG.m
 
 [project.scripts]
 bmd-signal-gen = "bmd_sg.cli.main:app"
+
+[tool.uv.sources]
+display-patterns = { git = "https://github.com/OpenLEDEval/display-patterns", tag = "v0.1.0" }
 
 [build-system]
 requires = ["hatchling"]

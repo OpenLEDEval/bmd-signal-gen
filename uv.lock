@@ -58,6 +58,7 @@ version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "colour-science" },
+    { name = "display-patterns", extra = ["charts", "io"] },
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pillow" },
@@ -89,6 +90,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "colour-science", specifier = ">=0.4.6" },
+    { name = "display-patterns", extras = ["charts", "io"], git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.1.0" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pillow", specifier = ">=12.1.1" },
@@ -201,6 +203,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f4/66/6e2216ffae6f0008118c99d6f425f7591e688671ab99f5636f7f65021395/colour_science-0.4.7.tar.gz", hash = "sha256:b34773dc4dd3f9ba99cca5297fa10e9f532134d994b3a2308dacbe970dfd5079", size = 13283171, upload-time = "2025-12-06T08:15:08.229Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/9e/ce54e33f383d7e1432be9fb39557477779ccb155c60033c491609936dacf/colour_science-0.4.7-py3-none-any.whl", hash = "sha256:fe2383d86e507fc11a4b5206ff31a7399031e0dce527e22ec06eeb491d45d9a7", size = 9065613, upload-time = "2025-12-06T08:15:14.908Z" },
+]
+
+[[package]]
+name = "display-patterns"
+version = "0.1.0"
+source = { git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.1.0#3e99ffd53474ee13e57dae6893a94fe45933dbfd" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[package.optional-dependencies]
+charts = [
+    { name = "colour-science" },
+    { name = "pillow" },
+    { name = "pyyaml" },
+    { name = "scipy" },
+]
+io = [
+    { name = "tifffile" },
 ]
 
 [[package]]
