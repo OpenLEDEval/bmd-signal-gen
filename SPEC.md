@@ -75,3 +75,48 @@ to every frame it builds. Callers keep the simpler device-level model.
   single-frame.
 - The FastAPI server's device management model (global state, enumeration
   at init) is unchanged.
+
+## Pattern library §spec:pattern-library
+
+*Status: in progress*
+
+### Problem
+
+`bmd_sg/image_generators/` and `bmd_sg/charts/` imported nothing from the
+device layer: a generic pattern/chart library carried inside a DeckLink
+tool. Other OpenLEDEval tools could not consume the math without DeckLink
+baggage.
+
+### Split
+
+The modules and their tests moved verbatim to
+[display-patterns](https://github.com/OpenLEDEval/display-patterns)
+(import package `display_patterns`): `bmd_sg/image_generators/` →
+`display_patterns.image_generators`, `bmd_sg/charts/` →
+`display_patterns.charts`. The package is a numpy-only core taking a
+caller-supplied array namespace, with `charts` (colour-science, Pillow,
+PyYAML) and `io` (tifffile) extras (`§spec:package-shape` there).
+
+The API stays value-space agnostic: measurement drives exact integer code
+values at a stated bit depth, so the library never rescales or quantizes
+behind the caller. The frame-indexed rendering signature and the
+temporal-alignment counter-panel catalog entry are specified in
+display-patterns' own SPEC (`§spec:render-model`, `§spec:catalog` there);
+this document does not re-spec them.
+
+### Consumption
+
+bmd-signal-gen depends on `display-patterns[charts,io]` as a git
+dependency pinned to tag v0.1.0. PyPI publishing is deferred org-wide
+pending the org rename/confirmation, tracked in display-patterns' roadmap
+(`§road:first-release` there). Consequence: bmd-signal-gen cannot itself
+publish to PyPI while carrying a git dependency — acceptable, it is not
+published today.
+
+### Deprecation shims
+
+Every previously importable module path under `bmd_sg.image_generators`
+and `bmd_sg.charts` keeps working for one release cycle as a re-export
+shim: module-level `DeprecationWarning`, explicit re-exports, `__all__`
+preserved. CLI, API server, and examples import `display_patterns.*`
+directly. Shim removal is scheduled (§road:remove-shims).
