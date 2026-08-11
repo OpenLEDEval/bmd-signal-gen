@@ -94,8 +94,9 @@ The modules and their tests moved verbatim to
 (import package `display_patterns`): `bmd_sg/image_generators/` →
 `display_patterns.image_generators`, `bmd_sg/charts/` →
 `display_patterns.charts`. The package is a numpy-only core taking a
-caller-supplied array namespace, with `charts` (colour-science, Pillow,
-PyYAML) and `io` (tifffile) extras (`§spec:package-shape` there).
+caller-supplied array namespace, with `charts` and `io` extras supplying
+the chart and file-export dependency stacks — their contents are
+upstream's contract (`§spec:package-shape` there), not re-pinned here.
 
 The API stays value-space agnostic: measurement drives exact integer code
 values at a stated bit depth, so the library never rescales or quantizes
@@ -118,5 +119,12 @@ published today.
 Every previously importable module path under `bmd_sg.image_generators`
 and `bmd_sg.charts` keeps working for one release cycle as a re-export
 shim: module-level `DeprecationWarning`, explicit re-exports, `__all__`
-preserved. CLI, API server, and examples import `display_patterns.*`
-directly. Shim removal is scheduled (§road:remove-shims).
+preserved. Importing a nested shim warns once per shim package on the
+path (parent, then leaf) — the accepted cost of per-module shims. The
+`bmd_sg.charts` shim mirrors upstream's lazy loading, so no shim import
+drags in the chart dependency stack. The root package's `ROI`,
+`PatternGenerator`, and `ColorRangeError` re-exports are permanent
+façade surface, not shims: they resolve silently and stay after
+§road:remove-shims. CLI, API server, and examples import
+`display_patterns.*` directly. Shim removal is scheduled
+(§road:remove-shims).

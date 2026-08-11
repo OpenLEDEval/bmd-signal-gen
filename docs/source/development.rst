@@ -210,7 +210,8 @@ Project Structure
     bmd-signal-gen/
     ├── bmd_sg/                    # Main Python package
     │   ├── decklink/              # DeckLink device layer (pydecklink)
-    │   ├── image_generators/      # Pattern generation
+    │   ├── image_generators/      # Deprecation shims (display-patterns)
+    │   ├── charts/                # Deprecation shims (display-patterns)
     │   ├── cli/                   # Command-line interface
     │   └── utilities/             # Helper functions
     ├── docs/                      # Sphinx documentation

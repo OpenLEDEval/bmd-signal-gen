@@ -17,8 +17,8 @@ Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with 
 **`shared.py`**: Device setup workflow, pixel format auto-selection (12-bit RGB preferred), HDR metadata setup, color validation, centralized error handling  
 **`commands/`**: Pattern commands (`checkerboard_commands.py`, `solid.py`, `device_details.py`)
 
-### `/bmd_sg/image_generators/`
-**`checkerboard.py`**: `PatternGenerator` class with ROI support, NumPy-based pattern generation, color expansion (1-4 colors), bit-depth validation, `ColorRangeError` exception
+### `/bmd_sg/image_generators/` and `/bmd_sg/charts/`
+Deprecation shims only — `PatternGenerator`, `ROI`, chart production, and TIFF I/O live in the [display-patterns](https://github.com/OpenLEDEval/display-patterns) package (SPEC §spec:pattern-library); import `display_patterns.*` in new code
 
 ### `/bmd_sg/utilities/`
 **`__init__.py`**: `suppress_cpp_output()` context manager for native library output redirection

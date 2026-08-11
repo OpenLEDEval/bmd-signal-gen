@@ -78,26 +78,14 @@ Python DeckLink Interface (``bmd_sg/decklink/``)
   * Comprehensive type hints throughout
   * Default HDR values optimized for professional use
 
-Pattern Generation (``bmd_sg/image_generators/``)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Pattern Generation (display-patterns)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Purpose:** Efficient test pattern generation using NumPy.
-
-**Key Features:**
-  * ``PatternGenerator`` class with bit-depth awareness
-  * ``ROI`` (Region of Interest) support for targeted testing
-  * Optimized NumPy algorithms avoiding Python loops
-  * Color validation against device bit depth
-
-**Pattern Types:**
-  * 2-color, 3-color, and 4-color checkerboard patterns
-  * Solid color fills
-  * Custom ROI-based rendering
-
-**Performance Optimizations:**
-  * NumPy advanced indexing for pattern generation
-  * Contiguous memory layouts for hardware transfer
-  * Minimal array copying with in-place operations
+Pattern and chart generation moved to the
+`display-patterns <https://github.com/OpenLEDEval/display-patterns>`_
+package (see SPEC §spec:pattern-library). ``bmd_sg.image_generators``
+and ``bmd_sg.charts`` remain as deprecation shims for one release
+cycle.
 
 Command Line Interface (``bmd_sg/cli/``)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
