@@ -11,9 +11,10 @@ import threading
 import time
 from typing import Any
 
+from display_patterns.image_generators.checkerboard import PatternGenerator
+
 from bmd_sg.cli.shared import validate_color
 from bmd_sg.decklink.bmd_decklink import BMDDeckLink, DecklinkSettings
-from bmd_sg.image_generators.checkerboard import PatternGenerator
 
 
 class APIDeviceManager:

@@ -53,7 +53,9 @@ both capable of full 12-bit RGB output at 1080p30.
 
 DeckLink access comes from
 [pydecklink](https://github.com/Fuse-Technical-Group/pydecklink), installed
-from PyPI. No SDK download or C++ toolchain is required.
+from PyPI. Pattern and chart math comes from
+[display-patterns](https://github.com/OpenLEDEval/display-patterns),
+installed from git. No SDK download or C++ toolchain is required.
 
 ### Installation
 
@@ -184,8 +186,8 @@ bmd-signal-gen/
 │   ├── decklink/                     # DeckLink device layer (pydecklink)
 │   │   ├── bmd_decklink.py           # DeckLinkOutput protocol and adapter
 │   │   └── mock/                     # Mock device implementation
-│   ├── image_generators/             # Pattern generation
-│   │   └── checkerboard.py           # Checkerboard pattern generator
+│   ├── image_generators/             # Deprecated shims (moved to display-patterns)
+│   ├── charts/                       # Deprecated shims (moved to display-patterns)
 │   └── utilities/                    # System utilities
 ├── docs/                             # Sphinx-compatible documentation source
 ├── examples/                         # Demo and test scripts

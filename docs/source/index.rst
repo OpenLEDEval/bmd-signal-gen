@@ -46,7 +46,6 @@ Contents
    :caption: API Reference:
 
    api/bmd_sg.decklink
-   api/bmd_sg.image_generators  
    api/bmd_sg.cli
    api/bmd_sg.utilities
 

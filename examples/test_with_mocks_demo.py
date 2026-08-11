@@ -13,13 +13,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
+from display_patterns.image_generators.checkerboard import PatternGenerator
 
 from bmd_sg.decklink.bmd_decklink import (
     EOTFType,
     HDRMetadata,
     PixelFormatType,
 )
-from bmd_sg.image_generators.checkerboard import PatternGenerator
 from tests.mocks.mock_decklink import (
     MockBMDDeckLink,
     mock_get_decklink_devices,

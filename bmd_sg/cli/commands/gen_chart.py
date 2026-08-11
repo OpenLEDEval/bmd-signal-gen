@@ -10,18 +10,13 @@ from typing import Annotated
 
 import numpy as np
 import typer
-from PIL import Image, ImageDraw, ImageFont
-from rich.console import Console
-
-from bmd_sg.charts.color_types import (
+from display_patterns.charts.color_types import (
     ColorSpace,
     Illuminant,
     LightSource,
     TransferFunction,
 )
-from bmd_sg.charts.loaders import load_chart
-from bmd_sg.charts.renderer import render_chart
-from bmd_sg.charts.tiff_writer import write_chart_tiff
+from rich.console import Console
 
 console = Console()
 
@@ -123,6 +118,12 @@ def gen_chart_command(
         bmd-signal-gen gen-chart chart.yaml --width 3840 --height 2160 -o chart_4k.tif
         bmd-signal-gen gen-chart chart.yaml --light-cct 5600 -o chart_5600k.tif
     """
+    # Deferred imports: colour-science, Pillow, and tifffile stay off the
+    # CLI startup path so unrelated commands and --help stay fast.
+    from display_patterns.charts.loaders import load_chart
+    from display_patterns.charts.renderer import render_chart
+    from display_patterns.charts.tiff_writer import write_chart_tiff
+
     # Map CLI options to internal types
     cs_map = {
         ColorSpaceOption.REC709: ColorSpace.REC709,
@@ -276,6 +277,9 @@ def _write_preview_png(
     height : int
         Image height.
     """
+    # Deferred import: Pillow is needed only for the preview path.
+    from PIL import Image, ImageDraw, ImageFont
+
     # Convert to 8-bit for PNG
     image_8bit = (image >> (bit_depth - 8)).astype(np.uint8)
     pil_image = Image.fromarray(image_8bit, mode="RGB")

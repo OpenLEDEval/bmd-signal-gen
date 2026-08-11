@@ -41,20 +41,19 @@ classifiers = [
     "Topic :: System :: Hardware :: Hardware Drivers",
 ]
 dependencies = [
+    # Git-pinned to a tag while PyPI publishing is deferred; see
+    # SPEC §spec:pattern-library and [tool.uv.sources] below. The chart
+    # stack (colour-science, Pillow, PyYAML, scipy, tifffile) arrives
+    # through its extras — do not re-pin those here.
+    "display-patterns[charts,io]>=0.1.0",
     "numpy>=2.3.1",
     "fastapi>=0.111.0",
     "pydantic>=2.12",
-    "pyyaml>=6.0.1",
     "uvicorn>=0.35.0",
     "typer>=0.16,<0.17",
     "rich>=14.0.0",
-    "colour-science>=0.4.6",
-    "tifffile>=2024.8.30",
     "pillow>=12.1.1",
     "pydecklink>=0.6.1",
-    # Not imported directly: colour-science uses scipy opportunistically
-    # (CCT/chromatic adaptation) and warns at import when it is absent.
-    "scipy>=1.16.3",
 ]
 
 [project.urls]
@@ -66,6 +65,9 @@ Changelog = "https://github.com/OpenLEDEval/bmd-signal-gen/blob/main/CHANGELOG.m
 
 [project.scripts]
 bmd-signal-gen = "bmd_sg.cli.main:app"
+
+[tool.uv.sources]
+display-patterns = { git = "https://github.com/OpenLEDEval/display-patterns", tag = "v0.1.0" }
 
 [build-system]
 requires = ["hatchling"]
