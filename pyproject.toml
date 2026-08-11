@@ -165,3 +165,7 @@ reportUnboundVariable = false
 reportUnnecessaryCast = true
 reportUnsupportedDunderAll = false
 reportUnusedExpression = false
+[tool.pytest.ini_options]
+# examples/ are runnable scripts, not tests — one opens a real device at
+# import time. Scope collection so bare `pytest` matches `invoke test`.
+testpaths = ["tests"]
