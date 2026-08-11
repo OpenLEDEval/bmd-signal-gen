@@ -66,6 +66,7 @@ installed from git. No SDK download or C++ toolchain is required.
    ```
 
 2. **Verify installation**:
+
    ```bash
    uv run bmd-signal-gen --help
    ```
@@ -175,7 +176,7 @@ The primary recommended video output is HDMI. SDI support is currently less well
 
 ### Project Structure
 
-```
+```text
 bmd-signal-gen/
 ├── bmd_sg/                           # Main Python package
 │   ├── api/                          # REST API implementation
