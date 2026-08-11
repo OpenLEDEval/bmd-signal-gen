@@ -84,7 +84,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "display-patterns", extras = ["charts", "io"], git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.1.0" },
+    { name = "display-patterns", extras = ["charts", "io"], git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.2.0" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pillow", specifier = ">=12.1.1" },
@@ -198,8 +198,8 @@ wheels = [
 
 [[package]]
 name = "display-patterns"
-version = "0.1.0"
-source = { git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.1.0#3e99ffd53474ee13e57dae6893a94fe45933dbfd" }
+version = "0.2.0"
+source = { git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.2.0#d2fcd5f0de5cfadaacdbd34ac6580bc2fe91783d" }
 dependencies = [
     { name = "numpy" },
 ]
