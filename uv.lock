@@ -57,17 +57,13 @@ name = "bmd-signal-generator"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "colour-science" },
     { name = "display-patterns", extra = ["charts", "io"] },
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pydantic" },
     { name = "pydecklink" },
-    { name = "pyyaml" },
     { name = "rich" },
-    { name = "scipy" },
-    { name = "tifffile" },
     { name = "typer" },
     { name = "uvicorn" },
 ]
@@ -89,17 +85,13 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "colour-science", specifier = ">=0.4.6" },
     { name = "display-patterns", extras = ["charts", "io"], git = "https://github.com/OpenLEDEval/display-patterns?tag=v0.1.0" },
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "pydantic", specifier = ">=2.12" },
     { name = "pydecklink", specifier = ">=0.6.1" },
-    { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "rich", specifier = ">=14.0.0" },
-    { name = "scipy", specifier = ">=1.16.3" },
-    { name = "tifffile", specifier = ">=2024.8.30" },
     { name = "typer", specifier = ">=0.16,<0.17" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
