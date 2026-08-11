@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/OpenLEDEval/bmd-signal-gen/compare/v0.2.0...v0.2.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **decklink:** resolve EOTF integer lookups without the 3.13-only enum alias API ([d3ed877](https://github.com/OpenLEDEval/bmd-signal-gen/commit/d3ed87724bbdeab8de180629819c476a874006c8))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
