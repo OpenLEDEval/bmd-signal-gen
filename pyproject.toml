@@ -1,6 +1,7 @@
 [project]
 name = "bmd-signal-generator"
-version = "0.2.0"
+# Version derives from git tags (hatch-vcs); flywheel cuts the tags.
+dynamic = ["version"]
 description = "Cross-platform BMD signal generator for Blackmagic Design DeckLink devices with HDR metadata support"
 authors = [
     { name = "Ritchie Argue", email = "4462072+repentsinner@users.noreply.github.com" },
@@ -70,8 +71,12 @@ bmd-signal-gen = "bmd_sg.cli.main:app"
 display-patterns = { git = "https://github.com/OpenLEDEval/display-patterns", tag = "v0.1.0" }
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["bmd_sg"]
@@ -116,6 +121,9 @@ select = [
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
+    # Blanket `# type: ignore` can silence version-compatibility errors
+    # (it hid the 3.13-only enum-alias call from pyright's 3.12 check).
+    "PGH003", # blanket-type-ignore
 ]
 ignore = [
     "E501", # Line too long (handled by formatter)
@@ -160,3 +168,8 @@ reportUnboundVariable = false
 reportUnnecessaryCast = true
 reportUnsupportedDunderAll = false
 reportUnusedExpression = false
+
+[tool.pytest.ini_options]
+# examples/ are runnable scripts, not tests — one opens a real device at
+# import time. Scope collection so bare `pytest` matches `invoke test`.
+testpaths = ["tests"]

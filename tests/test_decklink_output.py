@@ -46,8 +46,16 @@ class TestBackend:
         assert hasattr(bmd_decklink_module, "pydecklink")
 
     def test_get_decklink_devices_returns_names(self) -> None:
-        """Device enumeration returns a list of device name strings."""
-        devices = get_decklink_devices()
+        """Device enumeration returns a list of device name strings.
+
+        Enumeration needs the Desktop Video driver but no connected
+        device; on a driverless host (CI runners) it raises, so skip
+        there rather than fail.
+        """
+        try:
+            devices = get_decklink_devices()
+        except RuntimeError as error:
+            pytest.skip(f"DeckLink driver unavailable: {error}")
         assert isinstance(devices, list)
         assert all(isinstance(name, str) for name in devices)
 
@@ -137,3 +145,10 @@ class TestHardwareAdapter:
             frame = np.full((1080, 1920, 3), max_code // 2, dtype=np.uint16)
             device.display_frame(frame)
             device.stop_playback()
+
+
+def test_eotf_integer_lookup_resolves_on_all_supported_pythons():
+    """``EOTFType(2)`` resolves by SDK code via ``_missing_`` (works on 3.12)."""
+    assert bmd_decklink_module.EOTFType(2) is bmd_decklink_module.EOTFType.PQ
+    assert bmd_decklink_module.EOTFType(0) is bmd_decklink_module.EOTFType.RESERVED
+    assert bmd_decklink_module.EOTFType.parse("hlg") is bmd_decklink_module.EOTFType.HLG

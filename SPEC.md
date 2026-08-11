@@ -50,7 +50,7 @@ established device surface:
 Why this surface: it is the existing `BMDDeckLink` API. Twelve call sites
 (CLI, API server, examples) and the mock already code to it, so the swap is
 confined to one adapter and callers do not change. pydecklink's own SPEC
-names this integration path (§spec:test-pattern-generation): a narrow
+names this integration path (`§spec:test-pattern-generation` there): a narrow
 protocol in signal-gen that either backend satisfies.
 
 Why device-level HDR metadata: pydecklink attaches HDR metadata per frame

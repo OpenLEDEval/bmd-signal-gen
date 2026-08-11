@@ -278,9 +278,32 @@ class EOTFType(str, Enum):
     def __new__(cls, value: str, *args: Any):
         self = str.__new__(cls, value)
         self._value_ = value
-        for a in args:
-            self._add_value_alias_(a)  # type: ignore Added in python 3.13
+        del args  # consumed by __init__ as int_value
         return self
+
+    @classmethod
+    def _missing_(cls, value: object) -> "EOTFType | None":
+        """
+        Resolve ``EOTFType(2)``-style lookups by SDK integer code.
+
+        Replaces the ``_add_value_alias_`` API, which exists only on
+        Python 3.13+, so integer lookups work on every supported version.
+
+        Parameters
+        ----------
+        value : object
+            Candidate lookup value; only integers resolve.
+
+        Returns
+        -------
+        EOTFType or None
+            The member whose ``int_value`` matches, or None.
+        """
+        if isinstance(value, int):
+            for member in cls:
+                if member.int_value == value:
+                    return member
+        return None
 
     def __init__(
         self,
