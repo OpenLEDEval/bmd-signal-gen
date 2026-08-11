@@ -137,3 +137,10 @@ class TestHardwareAdapter:
             frame = np.full((1080, 1920, 3), max_code // 2, dtype=np.uint16)
             device.display_frame(frame)
             device.stop_playback()
+
+
+def test_eotf_integer_lookup_resolves_on_all_supported_pythons():
+    """``EOTFType(2)`` resolves by SDK code via ``_missing_`` (works on 3.12)."""
+    assert bmd_decklink_module.EOTFType(2) is bmd_decklink_module.EOTFType.PQ
+    assert bmd_decklink_module.EOTFType(0) is bmd_decklink_module.EOTFType.RESERVED
+    assert bmd_decklink_module.EOTFType.parse("hlg") is bmd_decklink_module.EOTFType.HLG
