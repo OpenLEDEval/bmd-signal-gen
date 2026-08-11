@@ -1,17 +1,30 @@
 """
-Chart generation module for BMD signal generator.
+Deprecated shim for ``display_patterns.charts``.
 
-This module provides tools for creating display-ready test charts from
-colorimetric data (XYZ, RGB, or built-in definitions like SMPTE bars).
-Charts can include optional text labels for measurement validation
-with spectroradiometers and colorimeters.
+Chart production moved to the display-patterns package
+(§spec:pattern-library). This module re-exports the display-patterns
+equivalents so existing ``bmd_sg.charts`` imports keep working for one
+release cycle. Import from ``display_patterns.charts`` instead.
 """
 
-from bmd_sg.charts.color_types import ChartLayout, ColorValue, Patch
-from bmd_sg.charts.conversion import xyz_to_display_rgb
-from bmd_sg.charts.renderer import render_chart
-from bmd_sg.charts.tiff_reader import TiffMetadata, load_chart_tiff
-from bmd_sg.charts.tiff_writer import write_chart_tiff
+import warnings
+
+from display_patterns.charts import (
+    ChartLayout,
+    ColorValue,
+    Patch,
+    TiffMetadata,
+    load_chart_tiff,
+    render_chart,
+    write_chart_tiff,
+    xyz_to_display_rgb,
+)
+
+warnings.warn(
+    "bmd_sg.charts is deprecated; import display_patterns.charts instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "ChartLayout",

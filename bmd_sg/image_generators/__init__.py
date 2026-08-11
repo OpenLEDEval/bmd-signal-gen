@@ -1,15 +1,26 @@
 """
-Image generators for BMD signal generation.
+Deprecated shim for ``display_patterns.image_generators``.
 
-This package provides various pattern and image generation utilities for BMD
-DeckLink devices, including checkerboard patterns, solid colors, and other
-test patterns commonly used in video production and display testing.
+Pattern generation moved to the display-patterns package
+(§spec:pattern-library). This module re-exports the display-patterns
+equivalents so existing ``bmd_sg.image_generators`` imports keep working
+for one release cycle. Import from ``display_patterns.image_generators``
+instead.
 """
 
-from bmd_sg.image_generators.checkerboard import (
+import warnings
+
+from display_patterns.image_generators import (
     DEFAULT_PATTERN_GENERATOR,
     ROI,
     PatternGenerator,
+)
+
+warnings.warn(
+    "bmd_sg.image_generators is deprecated; "
+    "import display_patterns.image_generators instead",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 __all__ = [
