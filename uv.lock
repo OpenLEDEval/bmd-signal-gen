@@ -54,7 +54,6 @@ wheels = [
 
 [[package]]
 name = "bmd-signal-generator"
-version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "display-patterns", extra = ["charts", "io"] },
