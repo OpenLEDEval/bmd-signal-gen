@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from display_patterns.charts.tiff_reader import load_chart_tiff
 from rich.console import Console
 
-from bmd_sg.charts.tiff_reader import load_chart_tiff
 from bmd_sg.cli.shared import (
     display_image_for_duration,
     get_device_settings,

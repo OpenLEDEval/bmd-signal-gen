@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import typer
+from display_patterns.image_generators.checkerboard import ROI, PatternGenerator
 from numpy.typing import ArrayLike
 
 from bmd_sg.decklink.bmd_decklink import (
@@ -21,7 +22,6 @@ from bmd_sg.decklink.bmd_decklink import (
     get_decklink_driver_version,
     get_decklink_sdk_version,
 )
-from bmd_sg.image_generators.checkerboard import ROI, PatternGenerator
 
 # Optional mock imports for --mock-device support
 try:

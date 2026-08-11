@@ -10,18 +10,17 @@ from typing import Annotated
 
 import numpy as np
 import typer
-from PIL import Image, ImageDraw, ImageFont
-from rich.console import Console
-
-from bmd_sg.charts.color_types import (
+from display_patterns.charts.color_types import (
     ColorSpace,
     Illuminant,
     LightSource,
     TransferFunction,
 )
-from bmd_sg.charts.loaders import load_chart
-from bmd_sg.charts.renderer import render_chart
-from bmd_sg.charts.tiff_writer import write_chart_tiff
+from display_patterns.charts.loaders import load_chart
+from display_patterns.charts.renderer import render_chart
+from display_patterns.charts.tiff_writer import write_chart_tiff
+from PIL import Image, ImageDraw, ImageFont
+from rich.console import Console
 
 console = Console()
 
