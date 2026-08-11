@@ -121,6 +121,9 @@ select = [
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
+    # Blanket `# type: ignore` can silence version-compatibility errors
+    # (it hid the 3.13-only enum-alias call from pyright's 3.12 check).
+    "PGH003", # blanket-type-ignore
 ]
 ignore = [
     "E501", # Line too long (handled by formatter)
