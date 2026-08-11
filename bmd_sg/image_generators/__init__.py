@@ -8,20 +8,15 @@ for one release cycle. Import from ``display_patterns.image_generators``
 instead.
 """
 
-import warnings
-
 from display_patterns.image_generators import (
     DEFAULT_PATTERN_GENERATOR,
     ROI,
     PatternGenerator,
 )
 
-warnings.warn(
-    "bmd_sg.image_generators is deprecated; "
-    "import display_patterns.image_generators instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "DEFAULT_PATTERN_GENERATOR",

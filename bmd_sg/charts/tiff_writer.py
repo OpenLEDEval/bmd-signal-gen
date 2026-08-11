@@ -8,16 +8,11 @@ working for one release cycle. Import from
 ``display_patterns.charts.tiff_writer`` instead.
 """
 
-import warnings
-
 from display_patterns.charts.tiff_writer import ChartMetadata, write_chart_tiff
 
-warnings.warn(
-    "bmd_sg.charts.tiff_writer is deprecated; "
-    "import display_patterns.charts.tiff_writer instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "ChartMetadata",

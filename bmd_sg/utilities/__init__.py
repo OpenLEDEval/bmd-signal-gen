@@ -7,7 +7,35 @@ the BMD signal generator, including output suppression and other utilities.
 
 import contextlib
 import os
+import warnings
 from collections.abc import Generator
+
+
+def warn_moved(name: str) -> None:
+    """
+    Emit the deprecation warning for a module that moved to display-patterns.
+
+    Derives the replacement path mechanically (``bmd_sg.`` →
+    ``display_patterns.``), so the migration advice cannot drift from the
+    module it lives in (§spec:pattern-library).
+
+    Parameters
+    ----------
+    name : str
+        The shim module's ``__name__``.
+
+    Examples
+    --------
+    At the top of a shim module:
+
+    >>> warn_moved(__name__)  # doctest: +SKIP
+    """
+    replacement = name.replace("bmd_sg.", "display_patterns.", 1)
+    warnings.warn(
+        f"{name} is deprecated; import {replacement} instead",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 @contextlib.contextmanager
@@ -57,4 +85,4 @@ def suppress_cpp_output() -> Generator[None]:
             os.close(old_stderr)
 
 
-__all__ = ["suppress_cpp_output"]
+__all__ = ["suppress_cpp_output", "warn_moved"]

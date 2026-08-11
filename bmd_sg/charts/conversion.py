@@ -8,20 +8,15 @@ working for one release cycle. Import from
 ``display_patterns.charts.conversion`` instead.
 """
 
-import warnings
-
 from display_patterns.charts.conversion import (
     apply_chromatic_adaptation,
     rgb_to_xyz,
     xyz_to_display_rgb,
 )
 
-warnings.warn(
-    "bmd_sg.charts.conversion is deprecated; "
-    "import display_patterns.charts.conversion instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "apply_chromatic_adaptation",

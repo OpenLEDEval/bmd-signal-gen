@@ -8,8 +8,6 @@ keep working for one release cycle. Import from
 ``display_patterns.image_generators.checkerboard`` instead.
 """
 
-import warnings
-
 from display_patterns.image_generators.checkerboard import (
     DEFAULT_PATTERN_BUFFER,
     DEFAULT_PATTERN_GENERATOR,
@@ -18,12 +16,9 @@ from display_patterns.image_generators.checkerboard import (
     PatternGenerator,
 )
 
-warnings.warn(
-    "bmd_sg.image_generators.checkerboard is deprecated; "
-    "import display_patterns.image_generators.checkerboard instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "DEFAULT_PATTERN_BUFFER",

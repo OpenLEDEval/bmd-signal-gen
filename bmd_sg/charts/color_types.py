@@ -8,8 +8,6 @@ working for one release cycle. Import from
 ``display_patterns.charts.color_types`` instead.
 """
 
-import warnings
-
 from display_patterns.charts.color_types import (
     AnnotationLayout,
     AnnotationStripe,
@@ -25,12 +23,9 @@ from display_patterns.charts.color_types import (
     TransferFunction,
 )
 
-warnings.warn(
-    "bmd_sg.charts.color_types is deprecated; "
-    "import display_patterns.charts.color_types instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "AnnotationLayout",

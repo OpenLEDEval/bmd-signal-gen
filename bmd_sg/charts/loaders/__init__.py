@@ -8,16 +8,11 @@ for one release cycle. Import from ``display_patterns.charts.loaders``
 instead.
 """
 
-import warnings
-
 from display_patterns.charts.loaders import load_chart
 
-warnings.warn(
-    "bmd_sg.charts.loaders is deprecated; "
-    "import display_patterns.charts.loaders instead",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from bmd_sg.utilities import warn_moved
+
+warn_moved(__name__)
 
 __all__ = [
     "load_chart",
