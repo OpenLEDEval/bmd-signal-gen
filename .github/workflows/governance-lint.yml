@@ -1,0 +1,11 @@
+name: Governance Lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    uses: repentsinner/symphonize/.github/workflows/governance-lint.yml@notation--v0
+    with:
+      readme-type: "application"
