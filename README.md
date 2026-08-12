@@ -7,7 +7,7 @@
 > authors primarily develop on macOS but have made their best effort to make the
 > software cross-platform. If you encounter issues or have questions, please
 > start a
-> [GitHub Discussion](https://github.com/OpenLEDEval/bmd-signal-gen/discussions).
+> [GitHub Discussion](https://github.com/OpenDisplayEval/bmd-signal-gen/discussions).
 
 A cross-platform BMD signal generator for Blackmagic Design DeckLink devices
 that outputs test patterns with comprehensive HDR metadata support. This project
@@ -54,7 +54,7 @@ both capable of full 12-bit RGB output at 1080p30.
 DeckLink access comes from
 [pydecklink](https://github.com/Fuse-Technical-Group/pydecklink), installed
 from PyPI. Pattern and chart math comes from
-[display-patterns](https://github.com/OpenLEDEval/display-patterns),
+[display-patterns](https://github.com/OpenDisplayEval/display-patterns),
 installed from git. No SDK download or C++ toolchain is required.
 
 ### Installation

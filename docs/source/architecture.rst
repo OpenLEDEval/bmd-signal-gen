@@ -82,7 +82,7 @@ Pattern Generation (display-patterns)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Pattern and chart generation moved to the
-`display-patterns <https://github.com/OpenLEDEval/display-patterns>`_
+`display-patterns <https://github.com/OpenDisplayEval/display-patterns>`_
 package (see SPEC §spec:pattern-library). ``bmd_sg.image_generators``
 and ``bmd_sg.charts`` remain as deprecation shims for one release
 cycle.

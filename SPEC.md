@@ -84,13 +84,13 @@ to every frame it builds. Callers keep the simpler device-level model.
 
 `bmd_sg/image_generators/` and `bmd_sg/charts/` imported nothing from the
 device layer: a generic pattern/chart library carried inside a DeckLink
-tool. Other OpenLEDEval tools could not consume the math without DeckLink
+tool. Other OpenDisplayEval tools could not consume the math without DeckLink
 baggage.
 
 ### Split
 
 The modules and their tests moved verbatim to
-[display-patterns](https://github.com/OpenLEDEval/display-patterns)
+[display-patterns](https://github.com/OpenDisplayEval/display-patterns)
 (import package `display_patterns`): `bmd_sg/image_generators/` →
 `display_patterns.image_generators`, `bmd_sg/charts/` →
 `display_patterns.charts`. The package is a numpy-only core taking a

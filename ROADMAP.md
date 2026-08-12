@@ -6,7 +6,7 @@ New work enters at the tail; completed work is deleted.
 ## Pattern library extraction §road:pattern-library
 
 The pattern/chart modules moved to
-[display-patterns](https://github.com/OpenLEDEval/display-patterns)
+[display-patterns](https://github.com/OpenDisplayEval/display-patterns)
 v0.1.0 — extraction spine complete; PyPI publishing is deferred and
 tracked in display-patterns' own roadmap (`§road:first-release` there).
 bmd-signal-gen consumes the package from git and keeps the legacy

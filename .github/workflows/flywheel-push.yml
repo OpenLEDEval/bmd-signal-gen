@@ -9,7 +9,7 @@ jobs:
   release:
     # Skips cleanly when the flywheel GitHub App credentials are absent
     # (vars.FLYWHEEL_GH_APP_ID, secrets.FLYWHEEL_GH_APP_PRIVATE_KEY are
-    # org-level on OpenLEDEval).
+    # org-level on OpenDisplayEval).
     if: vars.FLYWHEEL_GH_APP_ID != ''
     runs-on: ubuntu-latest
     steps:

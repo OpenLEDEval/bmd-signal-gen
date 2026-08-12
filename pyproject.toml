@@ -58,17 +58,17 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OpenLEDEval/bmd-signal-gen"
-Repository = "https://github.com/OpenLEDEval/bmd-signal-gen.git"
+Homepage = "https://github.com/OpenDisplayEval/bmd-signal-gen"
+Repository = "https://github.com/OpenDisplayEval/bmd-signal-gen.git"
 Documentation = "https://bmd-signal-gen.readthedocs.io/"
-Issues = "https://github.com/OpenLEDEval/bmd-signal-gen/issues"
-Changelog = "https://github.com/OpenLEDEval/bmd-signal-gen/blob/main/CHANGELOG.md"
+Issues = "https://github.com/OpenDisplayEval/bmd-signal-gen/issues"
+Changelog = "https://github.com/OpenDisplayEval/bmd-signal-gen/blob/main/CHANGELOG.md"
 
 [project.scripts]
 bmd-signal-gen = "bmd_sg.cli.main:app"
 
 [tool.uv.sources]
-display-patterns = { git = "https://github.com/OpenLEDEval/display-patterns", tag = "v0.2.0" }
+display-patterns = { git = "https://github.com/OpenDisplayEval/display-patterns", tag = "v0.2.0" }
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
