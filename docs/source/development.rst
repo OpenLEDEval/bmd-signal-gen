@@ -8,7 +8,7 @@ Development Setup
 
 1. **Clone the Repository**::
 
-    git clone https://github.com/OpenLEDEval/bmd-signal-gen.git
+    git clone https://github.com/OpenDisplayEval/bmd-signal-gen.git
     cd bmd-signal-gen
 
 2. **Install Dependencies**::
@@ -241,7 +241,7 @@ Getting Help
 
 **Resources:**
   * Project documentation at https://bmd-signal-gen.readthedocs.io/
-  * Issue tracker at https://github.com/OpenLEDEval/bmd-signal-gen/issues
+  * Issue tracker at https://github.com/OpenDisplayEval/bmd-signal-gen/issues
   * DeckLink SDK documentation from Blackmagic Design
 
 **Before Asking:**

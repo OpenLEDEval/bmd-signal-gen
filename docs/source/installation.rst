@@ -54,7 +54,7 @@ Install from PyPI (when available)::
 
 Install from source::
 
-    git clone https://github.com/OpenLEDEval/bmd-signal-gen.git
+    git clone https://github.com/OpenDisplayEval/bmd-signal-gen.git
     cd bmd-signal-gen
     pip install uv
     uv sync
@@ -65,7 +65,7 @@ Development Installation
 
 For development work::
 
-    git clone https://github.com/OpenLEDEval/bmd-signal-gen.git
+    git clone https://github.com/OpenDisplayEval/bmd-signal-gen.git
     cd bmd-signal-gen
     pip install uv
     uv sync --group dev --group docs
